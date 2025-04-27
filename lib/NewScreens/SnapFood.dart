@@ -656,21 +656,50 @@ class _SnapFoodState extends State<SnapFood> {
           // Get combined calories as string
           String combinedCalories = totalCalories.toString();
 
-          // For simplicity, use first item's macros (or implement combined calculation if needed)
-          String combinedProtein = "0";
-          String combinedFat = "0";
-          String combinedCarbs = "0";
-          if (mealItems[0].containsKey('macronutrients') &&
-              mealItems[0]['macronutrients'] is Map) {
-            var macros = mealItems[0]['macronutrients'];
-            combinedProtein = macros['protein']?.toString() ?? "0";
-            combinedFat = macros['fat']?.toString() ?? "0";
-            combinedCarbs = macros['carbohydrates']?.toString() ?? "0";
+          // Sum up all macros from all items
+          double totalProtein = 0;
+          double totalFat = 0;
+          double totalCarbs = 0;
+
+          // Process each meal item
+          for (var mealItem in mealItems) {
+            if (mealItem.containsKey('macronutrients') &&
+                mealItem['macronutrients'] is Map) {
+              var macros = mealItem['macronutrients'];
+
+              // Add protein
+              if (macros.containsKey('protein')) {
+                totalProtein +=
+                    _extractDecimalValue(macros['protein'].toString());
+              }
+
+              // Add fat
+              if (macros.containsKey('fat')) {
+                totalFat += _extractDecimalValue(macros['fat'].toString());
+              }
+
+              // Add carbs
+              if (macros.containsKey('carbohydrates')) {
+                totalCarbs +=
+                    _extractDecimalValue(macros['carbohydrates'].toString());
+              }
+            }
           }
+
+          // Convert the summed macros to strings
+          String combinedProtein = totalProtein.toString();
+          String combinedFat = totalFat.toString();
+          String combinedCarbs = totalCarbs.toString();
 
           // Get all ingredients combined
           String combinedIngredients =
               allIngredientsList.map((ing) => ing['name']).toSet().join(", ");
+
+          // Print the combined macros for verification
+          print("\nCOMBINED MACROS:");
+          print("Total Protein: ${totalProtein.toStringAsFixed(1)}g");
+          print("Total Fat: ${totalFat.toStringAsFixed(1)}g");
+          print("Total Carbs: ${totalCarbs.toStringAsFixed(1)}g");
 
           _saveFoodCardData(combinedName, combinedIngredients, combinedCalories,
               combinedProtein, combinedFat, combinedCarbs, allIngredientsList);
