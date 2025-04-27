@@ -519,92 +519,173 @@ class _SnapFoodState extends State<SnapFood> {
 
   void _displayAnalysisResults(Map<String, dynamic> analysisData) {
     try {
-      // Format the data for console output
-      String foodName = "";
-      String ingredients = "";
-      String calories = "0";
-      String protein = "0";
-      String fat = "0";
-      String carbs = "0";
-      String vitaminC = "0";
-      List<Map<String, dynamic>> ingredientsList = [];
+      print("\n----- FOOD ANALYSIS RESULTS -----");
 
       // Check for meal format (new API response format)
       if (analysisData.containsKey('meal') &&
           analysisData['meal'] is List &&
           analysisData['meal'].isNotEmpty) {
-        var meal = analysisData['meal'][0];
+        // Process all items in the meal array, not just the first one
+        List<dynamic> mealItems = analysisData['meal'];
+        int totalCalories = 0;
+        List<Map<String, dynamic>> allIngredientsList = [];
 
-        // Extract food name
-        if (meal.containsKey('dish')) {
-          foodName = meal['dish']?.toString() ?? "";
-        }
+        // Display each food item separately
+        for (int i = 0; i < mealItems.length; i++) {
+          var meal = mealItems[i];
 
-        // Extract ingredients with estimated amounts
-        if (meal.containsKey('ingredients') && meal['ingredients'] is List) {
-          final List<dynamic> rawIngredients = meal['ingredients'];
-          for (var ing in rawIngredients) {
-            String name = ing.toString();
-            String amount = ""; // Default empty amount
-            int estCalories = 0;
+          // Format the data for console output
+          String foodName = "";
+          String ingredients = "";
+          String calories = "0";
+          String protein = "0";
+          String fat = "0";
+          String carbs = "0";
+          String vitaminC = "0";
+          List<Map<String, dynamic>> ingredientsList = [];
 
-            // Try to estimate amount and calories for common ingredients
-            if (name.toLowerCase().contains("pasta") ||
-                name.toLowerCase().contains("rigatoni")) {
-              amount = "90g";
-              estCalories = 320;
-            } else if (name.toLowerCase().contains("cheese") ||
-                name.toLowerCase().contains("parmesan")) {
-              amount = "20g";
-              estCalories = 80;
-            } else if (name.toLowerCase().contains("cream") ||
-                name.toLowerCase().contains("sauce")) {
-              amount = "60ml";
-              estCalories = 150;
-            } else if (name.toLowerCase().contains("oil") ||
-                name.toLowerCase().contains("olive")) {
-              amount = "15ml";
-              estCalories = 120;
-            } else if (name.toLowerCase().contains("herb") ||
-                name.toLowerCase().contains("basil")) {
-              amount = "5g";
-              estCalories = 5;
-            }
-
-            ingredientsList
-                .add({'name': name, 'amount': amount, 'calories': estCalories});
+          // Extract food name
+          if (meal.containsKey('dish')) {
+            foodName = meal['dish']?.toString() ?? "";
           }
 
-          // Join ingredients with estimated amounts
-          ingredients = ingredientsList.map((ing) {
-            if (ing['amount'].toString().isNotEmpty) {
-              return "${ing['name']} (${ing['amount']}; ${ing['calories']}kcal)";
-            } else {
-              return ing['name'];
+          // Extract ingredients with estimated amounts
+          if (meal.containsKey('ingredients') && meal['ingredients'] is List) {
+            final List<dynamic> rawIngredients = meal['ingredients'];
+            for (var ing in rawIngredients) {
+              String name = ing.toString();
+              String amount = ""; // Default empty amount
+              int estCalories = 0;
+
+              // Try to estimate amount and calories for common ingredients
+              if (name.toLowerCase().contains("pasta") ||
+                  name.toLowerCase().contains("rigatoni")) {
+                amount = "90g";
+                estCalories = 320;
+              } else if (name.toLowerCase().contains("cheese") ||
+                  name.toLowerCase().contains("parmesan")) {
+                amount = "20g";
+                estCalories = 80;
+              } else if (name.toLowerCase().contains("cream") ||
+                  name.toLowerCase().contains("sauce")) {
+                amount = "60ml";
+                estCalories = 150;
+              } else if (name.toLowerCase().contains("oil") ||
+                  name.toLowerCase().contains("olive")) {
+                amount = "15ml";
+                estCalories = 120;
+              } else if (name.toLowerCase().contains("herb") ||
+                  name.toLowerCase().contains("basil")) {
+                amount = "5g";
+                estCalories = 5;
+              } else if (name.toLowerCase().contains("sausage") ||
+                  name.toLowerCase().contains("salami")) {
+                amount = "30g";
+                estCalories = 100;
+              } else if (name.toLowerCase().contains("bread") ||
+                  name.toLowerCase().contains("toast")) {
+                amount = "40g";
+                estCalories = 120;
+              } else if (name.toLowerCase().contains("salad") ||
+                  name.toLowerCase().contains("vegetable")) {
+                amount = "50g";
+                estCalories = 25;
+              }
+
+              ingredientsList.add(
+                  {'name': name, 'amount': amount, 'calories': estCalories});
             }
-          }).join(", ");
+
+            // Keep track of all ingredients for saving
+            allIngredientsList.addAll(ingredientsList);
+
+            // Join ingredients with estimated amounts
+            ingredients = ingredientsList.map((ing) {
+              if (ing['amount'].toString().isNotEmpty) {
+                return "${ing['name']} (${ing['amount']}; ${ing['calories']}kcal)";
+              } else {
+                return ing['name'];
+              }
+            }).join(", ");
+          }
+
+          // Extract calories
+          if (meal.containsKey('calories')) {
+            calories = meal['calories']?.toString() ?? "0";
+            totalCalories += _extractNumericValueAsInt(calories);
+          }
+
+          // Extract macronutrients
+          if (meal.containsKey('macronutrients') &&
+              meal['macronutrients'] is Map) {
+            var macros = meal['macronutrients'];
+            protein = macros['protein']?.toString() ?? "0";
+            fat = macros['fat']?.toString() ?? "0";
+            carbs = macros['carbohydrates']?.toString() ?? "0";
+          }
+
+          // Look for vitamin C in any available field
+          if (meal.containsKey('vitamins') && meal['vitamins'] is Map) {
+            vitaminC = meal['vitamins']['C']?.toString() ?? "0";
+          }
+
+          // Print each item individually
+          print("Food item ${i + 1}: $foodName");
+          print("Ingredients: $ingredients");
+          print("Calories: ${_extractNumericValue(calories)}kcal");
+          print("Protein: ${_extractNumericValue(protein)}g");
+          print("Fat: ${_extractNumericValue(fat)}g");
+          print("Carbs: ${_extractNumericValue(carbs)}g");
+          print("Vitamin C: ${_extractNumericValue(vitaminC)}mg");
+          print("---");
         }
 
-        // Extract calories
-        if (meal.containsKey('calories')) {
-          calories = meal['calories']?.toString() ?? "0";
-        }
+        // Print total calories from all items
+        print("TOTAL CALORIES: ${totalCalories}kcal");
+        print("---------------------------------\n");
 
-        // Extract macronutrients
-        if (meal.containsKey('macronutrients') &&
-            meal['macronutrients'] is Map) {
-          var macros = meal['macronutrients'];
-          protein = macros['protein']?.toString() ?? "0";
-          fat = macros['fat']?.toString() ?? "0";
-          carbs = macros['carbohydrates']?.toString() ?? "0";
-        }
+        // Save combined data to shared preferences
+        if (mealItems.isNotEmpty) {
+          // For saving, we'll use the first item's name but indicate it contains multiple items
+          String combinedName =
+              mealItems[0]['dish']?.toString() ?? "Analyzed Meal";
+          if (mealItems.length > 1) {
+            combinedName += " and ${mealItems.length - 1} other items";
+          }
 
-        // Look for vitamin C in any available field
-        if (meal.containsKey('vitamins') && meal['vitamins'] is Map) {
-          vitaminC = meal['vitamins']['C']?.toString() ?? "0";
+          // Get combined calories as string
+          String combinedCalories = totalCalories.toString();
+
+          // For simplicity, use first item's macros (or implement combined calculation if needed)
+          String combinedProtein = "0";
+          String combinedFat = "0";
+          String combinedCarbs = "0";
+          if (mealItems[0].containsKey('macronutrients') &&
+              mealItems[0]['macronutrients'] is Map) {
+            var macros = mealItems[0]['macronutrients'];
+            combinedProtein = macros['protein']?.toString() ?? "0";
+            combinedFat = macros['fat']?.toString() ?? "0";
+            combinedCarbs = macros['carbohydrates']?.toString() ?? "0";
+          }
+
+          // Get all ingredients combined
+          String combinedIngredients =
+              allIngredientsList.map((ing) => ing['name']).toSet().join(", ");
+
+          _saveFoodCardData(combinedName, combinedIngredients, combinedCalories,
+              combinedProtein, combinedFat, combinedCarbs, allIngredientsList);
         }
       } else {
-        // Try alternative formats
+        // Try alternative formats (same as before)
+        // Format the data for console output
+        String foodName = "";
+        String ingredients = "";
+        String calories = "0";
+        String protein = "0";
+        String fat = "0";
+        String carbs = "0";
+        String vitaminC = "0";
+        List<Map<String, dynamic>> ingredientsList = [];
 
         // Food name
         if (analysisData.containsKey('dish')) {
@@ -686,18 +767,21 @@ class _SnapFoodState extends State<SnapFood> {
             analysisData['vitamins'] is Map) {
           vitaminC = analysisData['vitamins']['C']?.toString() ?? "0";
         }
-      }
 
-      // Print results to terminal in specified format with units
-      print("\n----- FOOD ANALYSIS RESULTS -----");
-      print("Food name: $foodName");
-      print("Ingredients: $ingredients");
-      print("Calories: ${_extractNumericValue(calories)}kcal");
-      print("Protein: ${_extractNumericValue(protein)}g");
-      print("Fat: ${_extractNumericValue(fat)}g");
-      print("Carbs: ${_extractNumericValue(carbs)}g");
-      print("Vitamin C: ${_extractNumericValue(vitaminC)}mg");
-      print("---------------------------------\n");
+        // Print results to terminal in specified format with units
+        print("Food name: $foodName");
+        print("Ingredients: $ingredients");
+        print("Calories: ${_extractNumericValue(calories)}kcal");
+        print("Protein: ${_extractNumericValue(protein)}g");
+        print("Fat: ${_extractNumericValue(fat)}g");
+        print("Carbs: ${_extractNumericValue(carbs)}g");
+        print("Vitamin C: ${_extractNumericValue(vitaminC)}mg");
+        print("---------------------------------\n");
+
+        // Save the food card to SharedPreferences for the Recent Activity section
+        _saveFoodCardData(foodName, ingredients, calories, protein, fat, carbs,
+            ingredientsList);
+      }
 
       // We don't need to store or display the formatted text anymore
       setState(() {
@@ -705,10 +789,6 @@ class _SnapFoodState extends State<SnapFood> {
         _analysisResult = analysisData;
         _formattedAnalysisResult = null;
       });
-
-      // Save the food card to SharedPreferences for the Recent Activity section
-      _saveFoodCardData(foodName, ingredients, calories, protein, fat, carbs,
-          ingredientsList);
     } catch (e) {
       print("Error formatting analysis results: $e");
 
