@@ -119,7 +119,7 @@ app.post('/api/analyze-food', limiter, async (req, res) => {
         !data.choices[0] || 
         !data.choices[0].message || 
         !data.choices[0].message.content) {
-      console.error('Invalid response format from OpenAI');
+      console.error('Invalid response format from OpenAI:', JSON.stringify(data));
       return res.status(500).json({
         success: false,
         error: 'Invalid response from OpenAI'
@@ -127,7 +127,7 @@ app.post('/api/analyze-food', limiter, async (req, res) => {
     }
 
     const content = data.choices[0].message.content;
-    console.log('OpenAI API response content received');
+    console.log('OpenAI API response content:', content.substring(0, 100) + '...');
     
     // Process and parse the response
     try {
@@ -154,7 +154,7 @@ app.post('/api/analyze-food', limiter, async (req, res) => {
             data: parsedData
           });
         } catch (err) {
-          console.error('JSON extraction failed');
+          console.error('JSON extraction failed:', err);
           // Return the raw text if JSON parsing fails
           return res.json({
             success: true,
