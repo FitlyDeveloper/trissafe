@@ -540,8 +540,9 @@ class _SnapFoodState extends State<SnapFood> {
             _extractDecimalValue(analysisData['vitamin_c']?.toString() ?? "0");
         String healthScore = analysisData['health_score']?.toString() ?? "5/10";
 
-        // Display in the format the user wants
-        print("Food item 1: $mealName");
+        // Display in the format the user wants - with the exact format requested, NO "Food item 1:" prefix
+        print("\n----- FOOD ANALYSIS RESULTS -----");
+        print("$mealName");
         String ingredientsText = ingredients.isNotEmpty
             ? ingredients.join(", ")
             : "Mixed ingredients";
@@ -551,12 +552,9 @@ class _SnapFoodState extends State<SnapFood> {
         print("Fat: ${fat.toInt()}g");
         print("Carbs: ${carbs.toInt()}g");
         print("Vitamin C: ${vitaminC.toInt()}mg");
-        print("---");
+        print("Health Score: $healthScore");
         print("TOTAL CALORIES: ${calories.toInt()}kcal");
         print("---------------------------------\n");
-
-        // For health score display
-        print("Health Score: $healthScore");
 
         // Save the data
         List<Map<String, dynamic>> ingredientsList = [];
