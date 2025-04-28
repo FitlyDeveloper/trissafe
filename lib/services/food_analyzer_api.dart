@@ -17,6 +17,8 @@ class FoodAnalyzerApi {
       final String base64Image = base64Encode(imageBytes);
       final String dataUri = 'data:image/jpeg;base64,$base64Image';
 
+      print('Calling API endpoint: $baseUrl$analyzeEndpoint');
+
       // Call our secure API endpoint
       final response = await http
           .post(
@@ -40,6 +42,12 @@ class FoodAnalyzerApi {
       // Check for API-level errors
       if (responseData['success'] != true) {
         throw Exception('API error: ${responseData['error']}');
+      }
+
+      // If we got here, confirm that we received the expected format
+      print('API response format: ${responseData['data'] is Map ? 'Map' : 'Other type'}');
+      if (responseData['data'] is Map) {
+        print('Keys in data: ${(responseData['data'] as Map).keys.join(', ')}');
       }
 
       // Return the data
