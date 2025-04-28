@@ -1,9 +1,11 @@
-// Simple API server for food analysis
+// Import required packages
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const fetch = require('node-fetch');
 
+// Create Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -13,19 +15,26 @@ console.log('Node environment:', process.env.NODE_ENV);
 console.log('Current directory:', process.cwd());
 console.log('OpenAI API Key present:', process.env.OPENAI_API_KEY ? 'Yes' : 'No');
 
+// Configure rate limiting
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: process.env.RATE_LIMIT || 30, // Limit each IP to 30 requests per minute
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: {
+    status: 429,
+    message: 'Too many requests, please try again later.'
+  }
+});
+
 // Configure CORS
-app.use(cors({
-  origin: '*',
-  methods: ['POST', 'GET'],
-  credentials: true
-}));
+app.use(cors());
 
 // Body parser middleware
 app.use(express.json({ limit: '10mb' }));
 
 // Define routes
 app.get('/', (req, res) => {
-  console.log('Health check endpoint called');
   res.json({
     message: 'Food Analyzer API Server',
     status: 'operational'
@@ -33,19 +42,9 @@ app.get('/', (req, res) => {
 });
 
 // OpenAI proxy endpoint for food analysis
-app.post('/api/analyze-food', async (req, res) => {
+app.post('/api/analyze-food', limiter, async (req, res) => {
   try {
     console.log('Analyze food endpoint called');
-    
-    // Check API key
-    if (!process.env.OPENAI_API_KEY) {
-      console.error('OpenAI API key not configured');
-      return res.status(500).json({
-        success: false,
-        error: 'Server configuration error: OpenAI API key not set'
-      });
-    }
-    
     const { image } = req.body;
 
     if (!image) {
@@ -56,20 +55,18 @@ app.post('/api/analyze-food', async (req, res) => {
       });
     }
 
-    // Check image size (4MB limit)
-    // For data URLs, the content is approximately 4/3 of the decoded size
-    // So a 4MB image will be around 5.33MB in base64
-    const MAX_SIZE = 4 * 1024 * 1024 * 1.4; // 4MB with encoding overhead
-    if (image.length > MAX_SIZE) {
-      console.error('Image too large:', Math.round(image.length/1024/1024), 'MB');
-      return res.status(413).json({
-        success: false,
-        error: 'Image too large. Maximum size is 4MB.'
-      });
-    }
-
     // Debug logging
     console.log('Received image data, length:', image.length);
+    console.log('Image data starts with:', image.substring(0, 50));
+
+    // Check for API key
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('OpenAI API key not configured');
+      return res.status(500).json({
+        success: false,
+        error: 'Server configuration error: OpenAI API key not set'
+      });
+    }
 
     // Call OpenAI API
     console.log('Calling OpenAI API...');
@@ -81,17 +78,18 @@ app.post('/api/analyze-food', async (req, res) => {
       },
       body: JSON.stringify({
         model: 'gpt-4o',
+        temperature: 0.2,
         messages: [
           {
             role: 'system',
-            content: 'You are a professional nutritionist who analyzes food images with extreme accuracy. Provide precise nutritional information with the following guidelines:\n\n1. Use exact, scientifically accurate measurements\n2. Include 1-2 decimal places when appropriate for precision\n3. Do not artificially avoid any specific numbers - use whatever values are most accurate\n4. Base your analysis on visual assessment of portion sizes, ingredients, and food composition\n\nRespond in JSON format with precise measurements:\n{"meal":[{"dish":"Name","calories":542.76,"macronutrients":{"protein":27.3,"carbohydrates":65.8,"fat":23.2},"ingredients":["item1","item2"]}]}'
+            content: '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name for the entire image (e.g., "Pasta Meal", "Breakfast Plate")\n2. List ingredients with weights and calories (e.g., "Pasta (100g) 200kcal")\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. Use decimal places and realistic estimates\n6. DO NOT respond with markdown code blocks or text explanations\n7. DO NOT prefix your response with "json" or ```\n8. ONLY RETURN A RAW JSON OBJECT\n9. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: "Analyze this food with precision. Provide exact nutritional information based on what you can see in the image. Include appropriate decimal places when it adds meaningful precision, but don't add arbitrary decimals. Your analysis should reflect the true nutritional content as accurately as possible."
+                text: "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string (single name for entire meal),\n  \"ingredients\": array of strings with weights and calories,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}"
               },
               {
                 type: 'image_url',
@@ -100,7 +98,8 @@ app.post('/api/analyze-food', async (req, res) => {
             ]
           }
         ],
-        max_tokens: 1000
+        max_tokens: 1000,
+        response_format: { type: 'json_object' }
       })
     });
 
