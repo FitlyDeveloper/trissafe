@@ -32,6 +32,9 @@ import 'image_compress.dart';
 // Add import for our secure API service
 import '../services/food_analyzer_api.dart';
 
+// Import FoodCardOpen for navigation after analysis
+import 'FoodCardOpen.dart';
+
 class SnapFood extends StatefulWidget {
   const SnapFood({super.key});
 
@@ -521,7 +524,86 @@ class _SnapFoodState extends State<SnapFood> {
     try {
       print("\n----- FOOD ANALYSIS RESULTS -----");
 
-      // Check for meal format (new API response format)
+      // NEW FORMAT: First check for the meal_name format which is our target
+      if (analysisData.containsKey('meal_name')) {
+        String mealName = analysisData['meal_name'];
+        List<dynamic> ingredients = analysisData['ingredients'] ?? [];
+        double calories =
+            _extractDecimalValue(analysisData['calories']?.toString() ?? "0");
+        double protein =
+            _extractDecimalValue(analysisData['protein']?.toString() ?? "0");
+        double fat =
+            _extractDecimalValue(analysisData['fat']?.toString() ?? "0");
+        double carbs =
+            _extractDecimalValue(analysisData['carbs']?.toString() ?? "0");
+        double vitaminC =
+            _extractDecimalValue(analysisData['vitamin_c']?.toString() ?? "0");
+        String healthScore = analysisData['health_score']?.toString() ?? "5/10";
+
+        // Display in the format the user wants
+        print("Food item 1: $mealName");
+        String ingredientsText = ingredients.isNotEmpty
+            ? ingredients.join(", ")
+            : "Mixed ingredients";
+        print("Ingredients: $ingredientsText");
+        print("Calories: ${calories.toInt()}kcal");
+        print("Protein: ${protein.toInt()}g");
+        print("Fat: ${fat.toInt()}g");
+        print("Carbs: ${carbs.toInt()}g");
+        print("Vitamin C: ${vitaminC.toInt()}mg");
+        print("---");
+        print("TOTAL CALORIES: ${calories.toInt()}kcal");
+        print("---------------------------------\n");
+
+        // For health score display
+        print("Health Score: $healthScore");
+
+        // Save the data
+        List<Map<String, dynamic>> ingredientsList = [];
+        for (var ing in ingredients) {
+          String name = ing.toString();
+          // Extract weight and calories if available
+          final regex = RegExp(r'(.*?)\s*\((.*?)\)\s*(\d+)kcal');
+          final match = regex.firstMatch(name);
+          if (match != null) {
+            String ingredientName = match.group(1)?.trim() ?? name;
+            String weight = match.group(2) ?? "30g";
+            int kcal = int.tryParse(match.group(3) ?? "75") ?? 75;
+            ingredientsList.add({
+              'name': ingredientName,
+              'amount': weight,
+              'calories': kcal,
+            });
+          } else {
+            // Default values if no match
+            ingredientsList.add({
+              'name': name,
+              'amount': "30g",
+              'calories': 75,
+            });
+          }
+        }
+
+        // Save the food card
+        _saveFoodCardData(
+            mealName,
+            ingredientsText,
+            calories.toString(),
+            protein.toString(),
+            fat.toString(),
+            carbs.toString(),
+            ingredientsList);
+
+        // Set the analysis result for the UI
+        setState(() {
+          _analysisResult = analysisData;
+          _formattedAnalysisResult = null;
+        });
+
+        return; // Exit early as we've handled the new format
+      }
+
+      // OLD FORMAT CHECK: Check for meal format (API response format)
       if (analysisData.containsKey('meal') &&
           analysisData['meal'] is List &&
           analysisData['meal'].isNotEmpty) {
@@ -948,6 +1030,18 @@ class _SnapFoodState extends State<SnapFood> {
       // Save updated list
       await prefs.setStringList('food_cards', storedCards);
       print("Food card saved successfully");
+
+      // After saving, navigate to FoodCardOpen with the detected food name
+      if (mounted) {
+        Future.delayed(Duration(milliseconds: 1000), () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => FoodCardOpen(foodName: foodName),
+            ),
+          );
+        });
+      }
     } catch (e) {
       print("Error saving food card: $e");
     }
