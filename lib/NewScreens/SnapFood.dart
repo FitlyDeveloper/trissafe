@@ -524,7 +524,7 @@ class _SnapFoodState extends State<SnapFood> {
     try {
       print("\n----- FOOD ANALYSIS RESULTS -----");
 
-      // NEW FORMAT: First check for the meal_name format which is our target
+      // NEW FORMAT: First check for the meal_name format which is our desired format
       if (analysisData.containsKey('meal_name')) {
         String mealName = analysisData['meal_name'];
         List<dynamic> ingredients = analysisData['ingredients'] ?? [];
