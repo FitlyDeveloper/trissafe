@@ -911,7 +911,7 @@ class _CodiaPageState extends State<CodiaPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const FoodCardOpen(),
+              builder: (context) => FoodCardOpen(foodName: name),
             ),
           );
         },

@@ -30,7 +30,12 @@ class SlowScrollPhysics extends ScrollPhysics {
 }
 
 class FoodCardOpen extends StatefulWidget {
-  const FoodCardOpen({super.key});
+  final String? foodName;
+
+  const FoodCardOpen({
+    super.key,
+    this.foodName,
+  });
 
   @override
   State<FoodCardOpen> createState() => _FoodCardOpenState();
@@ -46,10 +51,13 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   late Animation<double> _bookmarkScaleAnimation;
   late AnimationController _likeController;
   late Animation<double> _likeScaleAnimation;
+  late String _foodName;
 
   @override
   void initState() {
     super.initState();
+    // Initialize food name with provided value or fallback
+    _foodName = widget.foodName ?? 'Delicious Cake';
 
     // Bookmark animations - simplified
     _bookmarkController = AnimationController(
@@ -379,7 +387,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Delicious Cake',
+                                      _foodName,
                                       style: TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.bold,
