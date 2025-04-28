@@ -106,14 +106,14 @@ app.post('/api/analyze-food', limiter, checkApiKey, async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: '[ULTRA PRECISE MEAL ANALYSIS] You are a nutrition expert analyzing food images. CRITICAL RULES:\n\n1. ALWAYS provide ONLY ONE meal name for the ENTIRE image, even if multiple separate foods are visible (e.g., "Pasta Carbonara with Side Salad" or "Continental Breakfast Plate" or "Afternoon Snack Plate").\n2. NEVER EVER use "Food item 1:", "Food item 2:", or any numbered food items in your response.\n3. The single meal name must be descriptive but concise (e.g., "Pasta Meal", "Breakfast Plate", "Salad with Protein").\n4. List ALL visible ingredients with weights and calories, e.g., "Pasta (100g) 200kcal".\n5. Return TOTAL values for calories, protein, fat, carbs, and vitamin C for the whole plate.\n6. Add a field: "Health score" (1-10, e.g., "7/10").\n7. ALL results must be as PRECISE as possible. Use decimal places and realistic estimates.\n8. NEVER round to 0 or 5, and never use .0 decimals.\n9. Output must be a single JSON object with a single meal_name field, not multiple dishes.\n10. Your response MUST BE ONLY RAW JSON - NO markdown, NO code blocks (```), NO backticks, NO explanations or additional text.\n\nEXAMPLE JSON OUTPUT (RESPOND EXACTLY LIKE THIS - ONLY JSON, NOTHING ELSE):\n{\n  "meal_name": "Continental Breakfast Plate",\n  "ingredients": [\n    "Bread (60g) 150kcal",\n    "Butter (10g) 72kcal",\n    "Cheese (30g) 120kcal",\n    "Salami (30g) 90kcal",\n    "Juice (200ml) 90kcal"\n  ],\n  "calories": 522.4,\n  "protein": 21.3,\n  "fat": 18.2,\n  "carbs": 31.7,\n  "vitamin_c": 1.7,\n  "health_score": "6/10"\n}'
+            content: '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name for the entire image (e.g., "Pasta Meal", "Breakfast Plate")\n2. List ingredients with weights and calories (e.g., "Pasta (100g) 200kcal")\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. Use decimal places and realistic estimates\n6. DO NOT respond with markdown code blocks or text explanations\n7. DO NOT prefix your response with "json" or ```\n8. ONLY RETURN A RAW JSON OBJECT\n9. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: "Analyze this food image and return ONLY RAW JSON with no explanations or formatting. Your response must be ONLY valid JSON that can be directly parsed - NO markdown, NO code blocks, NO text.\n\n1. Provide ONLY ONE SINGLE meal name for the ENTIRE image (e.g., 'Pasta Dish', 'Breakfast Plate', 'Afternoon Snack').\n2. NEVER use 'Food item 1:', 'Food item 2:' or any numbered food items - always treat the entire image as ONE meal.\n3. List ALL visible ingredients in the ingredients field, each with estimated weight and calories, e.g., 'Pasta (100g) 200kcal'.\n4. Return TOTAL values for calories, protein, fat, carbs, and vitamin C for everything visible in the image.\n5. Add a field: 'Health score' (1-10, e.g., '8/10').\n6. ALL results must be as PRECISE as possible. Use decimal places and realistic estimates.\n7. NEVER round to 0 or 5, and never use .0 decimals.\n8. Output must be a single JSON object with a single meal_name.\n9. Your response must be ONLY the raw JSON object - no code blocks, markdown, or explanations.\n\nRESPOND EXACTLY LIKE THIS EXAMPLE - RAW JSON ONLY:\n{\n  \"meal_name\": \"Continental Breakfast Plate\",\n  \"ingredients\": [\n    \"Bread (60g) 150kcal\",\n    \"Butter (10g) 72kcal\",\n    \"Cheese (30g) 120kcal\",\n    \"Salami (30g) 90kcal\",\n    \"Juice (200ml) 90kcal\"\n  ],\n  \"calories\": 522.4,\n  \"protein\": 21.3,\n  \"fat\": 18.2,\n  \"carbs\": 31.7,\n  \"vitamin_c\": 1.7,\n  \"health_score\": \"6/10\"\n}"
+                text: "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string (single name for entire meal),\n  \"ingredients\": array of strings with weights and calories,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}"
               },
               {
                 type: 'image_url',
@@ -122,7 +122,8 @@ app.post('/api/analyze-food', limiter, checkApiKey, async (req, res) => {
             ]
           }
         ],
-        max_tokens: 1000
+        max_tokens: 1000,
+        response_format: { type: 'json_object' }
       })
     });
 

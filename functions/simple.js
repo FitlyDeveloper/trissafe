@@ -14,18 +14,19 @@ async function analyzeFoodImageImpl(imageData, apiKey) {
       'messages': [
         {
           'role': 'system',
-          'content': '[ULTRA PRECISE MEAL ANALYSIS] You are a nutrition expert analyzing food images. CRITICAL INSTRUCTIONS:\n\n1. Return a single, context-aware meal name (e.g., "Pasta Carbonara", "Mixed Meal").\n2. List ALL visible ingredients with weights and calories, e.g., "Pasta (100g) 200kcal".\n3. Return TOTAL values for calories, protein, fat, carbs, and vitamin C for the whole plate.\n4. Add a field: "Health score" (1-10, e.g., "8/10").\n5. ALL results must be as PRECISE as possible with realistic estimates.\n6. NEVER round to 0 or 5, and never use .0 decimals.\n7. Output MUST BE ONLY RAW JSON - NO markdown, NO code blocks, NO explanations, NO ```json, NO backticks.\n8. The output should be a JSON object that can be directly parsed - NOTHING ELSE.\n\nJSON FORMAT EXAMPLE (RESPOND EXACTLY LIKE THIS - ONLY JSON, NOTHING ELSE):\n{\n  "meal_name": "Pasta Carbonara with Salad",\n  "ingredients": [\n    "Pasta (100g) 200kcal",\n    "Cheese (30g) 120kcal",\n    "Salad (45g) 35kcal",\n    "Olive Oil (10g) 90kcal"\n  ],\n  "calories": 445.4,\n  "protein": 21.3,\n  "fat": 18.2,\n  "carbs": 31.7,\n  "vitamin_c": 1.7,\n  "health_score": "7/10"\n}'
+          'content': '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name\n2. List ingredients with weights and calories\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. Use decimal places and realistic estimates\n6. DO NOT respond with markdown code blocks or text explanations\n7. DO NOT prefix your response with "json" or ```\n8. ONLY RETURN A RAW JSON OBJECT\n9. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
         },
         {
           'role': 'user',
           'content': [
-            { 'type': 'text', 'text': "Analyze this food image and return ONLY RAW JSON with no explanations or formatting. Your response must be ONLY valid JSON that can be directly parsed - NO markdown, NO code blocks, NO text.\n\n1. Return a single meal name for everything visible.\n2. List ALL ingredients with estimated weights and calories.\n3. Return TOTAL nutrition values for the whole plate.\n4. Be precise with realistic values.\n5. Output must be in this exact format:\n\n{\n  \"meal_name\": \"[SINGLE DESCRIPTIVE NAME]\",\n  \"ingredients\": [\n    \"[ITEM NAME] ([WEIGHT]g) [CALORIES]kcal\",\n    ...\n  ],\n  \"calories\": [TOTAL CALORIES],\n  \"protein\": [TOTAL PROTEIN],\n  \"fat\": [TOTAL FAT],\n  \"carbs\": [TOTAL CARBS],\n  \"vitamin_c\": [VITAMIN C IN MG],\n  \"health_score\": \"[SCORE]/10\"\n}" },
+            { 'type': 'text', 'text': "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string,\n  \"ingredients\": array of strings with weights and calories,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}" },
             { 'type': 'image_url', 'image_url': { 'url': imageData } }
           ]
         }
       ],
       'max_tokens': 1200,
-      'temperature': 0.2
+      'temperature': 0.2,
+      'response_format': { 'type': 'json_object' }
     })
   });
   
