@@ -1,8 +1,11 @@
 const functions = require('firebase-functions');
 const fetch = require('node-fetch');
 
-// Basic food image analyzer
-async function analyzeFoodImageImpl(imageData, apiKey) {
+// Helper for analyzing an food image using OpenAI API
+exports.analyzeFoodImageImpl = async (imageData, apiKey) => {
+  try {
+    console.log('Analyzing food image...');
+    
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -14,19 +17,19 @@ async function analyzeFoodImageImpl(imageData, apiKey) {
       'messages': [
         {
           'role': 'system',
-          'content': '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name\n2. List ingredients with weights and calories\n3. Return WHOLE NUMBER values for calories, protein, fat, carbs, vitamin C - NEVER include decimal points\n4. Calculate a health score (1-10) based ONLY on ingredient quality and nutritional value:\n\n   HEALTH SCORE CRITERIA:\n   • Positive indicators (+): Whole/unprocessed foods (vegetables, legumes, whole grains, lean meats), healthy fats (olive oil, avocado), high fiber or micronutrient-dense foods (spinach, lentils, salmon)\n   • Negative indicators (-): Highly processed or fried ingredients, high added sugars (syrups, sweetened sauces), high saturated fats (butter, cream, fatty meats), excess sodium (salty sauces, processed meats)\n   • Score meaning: 9-10 (Very healthy), 7-8 (Healthy), 5-6 (Moderate), 3-4 (Unhealthy), 1-2 (Very unhealthy)\n\n5. Use REALISTIC and PRECISE estimates - DO NOT round macronutrient values\n6. DO NOT respond with markdown code blocks or text explanations\n7. DO NOT prefix your response with "json" or ```\n8. ONLY RETURN A RAW JSON OBJECT\n9. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "calories": integer,\n  "protein": integer,\n  "fat": integer,\n  "carbs": integer,\n  "vitamin_c": integer,\n  "health_score": "score/10"\n}'
+            'content': '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name for the entire image (e.g., "Pasta Meal", "Breakfast Plate") WITHOUT "Name:" prefix\n2. List ingredients with weights and calories (e.g., "Pasta (100g) 200kcal")\n3. Return VALUES THAT ARE AS EXACT AND DIVERSE AS POSSIBLE - DO NOT ROUND TO COMMON NUMBERS:\n   • Use EXACT integers with natural distribution (all last digits 0-9 should occur naturally)\n   • Ensure digits 1 and 7 appear in values with the same frequency as other digits\n   • Never round values to nice numbers like 15, 20, 25, etc.\n   • For example, return values like 237, 31, 17, 142 instead of 240, 30, 15, 140\n4. Calculate a health score (1-10) based ONLY on ingredient quality and nutritional value:\n\n   HEALTH SCORE CRITERIA:\n   • Positive indicators (+): Whole/unprocessed foods (vegetables, legumes, whole grains, lean meats), healthy fats (olive oil, avocado), high fiber or micronutrient-dense foods (spinach, lentils, salmon)\n   • Negative indicators (-): Highly processed or fried ingredients, high added sugars (syrups, sweetened sauces), high saturated fats (butter, cream, fatty meats), excess sodium (salty sauces, processed meats)\n   • Score meaning: 9-10 (Very healthy), 7-8 (Healthy), 5-6 (Moderate), 3-4 (Unhealthy), 1-2 (Very unhealthy)\n\n5. Use REALISTIC and PRECISE estimates - NEVER round macronutrient values to "nice" numbers\n6. DO NOT respond with markdown code blocks or text explanations\n7. DO NOT prefix your response with "json" or ```\n8. ONLY RETURN A RAW JSON OBJECT\n9. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "calories": integer,\n  "protein": integer,\n  "fat": integer,\n  "carbs": integer,\n  "vitamin_c": integer,\n  "health_score": "score/10"\n}'
         },
         {
           'role': 'user',
           'content': [
-            { 'type': 'text', 'text': "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string,\n  \"ingredients\": array of strings with weights and calories,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}" },
+              { 'type': 'text', 'text': "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data with PRECISE NATURAL VALUES (not rounded) in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string (single name for entire meal, NO \"Name:\" prefix),\n  \"ingredients\": array of strings with weights and calories,\n  \"calories\": precise integer (not rounded to multiples of 5 or 10),\n  \"protein\": precise integer (ensure digits 1-9 appear with natural frequency),\n  \"fat\": precise integer (ensure digits 1-9 appear with natural frequency),\n  \"carbs\": precise integer (ensure digits 1-9 appear with natural frequency),\n  \"vitamin_c\": precise integer (ensure digits 1-9 appear with natural frequency),\n  \"health_score\": string\n}" },
             { 'type': 'image_url', 'image_url': { 'url': imageData } }
           ]
         }
       ],
-      'max_tokens': 1200,
-      'temperature': 0.2,
-      'response_format': { 'type': 'json_object' }
+        'max_tokens': 1000,
+        'temperature': 0.2,
+        'response_format': { 'type': 'json_object' }
     })
   });
   
@@ -36,6 +39,10 @@ async function analyzeFoodImageImpl(imageData, apiKey) {
   
   const result = await response.json();
   return result.choices[0].message.content;
+  } catch (error) {
+    console.error('Error analyzing food image:', error);
+    throw error;
+  }
 }
 
 // Simple ping function for status checking
@@ -61,7 +68,7 @@ function parseResult(content) {
     const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || content.match(/\{[\s\S]*\}/);
     if (match) {
       try {
-        const jsonText = match[0].replace(/```json\n|```/g, '').trim();
+      const jsonText = match[0].replace(/```json\n|```/g, '').trim();
         const jsonData = JSON.parse(jsonText);
         
         // Check if we have a properly formatted JSON with meal_name
