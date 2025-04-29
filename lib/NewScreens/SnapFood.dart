@@ -914,9 +914,11 @@ class _SnapFoodState extends State<SnapFood> {
     // Try to extract digits from the string, including decimal values
     final match = RegExp(r'(\d+\.?\d*)').firstMatch(input);
     if (match != null && match.group(1) != null) {
-      // Remove decimal points by parsing as double and converting to int
+      // Parse as double then convert to int directly - no rounding
       double value = double.tryParse(match.group(1)!) ?? 0.0;
-      return value.toInt().toString();
+      return value
+          .toInt()
+          .toString(); // Convert to int to remove decimal places
     }
     return "0"; // Return string "0" as fallback (without decimal)
   }
