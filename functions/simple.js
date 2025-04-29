@@ -14,7 +14,7 @@ async function analyzeFoodImageImpl(imageData, apiKey) {
       'messages': [
         {
           'role': 'system',
-          'content': '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name\n2. List ingredients with weights and calories\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. Use decimal places and realistic estimates\n6. DO NOT respond with markdown code blocks or text explanations\n7. DO NOT prefix your response with "json" or ```\n8. ONLY RETURN A RAW JSON OBJECT\n9. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
+          'content': '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name\n2. List ingredients with weights and calories\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Calculate a health score (1-10) based ONLY on ingredient quality and nutritional value:\n\n   HEALTH SCORE CRITERIA:\n   • Positive indicators (+): Whole/unprocessed foods (vegetables, legumes, whole grains, lean meats), healthy fats (olive oil, avocado), high fiber or micronutrient-dense foods (spinach, lentils, salmon)\n   • Negative indicators (-): Highly processed or fried ingredients, high added sugars (syrups, sweetened sauces), high saturated fats (butter, cream, fatty meats), excess sodium (salty sauces, processed meats)\n   • Score meaning: 9-10 (Very healthy), 7-8 (Healthy), 5-6 (Moderate), 3-4 (Unhealthy), 1-2 (Very unhealthy)\n\n5. Use decimal places and realistic estimates\n6. DO NOT respond with markdown code blocks or text explanations\n7. DO NOT prefix your response with "json" or ```\n8. ONLY RETURN A RAW JSON OBJECT\n9. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
         },
         {
           'role': 'user',
@@ -152,8 +152,58 @@ function transformToRequiredFormat(data) {
       ingredients.push("Mixed ingredients (100g) 200kcal");
     }
     
-    // Calculate a health score (simple algorithm based on macros)
-    const healthScore = calculateHealthScore(protein, vitaminC, fat, calories, carbs);
+    // Look for existing health score in the text
+    let healthScore = null;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('Health Score:')) {
+        const scoreText = line.replace('Health Score:', '').trim();
+        const scoreMatch = scoreText.match(/(\d+)\/10/);
+        if (scoreMatch && scoreMatch[1]) {
+          healthScore = parseInt(scoreMatch[1]);
+          break;
+        }
+      }
+    }
+    
+    // If no health score was found, estimate one based on ingredients
+    if (healthScore === null) {
+      // Count positive and negative nutritional factors
+      const ingredientText = ingredients.join(' ').toLowerCase();
+      
+      // Start with a moderate score
+      let score = 5;
+      
+      // Positive factors - add points for healthy ingredients
+      if (ingredientText.includes('vegetable') || ingredientText.includes('veg') || 
+          ingredientText.includes('broccoli') || ingredientText.includes('spinach') || 
+          ingredientText.includes('kale')) score += 1;
+      
+      if (ingredientText.includes('whole grain') || ingredientText.includes('brown rice') || 
+          ingredientText.includes('quinoa') || ingredientText.includes('oat')) score += 1;
+      
+      if (ingredientText.includes('lean') || ingredientText.includes('fish') || 
+          ingredientText.includes('salmon') || ingredientText.includes('chicken breast')) score += 1;
+      
+      if (ingredientText.includes('olive oil') || ingredientText.includes('avocado') || 
+          ingredientText.includes('nuts') || ingredientText.includes('seed')) score += 1;
+      
+      // Negative factors - subtract points for unhealthy ingredients
+      if (ingredientText.includes('fried') || ingredientText.includes('deep fried') || 
+          ingredientText.includes('crispy')) score -= 1;
+      
+      if (ingredientText.includes('sugar') || ingredientText.includes('syrup') || 
+          ingredientText.includes('sweetened') || ingredientText.includes('candy')) score -= 1;
+      
+      if (ingredientText.includes('cream') || ingredientText.includes('butter') || 
+          ingredientText.includes('cheese') || ingredientText.includes('mayo')) score -= 1;
+      
+      if (ingredientText.includes('processed') || ingredientText.includes('sausage') || 
+          ingredientText.includes('bacon') || ingredientText.includes('ham')) score -= 1;
+      
+      // Constrain to range 1-10
+      healthScore = Math.max(1, Math.min(10, score));
+    }
     
     // Return the properly formatted JSON
     return {
@@ -170,6 +220,11 @@ function transformToRequiredFormat(data) {
   
   // If we got here and data has properties like "calories" but no meal_name
   if (data.calories && !data.meal_name) {
+    // If health_score is available in the data, use it
+    const healthScore = data.health_score ? 
+      data.health_score.replace('/10', '') : 
+      estimateHealthScoreFromIngredients(data.ingredients || []);
+    
     return {
       meal_name: data.name || "Mixed Meal",
       ingredients: data.ingredients || ["Mixed ingredients (100g) 200kcal"],
@@ -178,7 +233,7 @@ function transformToRequiredFormat(data) {
       fat: data.fat || 10,
       carbs: data.carbs || 20,
       vitamin_c: data.vitamin_c || 2,
-      health_score: data.health_score || "5/10"
+      health_score: `${healthScore}/10`
     };
   }
   
@@ -191,29 +246,55 @@ function transformToRequiredFormat(data) {
     fat: 10,
     carbs: 20,
     vitamin_c: 2,
-    health_score: "5/10"
+    health_score: "5/10" // Moderate health score as default
   };
+}
+
+// Helper function to estimate health score from ingredients
+function estimateHealthScoreFromIngredients(ingredients) {
+  if (!ingredients || ingredients.length === 0) return 5;
+  
+  const ingredientText = ingredients.join(' ').toLowerCase();
+  
+  // Start with a moderate score
+  let score = 5;
+  
+  // Positive factors - add points for healthy ingredients
+  if (ingredientText.includes('vegetable') || ingredientText.includes('veg') || 
+      ingredientText.includes('broccoli') || ingredientText.includes('spinach') || 
+      ingredientText.includes('kale')) score += 1;
+  
+  if (ingredientText.includes('whole grain') || ingredientText.includes('brown rice') || 
+      ingredientText.includes('quinoa') || ingredientText.includes('oat')) score += 1;
+  
+  if (ingredientText.includes('lean') || ingredientText.includes('fish') || 
+      ingredientText.includes('salmon') || ingredientText.includes('chicken breast')) score += 1;
+  
+  if (ingredientText.includes('olive oil') || ingredientText.includes('avocado') || 
+      ingredientText.includes('nuts') || ingredientText.includes('seed')) score += 1;
+  
+  // Negative factors - subtract points for unhealthy ingredients
+  if (ingredientText.includes('fried') || ingredientText.includes('deep fried') || 
+      ingredientText.includes('crispy')) score -= 1;
+  
+  if (ingredientText.includes('sugar') || ingredientText.includes('syrup') || 
+      ingredientText.includes('sweetened') || ingredientText.includes('candy')) score -= 1;
+  
+  if (ingredientText.includes('cream') || ingredientText.includes('butter') || 
+      ingredientText.includes('cheese') || ingredientText.includes('mayo')) score -= 1;
+  
+  if (ingredientText.includes('processed') || ingredientText.includes('sausage') || 
+      ingredientText.includes('bacon') || ingredientText.includes('ham')) score -= 1;
+  
+  // Constrain to range 1-10
+  return Math.max(1, Math.min(10, score));
 }
 
 // Add a more sophisticated health score calculation function that varies results
 function calculateHealthScore(protein, vitaminC, fat, calories, carbs) {
-  // Base calculation - protein and vitamin C are positive contributors
-  let baseScore = (protein * 0.5 + vitaminC * 0.3) / Math.max(10, (fat * 0.3 + calories / 150));
-  
-  // Adjust for carb balance
-  const optimalCarbRatio = 0.4; // Approximately 40% of calories from carbs is often considered balanced
-  const actualCarbRatio = (carbs * 4) / Math.max(calories, 100); // 4 calories per gram of carbs
-  const carbPenalty = Math.abs(actualCarbRatio - optimalCarbRatio) * 2;
-  
-  // Adjust score
-  baseScore = baseScore * (1 - carbPenalty);
-  
-  // Add some randomness to avoid same score for similar foods (+/- 0.5)
-  const randomFactor = Math.random() - 0.5;
-  baseScore += randomFactor;
-  
-  // Constrain to 1-10 range and round to whole number
-  return Math.max(1, Math.min(10, Math.round(baseScore * 10)));
+  // This function is kept for compatibility with existing code
+  // but we now prefer to use the ingredient-based scoring from OpenAI
+  return estimateHealthScoreFromIngredients([]);
 }
 
 module.exports = { analyzeFoodImageImpl, parseResult, pingFunction }; 
