@@ -31,10 +31,20 @@ class SlowScrollPhysics extends ScrollPhysics {
 
 class FoodCardOpen extends StatefulWidget {
   final String? foodName;
+  final String? healthScore;
+  final String? calories;
+  final String? protein;
+  final String? fat;
+  final String? carbs;
 
   const FoodCardOpen({
     super.key,
     this.foodName,
+    this.healthScore,
+    this.calories,
+    this.protein,
+    this.fat,
+    this.carbs,
   });
 
   @override
@@ -52,12 +62,28 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   late AnimationController _likeController;
   late Animation<double> _likeScaleAnimation;
   late String _foodName;
+  late String _healthScore;
+  late double _healthScoreValue;
+  late String _calories;
+  late String _protein;
+  late String _fat;
+  late String _carbs;
 
   @override
   void initState() {
     super.initState();
     // Initialize food name with provided value or fallback
     _foodName = widget.foodName ?? 'Delicious Cake';
+    // Initialize health score with provided value or fallback
+    _healthScore = widget.healthScore ?? '8/10';
+    // Initialize nutritional values with provided values or fallbacks
+    _calories = widget.calories ?? '500';
+    _protein = widget.protein ?? '30';
+    _fat = widget.fat ?? '32';
+    _carbs = widget.carbs ?? '125';
+
+    // Extract the numeric value from the health score (e.g., 8 from "8/10")
+    _healthScoreValue = _extractHealthScoreValue(_healthScore);
 
     // Bookmark animations - simplified
     _bookmarkController = AnimationController(
@@ -137,6 +163,15 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       _likeController.reset();
       _likeController.forward();
     });
+  }
+
+  // Helper method to extract numeric value from health score
+  double _extractHealthScoreValue(String score) {
+    final match = RegExp(r'(\d+)\/10').firstMatch(score);
+    if (match != null && match.group(1) != null) {
+      return double.parse(match.group(1)!) / 10;
+    }
+    return 0.8; // Default to 8/10 if parsing fails
   }
 
   @override
@@ -555,7 +590,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
-                                                '500',
+                                                _calories,
                                                 style: TextStyle(
                                                   fontSize: 20,
                                                   fontWeight: FontWeight.bold,
@@ -585,11 +620,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceAround,
                                         children: [
-                                          _buildMacro('Protein', '30g',
+                                          _buildMacro('Protein', '${_protein}g',
                                               Color(0xFFD7C1FF)),
-                                          _buildMacro(
-                                              'Fat', '32g', Color(0xFFFFD8B1)),
-                                          _buildMacro('Carbs', '125g',
+                                          _buildMacro('Fat', '${_fat}g',
+                                              Color(0xFFFFD8B1)),
+                                          _buildMacro('Carbs', '${_carbs}g',
                                               Color(0xFFB1EFD8)),
                                         ],
                                       ),
@@ -642,7 +677,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                                 ),
                                                 Spacer(),
                                                 Text(
-                                                  '8/10',
+                                                  _healthScore,
                                                   style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight:
@@ -669,7 +704,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                                   child: FractionallySizedBox(
                                                     alignment:
                                                         Alignment.centerLeft,
-                                                    widthFactor: 0.8,
+                                                    widthFactor:
+                                                        _healthScoreValue,
                                                     child: Container(
                                                       decoration: BoxDecoration(
                                                         color:

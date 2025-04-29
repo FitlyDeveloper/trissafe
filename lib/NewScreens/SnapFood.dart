@@ -1040,7 +1040,11 @@ class _SnapFoodState extends State<SnapFood> {
             MaterialPageRoute(
               builder: (context) => FoodCardOpen(
                 foodName: foodName,
-                healthScore: healthScore, // Pass the health score
+                healthScore: healthScore,
+                calories: _extractNumericValue(calories),
+                protein: _extractNumericValue(protein),
+                fat: _extractNumericValue(fat),
+                carbs: _extractNumericValue(carbs),
               ),
             ),
           );
