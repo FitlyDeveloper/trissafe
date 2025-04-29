@@ -540,9 +540,9 @@ class _SnapFoodState extends State<SnapFood> {
             _extractDecimalValue(analysisData['vitamin_c']?.toString() ?? "0");
         String healthScore = analysisData['health_score']?.toString() ?? "5/10";
 
-        // Display in the format the user wants - with the exact format requested, NO "Food item 1:" prefix
+        // Display in the format the user wants - with the exact format requested, adding "Name:" only in terminal output
         print("\n----- FOOD ANALYSIS RESULTS -----");
-        print("$mealName");
+        print("Name: $mealName"); // Add "Name:" prefix only for terminal output
         String ingredientsText = ingredients.isNotEmpty
             ? ingredients.join(", ")
             : "Mixed ingredients";
@@ -590,7 +590,8 @@ class _SnapFoodState extends State<SnapFood> {
             protein.toString(),
             fat.toString(),
             carbs.toString(),
-            ingredientsList);
+            ingredientsList,
+            healthScore);
 
         // Set the analysis result for the UI
         setState(() {
@@ -958,7 +959,8 @@ class _SnapFoodState extends State<SnapFood> {
       String protein,
       String fat,
       String carbs,
-      List<Map<String, dynamic>> ingredientsList) async {
+      List<Map<String, dynamic>> ingredientsList,
+      [String healthScore = "5/10"]) async {
     try {
       // Get the current image bytes
       Uint8List? imageBytes;
@@ -1011,6 +1013,7 @@ class _SnapFoodState extends State<SnapFood> {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'image': base64Image,
         'ingredients': ingredientsList.map((ing) => ing['name']).toList(),
+        'health_score': healthScore, // Store health score in the food card
       };
 
       // Load existing food cards
@@ -1035,7 +1038,10 @@ class _SnapFoodState extends State<SnapFood> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => FoodCardOpen(foodName: foodName),
+              builder: (context) => FoodCardOpen(
+                foodName: foodName,
+                healthScore: healthScore, // Pass the health score
+              ),
             ),
           );
         });
