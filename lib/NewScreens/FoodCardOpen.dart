@@ -96,6 +96,23 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     _loadSavedData();
   }
 
+  // Debug method to print ingredient details
+  void _debugPrintIngredients(String source) {
+    print('\n========== INGREDIENTS DEBUG ($source) ==========');
+    print('Food: $_foodName');
+    print('Ingredient count: ${_ingredients.length}');
+
+    for (int i = 0; i < _ingredients.length; i++) {
+      var ingredient = _ingredients[i];
+      String name = ingredient['name'] ?? 'NO NAME';
+      String amount = ingredient['amount'] ?? 'NO AMOUNT';
+      var calories = ingredient['calories'] ?? 'NO CALORIES';
+      print('[$i] $name - $amount - $calories kcal (${calories.runtimeType})');
+    }
+
+    print('===========================================\n');
+  }
+
   void _initAnimationControllers() {
     // Bookmark animations
     _bookmarkController = AnimationController(
@@ -144,25 +161,45 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     _carbs = widget.carbs ?? '125';
 
     // Initialize ingredients list with 14-character limit enforcement
+    // Don't override _ingredients if it will be loaded from SharedPreferences in _loadSavedData
     if (widget.ingredients != null && widget.ingredients!.isNotEmpty) {
       _ingredients = [];
+
       // Process each ingredient and split if necessary
       for (var ingredient in widget.ingredients!) {
+        // Ensure ingredient is a Map<String, dynamic>
+        if (ingredient is! Map<String, dynamic>) {
+          print('Skipping invalid ingredient: $ingredient (not a Map)');
+          continue;
+        }
+
+        // Extract ingredient data with proper fallbacks
         String name = ingredient['name'] ?? '';
-        String amount = ingredient['amount'] ?? '';
+        String amount =
+            ingredient['amount'] ?? '1 serving'; // Ensure we keep the amount
+
+        // Handle different types of calories values properly
         dynamic calories = ingredient['calories'] ?? 0;
+        // If calories is a string, try to parse it to a number
+        if (calories is String) {
+          try {
+            calories = double.tryParse(calories) ?? 0;
+          } catch (e) {
+            calories = 0;
+          }
+        }
 
         // Skip ingredients containing "with"
         if (name.toLowerCase().contains(' with ')) {
           // Split at "with" instead of skipping
           List<String> parts = name.split(' with ');
           if (parts.length >= 2) {
-            // Add first part
+            // Add first part with original amount and calories
             if (parts[0].isNotEmpty && parts[0].length <= 14) {
               _ingredients.add({
                 'name': parts[0].trim(),
-                'amount': amount,
-                'calories': calories,
+                'amount': amount, // Keep original amount
+                'calories': calories, // Keep original calories
               });
             }
 
@@ -170,7 +207,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             if (parts[1].isNotEmpty && parts[1].length <= 14) {
               _ingredients.add({
                 'name': parts[1].trim(),
-                'amount': amount,
+                'amount': amount, // Keep original amount
                 'calories':
                     calories / 2, // Split calories between two ingredients
               });
@@ -191,8 +228,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 (currentSegment.length + word.length + 1) > 14) {
               _ingredients.add({
                 'name': currentSegment.trim(),
-                'amount': amount,
-                'calories': calories,
+                'amount': amount, // Keep original amount
+                'calories': calories, // Keep original calories
               });
               currentSegment = word;
             } else {
@@ -209,45 +246,37 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           if (currentSegment.isNotEmpty) {
             _ingredients.add({
               'name': currentSegment.trim(),
-              'amount': amount,
-              'calories': calories,
+              'amount': amount, // Keep original amount
+              'calories': calories, // Keep original calories
             });
           }
         } else {
-          // Name is within limit, add as is
-          _ingredients.add(ingredient);
+          // Name is within limit, add as is with original values
+          _ingredients
+              .add({'name': name, 'amount': amount, 'calories': calories});
         }
       }
 
       // Sort ingredients by calories (highest to lowest)
       _ingredients.sort((a, b) {
-        int caloriesA = (a['calories'] is int)
-            ? a['calories']
-            : int.tryParse(a['calories'].toString()) ?? 0;
-        int caloriesB = (b['calories'] is int)
-            ? b['calories']
-            : int.tryParse(b['calories'].toString()) ?? 0;
-        return caloriesB.compareTo(caloriesA); // Descending order
+        final caloriesA = a.containsKey('calories')
+            ? double.tryParse(a['calories'].toString()) ?? 0
+            : 0;
+        final caloriesB = b.containsKey('calories')
+            ? double.tryParse(b['calories'].toString()) ?? 0
+            : 0;
+        return caloriesB.compareTo(caloriesA);
       });
-    } else {
-      // Default fallback ingredients if none provided
-      _ingredients = [
-        {'name': 'Cheesecake', 'amount': '100g', 'calories': 300},
-        {'name': 'Berries', 'amount': '20g', 'calories': 10},
-        {'name': 'Jam', 'amount': '10g', 'calories': 20}
-      ];
 
-      // Sort default ingredients by calories (highest to lowest)
-      _ingredients.sort((a, b) {
-        int caloriesA = (a['calories'] is int)
-            ? a['calories']
-            : int.tryParse(a['calories'].toString()) ?? 0;
-        int caloriesB = (b['calories'] is int)
-            ? b['calories']
-            : int.tryParse(b['calories'].toString()) ?? 0;
-        return caloriesB.compareTo(caloriesA); // Descending order
-      });
+      // Debug print the processed ingredients
+      _debugPrintIngredients('After processing widget ingredients');
+
+      // We've processed widget.ingredients - immediately save them to SharedPreferences
+      // to make sure they persist across screens
+      _saveData();
     }
+    // Note: We don't need the else clause here with default ingredients
+    // It will only be used if no ingredients are loaded from SharedPreferences
 
     // Extract the numeric value from the health score (e.g., 8 from "8/10")
     _healthScoreValue = _extractHealthScoreValue(_healthScore);
@@ -260,10 +289,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     // Try to use image from parameters first
     if (widget.imageBase64 != null && widget.imageBase64!.isNotEmpty) {
       try {
+        // Store the original image base64 to avoid any quality loss
+        _storedImageBase64 = widget.imageBase64;
+
         // Decode base64 string to bytes
         _imageBytes = base64Decode(widget.imageBase64!);
         print(
             'Loaded image from passed parameter, size: ${_imageBytes!.length} bytes');
+
+        // Call optimize method
+        _optimizeImage();
       } catch (e) {
         print('Error decoding image from parameter: $e');
       }
@@ -274,6 +309,21 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     try {
       final prefs = await SharedPreferences.getInstance();
       final String foodId = _foodName.replaceAll(' ', '_').toLowerCase();
+
+      // Before loading - check if we have any widget ingredients passed
+      if (widget.ingredients != null && widget.ingredients!.isNotEmpty) {
+        print(
+            'Ingredients received from widget: ${widget.ingredients!.length}');
+        for (var ingredient in widget.ingredients!) {
+          if (ingredient is Map<String, dynamic>) {
+            print(
+                'Ingredient: ${ingredient['name']} - ${ingredient['amount']} - ${ingredient['calories']} kcal');
+          } else {
+            print(
+                'Non-map ingredient: $ingredient (${ingredient.runtimeType})');
+          }
+        }
+      }
 
       setState(() {
         // Load interaction data only (likes, bookmarks, counter)
@@ -306,6 +356,58 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           _healthScoreValue = _extractHealthScoreValue(_healthScore);
         }
 
+        // Load ingredients if not provided as parameters or if ingredients list is empty
+        if ((widget.ingredients == null || widget.ingredients!.isEmpty) &&
+            _ingredients.isEmpty) {
+          final String? ingredientsJson =
+              prefs.getString('food_ingredients_$foodId');
+          if (ingredientsJson != null && ingredientsJson.isNotEmpty) {
+            try {
+              final List<dynamic> decodedList = jsonDecode(ingredientsJson);
+              // Explicitly validate each ingredient when loading
+              _ingredients = [];
+              for (var item in decodedList) {
+                if (item is Map<String, dynamic>) {
+                  // Ensure all required fields exist
+                  Map<String, dynamic> validIngredient = {
+                    'name': item['name'] ?? 'Ingredient',
+                    'amount': item['amount'] ?? '1 serving',
+                    'calories': item['calories'] ?? 0
+                  };
+                  _ingredients.add(validIngredient);
+                }
+              }
+              print(
+                  'Loaded and validated ${_ingredients.length} ingredients from SharedPreferences');
+            } catch (e) {
+              print('Error decoding ingredients JSON: $e');
+              _ingredients = []; // Reset to empty on error
+            }
+          }
+
+          // If no ingredients were loaded from SharedPreferences, use default fallback
+          if (_ingredients.isEmpty) {
+            _ingredients = [
+              {'name': 'Cheesecake', 'amount': '100g', 'calories': 300},
+              {'name': 'Berries', 'amount': '20g', 'calories': 10},
+              {'name': 'Jam', 'amount': '10g', 'calories': 20}
+            ];
+
+            // Sort default ingredients by calories (highest to lowest)
+            _ingredients.sort((a, b) {
+              final caloriesA = a.containsKey('calories')
+                  ? double.tryParse(a['calories'].toString()) ?? 0
+                  : 0;
+              final caloriesB = b.containsKey('calories')
+                  ? double.tryParse(b['calories'].toString()) ?? 0
+                  : 0;
+              return caloriesB.compareTo(caloriesA);
+            });
+
+            print('Using default ingredients as fallback');
+          }
+        }
+
         // Load image from SharedPreferences if not already loaded from parameter
         if (_imageBytes == null) {
           _storedImageBase64 = prefs.getString('food_image_$foodId');
@@ -314,6 +416,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               _imageBytes = base64Decode(_storedImageBase64!);
               print(
                   'Loaded image from SharedPreferences, size: ${_imageBytes!.length} bytes');
+
+              // Call optimize method
+              _optimizeImage();
             } catch (e) {
               print('Error decoding stored image: $e');
             }
@@ -321,16 +426,25 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         }
       });
 
+      // After loading - check what we have
+      _debugPrintIngredients('After load');
+
       print(
           'Loaded interaction data for $foodId: liked=$_isLiked, bookmarked=$_isBookmarked, counter=$_counter');
       print(
           'Using nutrition data: calories=$_calories, protein=$_protein, fat=$_fat, carbs=$_carbs, healthScore=$_healthScore');
+      if (_ingredients.isNotEmpty) {
+        print('Loaded ${_ingredients.length} ingredients');
+      }
     } catch (e) {
       print('Error loading saved food data: $e');
     }
   }
 
   Future<void> _saveData() async {
+    // Debug output before saving
+    _debugPrintIngredients('Before save');
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final String foodId = _foodName.replaceAll(' ', '_').toLowerCase();
@@ -346,14 +460,156 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       await prefs.setString('food_carbs_$foodId', _carbs);
       await prefs.setString('food_health_score_$foodId', _healthScore);
 
-      // Save image if available
-      if (_imageBytes != null) {
-        final imageBase64 = base64Encode(_imageBytes!);
-        await prefs.setString('food_image_$foodId', imageBase64);
+      // Save ingredients list
+      if (_ingredients.isNotEmpty) {
+        try {
+          // Validate that _ingredients contains valid Map objects before saving
+          List<Map<String, dynamic>> validIngredients = [];
+          for (var ingredient in _ingredients) {
+            if (ingredient is Map<String, dynamic>) {
+              // Make sure all required fields exist
+              if (!ingredient.containsKey('name') ||
+                  !ingredient.containsKey('amount') ||
+                  !ingredient.containsKey('calories')) {
+                // Add missing fields with defaults
+                ingredient['name'] = ingredient['name'] ?? 'Ingredient';
+                ingredient['amount'] = ingredient['amount'] ?? '1 serving';
+                ingredient['calories'] = ingredient['calories'] ?? 0;
+              }
+              validIngredients.add(ingredient);
+            }
+          }
+
+          final ingredientsJson = jsonEncode(validIngredients);
+          await prefs.setString('food_ingredients_$foodId', ingredientsJson);
+          print('Saved ${validIngredients.length} validated ingredients');
+
+          // IMPORTANT: Also update the ingredients in the food_cards list
+          // This ensures that when returning to FoodCardOpen, we have correct ingredients
+          final List<String>? storedCards = prefs.getStringList('food_cards');
+          if (storedCards != null && storedCards.isNotEmpty) {
+            List<String> updatedCards = [];
+            bool foundCard = false;
+
+            // Find the correct card and update it
+            for (String cardJson in storedCards) {
+              try {
+                Map<String, dynamic> cardData = jsonDecode(cardJson);
+                String cardName = cardData['name'] ?? '';
+
+                // If this is our card, update the ingredients
+                if (cardName.toLowerCase() == _foodName.toLowerCase()) {
+                  foundCard = true;
+
+                  // Update with our valid ingredients
+                  cardData['ingredients'] = validIngredients;
+
+                  // Also create ingredient lookup maps for future use
+                  Map<String, dynamic> ingredientAmounts = {};
+                  Map<String, dynamic> ingredientCalories = {};
+
+                  for (var ingredient in validIngredients) {
+                    String name = ingredient['name'];
+                    ingredientAmounts[name] = ingredient['amount'];
+                    ingredientCalories[name] = ingredient['calories'];
+                  }
+
+                  cardData['ingredient_amounts'] = ingredientAmounts;
+                  cardData['ingredient_calories'] = ingredientCalories;
+
+                  // Update with our high quality image - preserve original quality
+                  if (_storedImageBase64 != null &&
+                      _storedImageBase64!.isNotEmpty) {
+                    cardData['image'] = _storedImageBase64;
+                    print(
+                        'Using high-quality stored image data for food_cards: ${_storedImageBase64!.length} characters');
+                  }
+
+                  // Add the updated card to our list
+                  updatedCards.add(jsonEncode(cardData));
+                } else {
+                  // Not our card, keep it as is
+                  updatedCards.add(cardJson);
+                }
+              } catch (e) {
+                print('Error updating food card ingredient data: $e');
+                // If there was an error, keep the original card
+                updatedCards.add(cardJson);
+              }
+            }
+
+            // Save the updated cards list back to SharedPreferences
+            if (foundCard) {
+              await prefs.setStringList('food_cards', updatedCards);
+              print('Updated ingredients in food_cards list for: $_foodName');
+            }
+          }
+        } catch (e) {
+          print('Error encoding ingredients for saving: $e');
+        }
+      }
+
+      // Save image if available - ensure high quality
+      if (_imageBytes != null || _storedImageBase64 != null) {
+        // Prefer to use the stored base64 string directly if available
+        // This prevents re-encoding which can reduce quality
+        String imageData;
+        if (_storedImageBase64 != null && _storedImageBase64!.isNotEmpty) {
+          imageData = _storedImageBase64!;
+          print(
+              'Using original stored image data: ${imageData.length} characters');
+        } else {
+          // Only re-encode if we must
+          imageData = base64Encode(_imageBytes!);
+          print('Re-encoded image data: ${imageData.length} characters');
+        }
+
+        // Store the image
+        await prefs.setString('food_image_$foodId', imageData);
+
+        // Also update the image in the food_cards list to ensure high quality there too
+        final List<String>? storedCards = prefs.getStringList('food_cards');
+        if (storedCards != null && storedCards.isNotEmpty) {
+          List<String> updatedCards = [];
+          bool foundCard = false;
+
+          // Find the correct card and update its image
+          for (String cardJson in storedCards) {
+            try {
+              Map<String, dynamic> cardData = jsonDecode(cardJson);
+              String cardName = cardData['name'] ?? '';
+
+              // If this is our card, update the image
+              if (cardName.toLowerCase() == _foodName.toLowerCase()) {
+                foundCard = true;
+
+                // Update with our high quality image
+                cardData['image'] = imageData;
+
+                // Add the updated card to our list
+                updatedCards.add(jsonEncode(cardData));
+              } else {
+                // Not our card, keep it as is
+                updatedCards.add(cardJson);
+              }
+            } catch (e) {
+              print('Error updating food card image data: $e');
+              // If there was an error, keep the original card
+              updatedCards.add(cardJson);
+            }
+          }
+
+          // Save the updated cards list back to SharedPreferences
+          if (foundCard) {
+            await prefs.setStringList('food_cards', updatedCards);
+            print(
+                'Updated high-quality image in food_cards list for: $_foodName');
+          }
+        }
       }
 
       print(
-          'Saved data for $foodId: liked=$_isLiked, bookmarked=$_isBookmarked, counter=$_counter, calories=$_calories, protein=$_protein, fat=$_fat, carbs=$_carbs, healthScore=$_healthScore');
+          'Saved data for $foodId: liked=$_isLiked, bookmarked=$_isBookmarked, counter=$_counter, calories=$_calories, protein=$_protein, fat=$_fat, carbs=$_carbs, healthScore=$_healthScore, ingredients=${_ingredients.length}');
     } catch (e) {
       print('Error saving food data: $e');
     }
@@ -460,31 +716,240 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   // Show confirmation dialog for delete
                   showDialog(
                     context: context,
+                    barrierColor:
+                        Colors.black.withOpacity(0.5), // Add dark overlay
                     builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: Text("Delete Food?"),
-                        content:
-                            Text("Are you sure you want to delete this food?"),
-                        actions: [
-                          TextButton(
-                            child: Text("Cancel"),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                          TextButton(
-                            child: Text(
-                              "Delete",
-                              style: TextStyle(color: Color(0xFFE97372)),
+                      return Dialog(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        elevation: 0,
+                        backgroundColor: Colors.white,
+                        insetPadding: EdgeInsets.symmetric(horizontal: 32),
+                        child: Container(
+                          width: 326,
+                          height: 182,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Title
+                                Text(
+                                  "Delete Meal?",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'SF Pro Display',
+                                  ),
+                                ),
+                                SizedBox(height: 20),
+
+                                // Delete button
+                                Container(
+                                  width: 267,
+                                  height: 40,
+                                  margin: EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                    color: Colors.white,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // Centered text
+                                      Text(
+                                        "Delete",
+                                        style: TextStyle(
+                                          color: Color(0xFFE97372),
+                                          fontSize: 16,
+                                          fontFamily: 'SF Pro Display',
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      // Icon positioned to the left with exact spacing
+                                      Positioned(
+                                        left:
+                                            70, // Position for 28px from text (calculated based on button width)
+                                        child: Image.asset(
+                                          'assets/images/trashcan.png',
+                                          width: 20,
+                                          height: 20,
+                                          color: Color(0xFFE97372),
+                                        ),
+                                      ),
+                                      // Full-width button for tap area
+                                      Positioned.fill(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            onTap: () {
+                                              // Delete the meal
+                                              final prefs = SharedPreferences
+                                                  .getInstance();
+                                              prefs.then((prefs) {
+                                                final String foodId = _foodName
+                                                    .replaceAll(' ', '_')
+                                                    .toLowerCase();
+
+                                                // First: Delete all food-specific data
+                                                prefs.remove(
+                                                    'food_liked_$foodId');
+                                                prefs.remove(
+                                                    'food_bookmarked_$foodId');
+                                                prefs.remove(
+                                                    'food_counter_$foodId');
+                                                prefs.remove(
+                                                    'food_calories_$foodId');
+                                                prefs.remove(
+                                                    'food_protein_$foodId');
+                                                prefs
+                                                    .remove('food_fat_$foodId');
+                                                prefs.remove(
+                                                    'food_carbs_$foodId');
+                                                prefs.remove(
+                                                    'food_health_score_$foodId');
+                                                prefs.remove(
+                                                    'food_image_$foodId');
+
+                                                print(
+                                                    'Deleted all data for food: $foodId');
+
+                                                // Second: Remove this meal from the food_cards list in SharedPreferences
+                                                final List<String>?
+                                                    storedCards =
+                                                    prefs.getStringList(
+                                                        'food_cards');
+                                                if (storedCards != null &&
+                                                    storedCards.isNotEmpty) {
+                                                  List<Map<String, dynamic>>
+                                                      cards = [];
+                                                  List<String>
+                                                      updatedCardsList = [];
+
+                                                  // Parse all cards and filter out the one being deleted
+                                                  for (String cardJson
+                                                      in storedCards) {
+                                                    try {
+                                                      Map<String, dynamic>
+                                                          cardData =
+                                                          jsonDecode(cardJson);
+                                                      String cardName =
+                                                          cardData['name'] ??
+                                                              '';
+
+                                                      // Only keep cards with a different name
+                                                      if (cardName
+                                                              .toLowerCase() !=
+                                                          _foodName
+                                                              .toLowerCase()) {
+                                                        updatedCardsList
+                                                            .add(cardJson);
+                                                      } else {
+                                                        print(
+                                                            'Removing card: $cardName from food_cards list');
+                                                      }
+                                                    } catch (e) {
+                                                      print(
+                                                          "Error parsing food card JSON: $e");
+                                                      // Keep cards that can't be parsed (just in case)
+                                                      updatedCardsList
+                                                          .add(cardJson);
+                                                    }
+                                                  }
+
+                                                  // Save the updated list back to SharedPreferences
+                                                  prefs.setStringList(
+                                                      'food_cards',
+                                                      updatedCardsList);
+                                                  print(
+                                                      'Updated food_cards list, removed deleted meal');
+                                                }
+
+                                                // Navigate back to main screen
+                                                Navigator.of(context).pop();
+                                                Navigator.pushReplacement(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          CodiaPage()),
+                                                );
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Cancel button
+                                Container(
+                                  width: 267,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                    color: Colors.white,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // Centered text
+                                      Text(
+                                        "Cancel",
+                                        style: TextStyle(
+                                          color: Colors.black54,
+                                          fontSize: 16,
+                                          fontFamily: 'SF Pro Display',
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      // Icon positioned to match the delete icon's position
+                                      Positioned(
+                                        left:
+                                            70, // Same position as delete icon
+                                        child: Image.asset(
+                                          'assets/images/closeicon.png',
+                                          width: 18, // 10% smaller than 20
+                                          height: 18, // 10% smaller than 20
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                      // Full-width button for tap area
+                                      Positioned.fill(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            onTap: () =>
+                                                Navigator.of(context).pop(),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => CodiaPage()),
-                              );
-                            },
                           ),
-                        ],
+                        ),
                       );
                     },
                   );
@@ -580,18 +1045,44 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       if (match != null && match.group(1) != null) {
         // Use original value with decimal places
         double value = double.tryParse(match.group(1)!) ?? 0.0;
-        if (value == value.toInt()) {
-          // Display as integer if it's a whole number
-          return value.toInt().toString();
-        } else {
-          // Otherwise keep one decimal place
-          return value.toStringAsFixed(1);
-        }
+
+        // Keep full precision for all calorie values
+        return value.toString();
       }
     } catch (e) {
       print('Error formatting decimal value: $e');
     }
     return input; // Return original if parsing fails
+  }
+
+  // Helper method to optimize image quality
+  void _optimizeImage() {
+    if (_imageBytes != null) {
+      try {
+        print('Optimizing image quality for display...');
+        // Create an optimized image storage if needed
+        if (_storedImageBase64 == null || _storedImageBase64!.isEmpty) {
+          _storedImageBase64 = base64Encode(_imageBytes!);
+          print(
+              'Created high-quality image storage: ${_storedImageBase64!.length} characters');
+        }
+      } catch (e) {
+        print('Error optimizing image: $e');
+      }
+    }
+  }
+
+  // Helper method to format ingredient calories for display
+  String _formatIngredientCalories(dynamic calories) {
+    if (calories == null) return "0 kcal";
+
+    // If it's already a string, ensure it has "kcal" suffix
+    if (calories is String) {
+      return calories.contains("kcal") ? calories : "$calories kcal";
+    }
+
+    // If it's a number, convert to string with full precision
+    return "$calories kcal";
   }
 
   @override
@@ -639,15 +1130,21 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                         children: [
                           // Meal image - show user image or fallback
                           _imageBytes != null
-                              ? Container(
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  decoration: BoxDecoration(
-                                    image: DecorationImage(
-                                      image: MemoryImage(_imageBytes!),
-                                      fit: BoxFit.cover,
-                                      filterQuality: FilterQuality.high,
-                                    ),
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.zero,
+                                  child: Image.memory(
+                                    _imageBytes!,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                    alignment: Alignment.center,
+                                    filterQuality: FilterQuality.high,
+                                    cacheWidth: MediaQuery.of(context)
+                                            .size
+                                            .width
+                                            .toInt() *
+                                        2, // 2x display size for quality
+                                    isAntiAlias: true,
                                   ),
                                 )
                               : Center(
@@ -1528,12 +2025,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 _buildIngredient(
                   _ingredients[i]['name'],
                   _ingredients[i]['amount'],
-                  "${_ingredients[i]['calories']} kcal",
+                  _formatIngredientCalories(_ingredients[i]['calories']),
                 ),
                 _buildIngredient(
                   _ingredients[i + 1]['name'],
                   _ingredients[i + 1]['amount'],
-                  "${_ingredients[i + 1]['calories']} kcal",
+                  _formatIngredientCalories(_ingredients[i + 1]['calories']),
                 ),
               ],
             ),
@@ -1550,7 +2047,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 _buildIngredient(
                   _ingredients[i]['name'],
                   _ingredients[i]['amount'],
-                  "${_ingredients[i]['calories']} kcal",
+                  _formatIngredientCalories(_ingredients[i]['calories']),
                 ),
                 // Add button
                 Stack(
@@ -1623,17 +2120,26 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       ];
     } else if (_ingredients.length == 1) {
       return [
-        _buildIngredient(_ingredients[0]['name'], _ingredients[0]['amount'],
-            "${_ingredients[0]['calories']} kcal"),
+        _buildIngredient(
+          _ingredients[0]['name'],
+          _ingredients[0]['amount'],
+          _formatIngredientCalories(_ingredients[0]['calories']),
+        ),
         SizedBox(), // Empty spacer
       ];
     } else {
       // Display first two ingredients
       return [
-        _buildIngredient(_ingredients[0]['name'], _ingredients[0]['amount'],
-            "${_ingredients[0]['calories']} kcal"),
-        _buildIngredient(_ingredients[1]['name'], _ingredients[1]['amount'],
-            "${_ingredients[1]['calories']} kcal"),
+        _buildIngredient(
+          _ingredients[0]['name'],
+          _ingredients[0]['amount'],
+          _formatIngredientCalories(_ingredients[0]['calories']),
+        ),
+        _buildIngredient(
+          _ingredients[1]['name'],
+          _ingredients[1]['amount'],
+          _formatIngredientCalories(_ingredients[1]['calories']),
+        ),
       ];
     }
   }

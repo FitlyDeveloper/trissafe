@@ -144,7 +144,7 @@ class _SnapFoodState extends State<SnapFood> {
     };
   }
 
-  // Modify the _analyzeImage method to use our secure API
+  // Modify the _analyzeImage method to keep isAnalyzing true until redirection
   Future<void> _analyzeImage(XFile? image) async {
     if (_isAnalyzing || image == null) return;
 
@@ -210,13 +210,15 @@ class _SnapFoodState extends State<SnapFood> {
       print('Response: $response');
 
       if (mounted) {
+        // DO NOT set _isAnalyzing to false here to keep animation running
         setState(() {
-          _isAnalyzing = false;
           _analysisResult = response;
         });
 
         // Display the formatted results in the terminal
         _displayAnalysisResults(_analysisResult!);
+
+        // _isAnalyzing will be set to false after navigation to FoodCardOpen
       }
     } catch (e) {
       print("Error analyzing image: $e");
@@ -911,16 +913,13 @@ class _SnapFoodState extends State<SnapFood> {
     }
   }
 
-  // Helper method to extract numeric value from a string, removing decimal places
+  // Helper method to extract numeric value from a string, preserving decimal places
   String _extractNumericValue(String input) {
     // Try to extract digits from the string, including decimal values
     final match = RegExp(r'(\d+\.?\d*)').firstMatch(input);
     if (match != null && match.group(1) != null) {
-      // Parse as double then convert to int directly - no rounding
-      double value = double.tryParse(match.group(1)!) ?? 0.0;
-      return value
-          .toInt()
-          .toString(); // Convert to int to remove decimal places
+      // Return the exact extracted value with decimal precision
+      return match.group(1)!;
     }
     return "0"; // Return string "0" as fallback (without decimal)
   }
@@ -978,15 +977,15 @@ class _SnapFoodState extends State<SnapFood> {
         } catch (e) {
           print("Error getting web image bytes: $e");
         }
-      } /* else if (_imageFile != null && !kIsWeb) {
+      } else if (_imageFile != null && !kIsWeb) {
         try {
-          // Commented out for now to avoid type errors
-          // imageBytes = await _imageFile!.readAsBytes();
-          print("Reading file bytes not supported in this environment");
+          // Read file bytes for non-web platforms
+          imageBytes = await _imageFile!.readAsBytes();
+          print("Read file bytes: ${imageBytes.length} bytes");
         } catch (e) {
           print("Error reading image file bytes: $e");
         }
-      } */
+      }
 
       // Convert image to base64 for storage
       String? base64Image;
@@ -1034,44 +1033,55 @@ class _SnapFoodState extends State<SnapFood> {
       await prefs.setStringList('food_cards', storedCards);
       print("Food card saved successfully");
 
-      // After saving, navigate to FoodCardOpen with the detected food name
+      // After saving, navigate directly to FoodCardOpen with the detected food name
       if (mounted) {
-        Future.delayed(Duration(milliseconds: 1000), () {
-          // Store original high-quality image for FoodCardOpen
-          String? highQualityImageBase64;
-          if (_webImageBytes != null) {
-            // Use original image bytes for best quality
-            highQualityImageBase64 = base64Encode(_webImageBytes!);
-          } else if (_imageFile != null && !kIsWeb) {
-            try {
-              // Read file bytes directly for best quality
-              final originalBytes = _imageFile!.readAsBytesSync();
-              highQualityImageBase64 = base64Encode(originalBytes);
-            } catch (e) {
-              print("Error reading original image file: $e");
-            }
+        // Prepare high-quality image for FoodCardOpen
+        String? highQualityImageBase64;
+        if (_webImageBytes != null) {
+          // Use original image bytes for best quality
+          highQualityImageBase64 = base64Encode(_webImageBytes!);
+        } else if (_imageFile != null && !kIsWeb) {
+          try {
+            // Read file bytes directly for best quality
+            final originalBytes = _imageFile!.readAsBytesSync();
+            highQualityImageBase64 = base64Encode(originalBytes);
+          } catch (e) {
+            print("Error reading original image file: $e");
           }
+        }
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => FoodCardOpen(
-                foodName: foodName,
-                healthScore: healthScore,
-                calories: calories.toString(),
-                protein: protein.toString(),
-                fat: fat.toString(),
-                carbs: carbs.toString(),
-                imageBase64: highQualityImageBase64 ??
-                    base64Image, // Use high quality or fallback to compressed
-                ingredients: ingredientsList, // Pass ingredients list
-              ),
+        // Don't set _isAnalyzing to false, keep the loading animation until navigation
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FoodCardOpen(
+              foodName: foodName,
+              healthScore: healthScore,
+              calories: calories.toString(),
+              protein: protein.toString(),
+              fat: fat.toString(),
+              carbs: carbs.toString(),
+              imageBase64: highQualityImageBase64 ?? base64Image,
+              ingredients: ingredientsList, // Pass ingredients list
             ),
-          );
+          ),
+        ).then((_) {
+          // Set _isAnalyzing to false only after returning from FoodCardOpen
+          if (mounted) {
+            setState(() {
+              _isAnalyzing = false;
+            });
+          }
         });
       }
     } catch (e) {
       print("Error saving food card: $e");
+      // Make sure to set _isAnalyzing to false on error
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+        });
+      }
     }
   }
 
