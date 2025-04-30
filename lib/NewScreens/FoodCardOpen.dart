@@ -698,14 +698,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 setModalState(() => _selectedPrivacy = value);
                 Navigator.pop(context);
               }),
-              _buildPrivacyOption(
-                  'Private', 'assets/images/Lock.png', _selectedPrivacy,
-                  (value) {
+              _buildPrivacyOption('Friends Only',
+                  'assets/images/socialicon.png', _selectedPrivacy, (value) {
                 setModalState(() => _selectedPrivacy = value);
                 Navigator.pop(context);
               }),
-              _buildPrivacyOption('Friends Only',
-                  'assets/images/socialicon.png', _selectedPrivacy, (value) {
+              _buildPrivacyOption(
+                  'Private', 'assets/images/Lock.png', _selectedPrivacy,
+                  (value) {
                 setModalState(() => _selectedPrivacy = value);
                 Navigator.pop(context);
               }),
@@ -2054,7 +2054,10 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   alignment: Alignment.center,
                   children: [
                     // Add box
-                    _buildIngredient('Add', '', ''),
+                    GestureDetector(
+                      onTap: _showAddIngredientDialog,
+                      child: _buildIngredient('Add', '', ''),
+                    ),
                     // Add icon overlay
                     Padding(
                       padding: const EdgeInsets.only(top: 20.0),
@@ -2086,7 +2089,10 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 alignment: Alignment.center,
                 children: [
                   // Add box
-                  _buildIngredient('Add', '', ''),
+                  GestureDetector(
+                    onTap: _showAddIngredientDialog,
+                    child: _buildIngredient('Add', '', ''),
+                  ),
                   // Add icon overlay
                   Padding(
                     padding: const EdgeInsets.only(top: 20.0),
@@ -2110,37 +2116,319 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     return Column(children: rows);
   }
 
-  // Helper method that just returns children for the first row
-  List<Widget> _buildIngredientRows() {
-    // Show up to 2 ingredients in the first row
-    if (_ingredients.isEmpty) {
-      return [
-        _buildIngredient('Add ingredient', '', ''),
-        SizedBox(), // Empty spacer
-      ];
-    } else if (_ingredients.length == 1) {
-      return [
-        _buildIngredient(
-          _ingredients[0]['name'],
-          _ingredients[0]['amount'],
-          _formatIngredientCalories(_ingredients[0]['calories']),
-        ),
-        SizedBox(), // Empty spacer
-      ];
-    } else {
-      // Display first two ingredients
-      return [
-        _buildIngredient(
-          _ingredients[0]['name'],
-          _ingredients[0]['amount'],
-          _formatIngredientCalories(_ingredients[0]['calories']),
-        ),
-        _buildIngredient(
-          _ingredients[1]['name'],
-          _ingredients[1]['amount'],
-          _formatIngredientCalories(_ingredients[1]['calories']),
-        ),
-      ];
-    }
+  // Method to show add ingredient dialog
+  void _showAddIngredientDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black
+          .withOpacity(0.5), // Same blackish overlay as Delete meal popup
+      builder: (BuildContext context) {
+        return Theme(
+          // Apply theme override to match text selection highlight color from Coach.dart
+          data: Theme.of(context).copyWith(
+            textSelectionTheme: TextSelectionThemeData(
+              selectionColor: Colors.grey.withOpacity(0.3),
+              cursorColor: Colors.black,
+              selectionHandleColor: Colors.black,
+            ),
+          ),
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 0,
+            backgroundColor: Colors.white,
+            insetPadding: EdgeInsets.symmetric(horizontal: 32),
+            child: Container(
+              width: 326,
+              height: 530, // Adjusted to have 24px below button (526 + 4px)
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal:
+                            10), // Reduced horizontal padding to allow wider fields
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Title with exact spacing (24px from top)
+                        SizedBox(height: 14), // Reduced from 24px to 14px
+                        Text(
+                          "Add Ingredient",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
+
+                        // Plus icon (45x45) - centered between title and "Food" label, but moved down 4px
+                        SizedBox(
+                            height: 29), // Increased by 4px (from 25px to 29px)
+                        Image.asset(
+                          'assets/images/add.png',
+                          width: 45.0,
+                          height: 45.0,
+                        ),
+
+                        // Food field
+                        SizedBox(
+                            height:
+                                25), // Adjusted to match spacing above the icon
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal:
+                                  20), // Reduced padding to allow wider fields
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Food",
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight:
+                                      FontWeight.w500, // Ensuring medium weight
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                              ),
+                              SizedBox(
+                                  height:
+                                      7), // Changed to exactly 7px for label to input spacing
+                              Container(
+                                width:
+                                    280, // Increased to 280px to ensure visible width of 265px
+                                height: 50, // Match Coach.dart's height
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(
+                                      25), // Match Coach.dart's radius
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 15),
+                                child: TextField(
+                                  cursorColor: Colors.black,
+                                  cursorWidth: 1.2,
+                                  style: TextStyle(
+                                    fontSize: 13.6,
+                                    fontFamily: '.SF Pro Display',
+                                    color: Colors.black,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: "Pasta, Tomato, etc",
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[600]!.withOpacity(0.7),
+                                      fontSize: 13.6,
+                                      fontFamily: '.SF Pro Display',
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    contentPadding:
+                                        EdgeInsets.symmetric(vertical: 15),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Size field
+                        SizedBox(height: 10), // Reduced from 20px to 10px
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal:
+                                  20), // Reduced padding to allow wider fields
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Size",
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight:
+                                      FontWeight.w500, // Ensuring medium weight
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                              ),
+                              SizedBox(
+                                  height:
+                                      7), // Changed to exactly 7px for label to input spacing
+                              Container(
+                                width:
+                                    280, // Increased to 280px to ensure visible width of 265px
+                                height: 50, // Match Coach.dart's height
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(
+                                      25), // Match Coach.dart's radius
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 15),
+                                child: TextField(
+                                  cursorColor: Colors.black,
+                                  cursorWidth: 1.2,
+                                  style: TextStyle(
+                                    fontSize: 13.6,
+                                    fontFamily: '.SF Pro Display',
+                                    color: Colors.black,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: "150g, 3/4 cup, etc",
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[600]!.withOpacity(0.7),
+                                      fontSize: 13.6,
+                                      fontFamily: '.SF Pro Display',
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    contentPadding:
+                                        EdgeInsets.symmetric(vertical: 15),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Calories field
+                        SizedBox(height: 10), // Reduced from 20px to 10px
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal:
+                                  20), // Reduced padding to allow wider fields
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    "Calories",
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight
+                                          .w500, // Ensuring medium weight
+                                      fontFamily: 'SF Pro Display',
+                                    ),
+                                  ),
+                                  SizedBox(
+                                      width:
+                                          12), // 12px away from calories label
+                                  Text(
+                                    "(optional)",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black.withOpacity(0.5),
+                                      fontFamily: 'SF Pro Display',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(
+                                  height:
+                                      7), // Changed to exactly 7px for label to input spacing
+                              Container(
+                                width:
+                                    280, // Increased to 280px to ensure visible width of 265px
+                                height: 50, // Match Coach.dart's height
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(
+                                      25), // Match Coach.dart's radius
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 15),
+                                child: TextField(
+                                  cursorColor: Colors.black,
+                                  cursorWidth: 1.2,
+                                  style: TextStyle(
+                                    fontSize: 13.6,
+                                    fontFamily: '.SF Pro Display',
+                                    color: Colors.black,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: "450 kcal",
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[600]!.withOpacity(0.7),
+                                      fontSize: 13.6,
+                                      fontFamily: '.SF Pro Display',
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    contentPadding:
+                                        EdgeInsets.symmetric(vertical: 15),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // 32px spacing between last input field and Add button
+                        SizedBox(
+                            height:
+                                30), // Reduced from 32px to 30px (moving button up by 2px)
+
+                        // Add button - no longer using Spacer() to allow exact positioning
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20), // Same padding as input fields
+                          child: Container(
+                            width:
+                                280, // Exactly the same width as input fields
+                            height: 48, // Exactly 48px height (already correct)
+                            margin: EdgeInsets.only(
+                                bottom:
+                                    24), // Changed to exactly 24px from bottom of popup
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                            child: TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                              },
+                              style: ButtonStyle(
+                                overlayColor: MaterialStateProperty.all(
+                                    Colors.transparent),
+                              ),
+                              child: const Text(
+                                'Add',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: '.SF Pro Display',
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Close button in top right corner
+                  Positioned(
+                    top:
+                        19, // Adjusted to center with the "Add Ingredient" title (14px + 24px font size / 2 - 22px icon / 2)
+                    right: 18, // Moved 2px to the left from original 20px
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                      child: Image.asset(
+                        'assets/images/closeicon.png',
+                        width: 22,
+                        height: 22,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
