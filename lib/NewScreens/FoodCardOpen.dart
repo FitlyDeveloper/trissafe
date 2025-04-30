@@ -417,6 +417,152 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     });
   }
 
+  // Method to show privacy options in a bottom sheet
+  void _showPrivacyOptions() {
+    String _selectedPrivacy = 'Public'; // Default selection
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      barrierColor: Colors.black.withOpacity(0.5),
+      isScrollControlled: true, // Allow more height for additional options
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          width: MediaQuery.of(context).size.width, // Use full width
+          padding: EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildPrivacyOption(
+                  'Public', 'assets/images/globe.png', _selectedPrivacy,
+                  (value) {
+                setModalState(() => _selectedPrivacy = value);
+                Navigator.pop(context);
+              }),
+              _buildPrivacyOption(
+                  'Private', 'assets/images/Lock.png', _selectedPrivacy,
+                  (value) {
+                setModalState(() => _selectedPrivacy = value);
+                Navigator.pop(context);
+              }),
+              _buildPrivacyOption('Friends Only',
+                  'assets/images/socialicon.png', _selectedPrivacy, (value) {
+                setModalState(() => _selectedPrivacy = value);
+                Navigator.pop(context);
+              }),
+              // Add Delete option with trashcan icon
+              InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                  // Show confirmation dialog for delete
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: Text("Delete Food?"),
+                        content:
+                            Text("Are you sure you want to delete this food?"),
+                        actions: [
+                          TextButton(
+                            child: Text("Cancel"),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          TextButton(
+                            child: Text(
+                              "Delete",
+                              style: TextStyle(color: Color(0xFFE97372)),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => CodiaPage()),
+                              );
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Image.asset(
+                            'assets/images/trashcan.png',
+                            width: 20,
+                            height: 20,
+                            color: Color(0xFFE97372),
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            "Delete",
+                            style: TextStyle(
+                              color: Color(0xFFE97372),
+                              fontSize: 16,
+                              fontFamily: 'SF Pro Display',
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper widget to build privacy option rows
+  Widget _buildPrivacyOption(String title, String iconPath,
+      String selectedPrivacy, Function(String) onSelect) {
+    bool isSelected = selectedPrivacy == title;
+    return InkWell(
+      onTap: () => onSelect(title),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Image.asset(
+                  iconPath,
+                  width: 20,
+                  height: 20,
+                  color: isSelected ? Colors.black : Colors.grey,
+                ),
+                SizedBox(width: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: isSelected ? Colors.black : Colors.grey,
+                    fontSize: 16,
+                    fontFamily: 'SF Pro Display',
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+            if (isSelected) Icon(Icons.check, color: Colors.black),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Helper method to extract numeric value from health score
   double _extractHealthScoreValue(String score) {
     final match = RegExp(r'(\d+)\/10').firstMatch(score);
@@ -587,7 +733,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                         height: 21.6, // 10% smaller
                                         color: Colors.black,
                                       ),
-                                      onPressed: () {},
+                                      onPressed: _showPrivacyOptions,
                                       padding: EdgeInsets.zero,
                                       constraints: BoxConstraints(),
                                     ),
