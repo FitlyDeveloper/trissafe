@@ -143,9 +143,54 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     _fat = widget.fat ?? '32';
     _carbs = widget.carbs ?? '125';
 
-    // Initialize ingredients list
+    // Initialize ingredients list with 14-character limit enforcement
     if (widget.ingredients != null && widget.ingredients!.isNotEmpty) {
-      _ingredients = widget.ingredients!;
+      _ingredients = [];
+      // Process each ingredient and split if necessary
+      for (var ingredient in widget.ingredients!) {
+        String name = ingredient['name'] ?? '';
+        String amount = ingredient['amount'] ?? '';
+        dynamic calories = ingredient['calories'] ?? 0;
+
+        // Check if name exceeds 14 characters
+        if (name.length > 14) {
+          // Split the name by spaces
+          List<String> words = name.split(' ');
+          String currentSegment = '';
+
+          for (var word in words) {
+            // If adding this word would exceed limit, create a new ingredient with current segment
+            if (currentSegment.isNotEmpty &&
+                (currentSegment.length + word.length + 1) > 14) {
+              _ingredients.add({
+                'name': currentSegment.trim(),
+                'amount': amount,
+                'calories': calories,
+              });
+              currentSegment = word;
+            } else {
+              // Add word to current segment
+              if (currentSegment.isEmpty) {
+                currentSegment = word;
+              } else {
+                currentSegment += ' $word';
+              }
+            }
+          }
+
+          // Add remaining segment as an ingredient
+          if (currentSegment.isNotEmpty) {
+            _ingredients.add({
+              'name': currentSegment.trim(),
+              'amount': amount,
+              'calories': calories,
+            });
+          }
+        } else {
+          // Name is within limit, add as is
+          _ingredients.add(ingredient);
+        }
+      }
     } else {
       // Default fallback ingredients if none provided
       _ingredients = [
@@ -996,49 +1041,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                       ),
                                       // Gap between Ingredients label and boxes - set to 20px
                                       SizedBox(height: 20),
-                                      // Display first two ingredients in first row
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: _buildIngredientRows(),
-                                      ),
-                                      // Gap between rows of ingredient boxes - set to 15px
-                                      SizedBox(height: 15),
-                                      // Display next ingredient and add button in second row
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          // Display third ingredient if available
-                                          _ingredients.length > 2
-                                              ? _buildIngredient(
-                                                  _ingredients[2]['name'],
-                                                  _ingredients[2]['amount'],
-                                                  "${_ingredients[2]['calories']} kcal")
-                                              : SizedBox(), // Empty if no third ingredient
-                                          // Wrap the Add box in a Stack to overlay the icon
-                                          Stack(
-                                            alignment: Alignment.center,
-                                            children: [
-                                              // This handles the box structure and "Add" text alignment
-                                              _buildIngredient('Add', '', ''),
-                                              // Add the icon as a separate overlay, centered, and pushed down
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                    top:
-                                                        20.0), // Moved down another 10px (was 10)
-                                                child: Image.asset(
-                                                  'assets/images/add.png',
-                                                  width:
-                                                      29.0, // Increased size by 10% (was 26.4)
-                                                  height:
-                                                      29.0, // Increased size by 10% (was 26.4)
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
+                                      // Display ingredient grid
+                                      _buildIngredientGrid(),
                                     ],
                                   ),
                                 ),
@@ -1300,6 +1304,67 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     );
   }
 
+  // Build a responsive grid of ingredient boxes
+  Widget _buildIngredientGrid() {
+    if (_ingredients.isEmpty) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _buildIngredient('Add ingredient', '', ''),
+          SizedBox(), // Empty spacer
+        ],
+      );
+    }
+
+    // Organize ingredients in rows of 2 columns
+    List<Widget> rows = [];
+    for (int i = 0; i < _ingredients.length; i += 2) {
+      rows.add(
+        Padding(
+          padding: EdgeInsets.only(bottom: 15), // Gap between rows
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // First ingredient in row
+              _buildIngredient(
+                _ingredients[i]['name'],
+                _ingredients[i]['amount'],
+                "${_ingredients[i]['calories']} kcal",
+              ),
+
+              // Second ingredient or Add button
+              i + 1 < _ingredients.length
+                  ? _buildIngredient(
+                      _ingredients[i + 1]['name'],
+                      _ingredients[i + 1]['amount'],
+                      "${_ingredients[i + 1]['calories']} kcal",
+                    )
+                  : Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Add box
+                        _buildIngredient('Add', '', ''),
+                        // Add icon overlay
+                        Padding(
+                          padding: const EdgeInsets.only(top: 20.0),
+                          child: Image.asset(
+                            'assets/images/add.png',
+                            width: 29.0,
+                            height: 29.0,
+                          ),
+                        ),
+                      ],
+                    ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(children: rows);
+  }
+
+  // Helper method that just returns children for the first row
   List<Widget> _buildIngredientRows() {
     // Show up to 2 ingredients in the first row
     if (_ingredients.isEmpty) {
