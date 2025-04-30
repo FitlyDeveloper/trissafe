@@ -1367,43 +1367,97 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     // Organize ingredients in rows of 2 columns
     List<Widget> rows = [];
+
+    // Process actual ingredients (all except possibly the last one to leave room for Add button)
     for (int i = 0; i < _ingredients.length; i += 2) {
+      // Check if we have a pair or a single ingredient left
+      if (i + 1 < _ingredients.length) {
+        // We have a pair of ingredients
+        rows.add(
+          Padding(
+            padding: EdgeInsets.only(bottom: 15), // Gap between rows
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildIngredient(
+                  _ingredients[i]['name'],
+                  _ingredients[i]['amount'],
+                  "${_ingredients[i]['calories']} kcal",
+                ),
+                _buildIngredient(
+                  _ingredients[i + 1]['name'],
+                  _ingredients[i + 1]['amount'],
+                  "${_ingredients[i + 1]['calories']} kcal",
+                ),
+              ],
+            ),
+          ),
+        );
+      } else {
+        // We have a single ingredient left, pair it with the Add button
+        rows.add(
+          Padding(
+            padding: EdgeInsets.only(bottom: 15), // Gap between rows
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildIngredient(
+                  _ingredients[i]['name'],
+                  _ingredients[i]['amount'],
+                  "${_ingredients[i]['calories']} kcal",
+                ),
+                // Add button
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Add box
+                    _buildIngredient('Add', '', ''),
+                    // Add icon overlay
+                    Padding(
+                      padding: const EdgeInsets.only(top: 20.0),
+                      child: Image.asset(
+                        'assets/images/add.png',
+                        width: 29.0,
+                        height: 29.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    // If we have an even number of ingredients, add a row with just the Add button
+    if (_ingredients.length % 2 == 0) {
       rows.add(
         Padding(
           padding: EdgeInsets.only(bottom: 15), // Gap between rows
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // First ingredient in row
-              _buildIngredient(
-                _ingredients[i]['name'],
-                _ingredients[i]['amount'],
-                "${_ingredients[i]['calories']} kcal",
-              ),
-
-              // Second ingredient or Add button
-              i + 1 < _ingredients.length
-                  ? _buildIngredient(
-                      _ingredients[i + 1]['name'],
-                      _ingredients[i + 1]['amount'],
-                      "${_ingredients[i + 1]['calories']} kcal",
-                    )
-                  : Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Add box
-                        _buildIngredient('Add', '', ''),
-                        // Add icon overlay
-                        Padding(
-                          padding: const EdgeInsets.only(top: 20.0),
-                          child: Image.asset(
-                            'assets/images/add.png',
-                            width: 29.0,
-                            height: 29.0,
-                          ),
-                        ),
-                      ],
+              // Add button
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Add box
+                  _buildIngredient('Add', '', ''),
+                  // Add icon overlay
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20.0),
+                    child: Image.asset(
+                      'assets/images/add.png',
+                      width: 29.0,
+                      height: 29.0,
                     ),
+                  ),
+                ],
+              ),
+              SizedBox(
+                width: (MediaQuery.of(context).size.width - 78) / 2,
+              ), // Empty spacer with same width as ingredient box
             ],
           ),
         ),
