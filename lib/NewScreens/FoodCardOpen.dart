@@ -152,6 +152,33 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         String amount = ingredient['amount'] ?? '';
         dynamic calories = ingredient['calories'] ?? 0;
 
+        // Skip ingredients containing "with"
+        if (name.toLowerCase().contains(' with ')) {
+          // Split at "with" instead of skipping
+          List<String> parts = name.split(' with ');
+          if (parts.length >= 2) {
+            // Add first part
+            if (parts[0].isNotEmpty && parts[0].length <= 14) {
+              _ingredients.add({
+                'name': parts[0].trim(),
+                'amount': amount,
+                'calories': calories,
+              });
+            }
+
+            // Add second part
+            if (parts[1].isNotEmpty && parts[1].length <= 14) {
+              _ingredients.add({
+                'name': parts[1].trim(),
+                'amount': amount,
+                'calories':
+                    calories / 2, // Split calories between two ingredients
+              });
+            }
+          }
+          continue; // Skip the rest of the loop
+        }
+
         // Check if name exceeds 14 characters
         if (name.length > 14) {
           // Split the name by spaces
@@ -191,6 +218,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           _ingredients.add(ingredient);
         }
       }
+
+      // Sort ingredients by calories (highest to lowest)
+      _ingredients.sort((a, b) {
+        int caloriesA = (a['calories'] is int)
+            ? a['calories']
+            : int.tryParse(a['calories'].toString()) ?? 0;
+        int caloriesB = (b['calories'] is int)
+            ? b['calories']
+            : int.tryParse(b['calories'].toString()) ?? 0;
+        return caloriesB.compareTo(caloriesA); // Descending order
+      });
     } else {
       // Default fallback ingredients if none provided
       _ingredients = [
@@ -198,6 +236,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         {'name': 'Berries', 'amount': '20g', 'calories': 10},
         {'name': 'Jam', 'amount': '10g', 'calories': 20}
       ];
+
+      // Sort default ingredients by calories (highest to lowest)
+      _ingredients.sort((a, b) {
+        int caloriesA = (a['calories'] is int)
+            ? a['calories']
+            : int.tryParse(a['calories'].toString()) ?? 0;
+        int caloriesB = (b['calories'] is int)
+            ? b['calories']
+            : int.tryParse(b['calories'].toString()) ?? 0;
+        return caloriesB.compareTo(caloriesA); // Descending order
+      });
     }
 
     // Extract the numeric value from the health score (e.g., 8 from "8/10")
