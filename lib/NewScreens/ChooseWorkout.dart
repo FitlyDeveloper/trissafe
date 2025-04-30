@@ -78,7 +78,7 @@ class _ChooseWorkoutState extends State<ChooseWorkout> {
                         // Weight Lifting Option
                         _buildWorkoutCard(
                           'Weight Lifting',
-                          'Build strength with machines or free weights',
+                          'Lift with machines or free weights',
                           'assets/images/dumbbell.png',
                           () {
                             Navigator.push(
@@ -95,7 +95,7 @@ class _ChooseWorkoutState extends State<ChooseWorkout> {
                         // Running Option
                         _buildWorkoutCard(
                           'Running',
-                          'Track your runs, jogs, sprints etc.',
+                          'Track your runs, jogs, sprints etc',
                           'assets/images/Shoe.png',
                           () {
                             Navigator.push(

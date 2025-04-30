@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:grouped_list/grouped_list.dart';
+import 'ExerciseInfo.dart';
 
 class CodiaPage extends StatefulWidget {
   CodiaPage({super.key});
@@ -12,6 +13,7 @@ class _CodiaPage extends State<CodiaPage> {
   TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   int? _selectedIndex;
+  String? _selectedMuscleGroup;
 
   @override
   void initState() {
@@ -32,13 +34,15 @@ class _CodiaPage extends State<CodiaPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredExercises = _searchQuery.isEmpty
-        ? exercises
-        : exercises
-            .where((ex) =>
-                ex.name.toLowerCase().contains(_searchQuery.toLowerCase()))
-            .toList();
-    return Container(
+    final filteredExercises = exercises.where((ex) {
+      final matchesSearch = _searchQuery.isEmpty || 
+          ex.name.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesMuscle = _selectedMuscleGroup == null || 
+          _selectedMuscleGroup == 'All muscles' ||
+          ex.muscle.toLowerCase() == _selectedMuscleGroup!.toLowerCase();
+      return matchesSearch && matchesMuscle;
+    }).toList();
+    return Material(
       color: Colors.white,
       child: SizedBox(
         width: 393,
@@ -198,7 +202,7 @@ class _CodiaPage extends State<CodiaPage> {
                       ),
                       child: Center(
                         child: Text(
-                          'All Equipment',
+                          'Favorites',
                           style: TextStyle(
                             decoration: TextDecoration.none,
                             fontSize: 17,
@@ -212,32 +216,80 @@ class _CodiaPage extends State<CodiaPage> {
                   ),
                   SizedBox(width: 16),
                   Expanded(
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0xffffffff),
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: const [
-                          BoxShadow(
-                              color: Color(0x14000000),
-                              offset: Offset(0, 3),
-                              blurRadius: 8)
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          'All Muscles',
-                          style: TextStyle(
-                            decoration: TextDecoration.none,
-                            fontSize: 17,
-                            color: const Color(0xff000000),
-                            fontFamily: 'SFProDisplay-Regular',
-                            fontWeight: FontWeight.normal,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(15),
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                          ),
+                          builder: (context) => _buildMuscleGroupPopup(context),
+                        );
+                      },
+                      child: Container(
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: _selectedMuscleGroup != null ? Colors.black : const Color(0xffffffff),
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: const [
+                            BoxShadow(
+                                color: Color(0x14000000),
+                                offset: Offset(0, 3),
+                                blurRadius: 8)
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            _selectedMuscleGroup ?? 'All muscles',
+                            style: TextStyle(
+                              fontSize: 17,
+                              color: _selectedMuscleGroup != null ? Colors.white : const Color(0xff000000),
+                              fontFamily: 'SFProDisplay-Regular',
+                              fontWeight: FontWeight.normal,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
+                  if (_selectedMuscleGroup != null) ...[
+                    SizedBox(width: 8),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD9D9D9),
+                        shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x14000000),
+                            offset: Offset(0, 3),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            setState(() {
+                              _selectedMuscleGroup = null;
+                            });
+                          },
+                          child: Center(
+                            child: Icon(
+                              Icons.close,
+                              size: 16,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -357,12 +409,25 @@ class _CodiaPage extends State<CodiaPage> {
                               ),
                             ),
                             SizedBox(width: 12),
-                            Image.asset(
-                              'assets/images/CircleMenu.png',
-                              width: 18,
-                              height: 18,
-                              color: isSelected ? Colors.white : null,
-                              fit: BoxFit.cover,
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ExerciseInfo(
+                                      exerciseName: ex.name,
+                                      muscle: ex.muscle,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Image.asset(
+                                'assets/images/CircleMenu.png',
+                                width: 18,
+                                height: 18,
+                                color: isSelected ? Colors.white : null,
+                                fit: BoxFit.cover,
+                              ),
                             ),
                             SizedBox(width: 13),
                           ],
@@ -410,6 +475,102 @@ class _CodiaPage extends State<CodiaPage> {
                   ),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMuscleGroupPopup(BuildContext context) {
+    final muscleGroups = [
+      {'name': 'All muscles', 'icon': Icons.grid_view},
+      {'name': 'Chest', 'icon': Icons.image},
+      {'name': 'Back', 'icon': Icons.image},
+      {'name': 'Legs', 'icon': Icons.image},
+      {'name': 'Shoulders', 'icon': Icons.image},
+      {'name': 'Arms', 'icon': Icons.image},
+      {'name': 'Core', 'icon': Icons.image},
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Muscle Group',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'SF Pro Display',
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            ...muscleGroups.map((group) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    setState(() {
+                      _selectedMuscleGroup = group['name'] as String;
+                    });
+                    Navigator.of(context).pop();
+                  },
+                  child: Container(
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 18, right: 18),
+                          child: Icon(
+                            group['icon'] as IconData,
+                            size: 40,
+                            color: Colors.black,
+                          ),
+                        ),
+                        Text(
+                          group['name'] as String,
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontFamily: 'SFProDisplay-Regular',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )),
+            SizedBox(height: 24),
           ],
         ),
       ),
