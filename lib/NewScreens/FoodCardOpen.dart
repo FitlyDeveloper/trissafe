@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../Features/codia/codia_page.dart';
 import 'dart:convert'; // For base64 decoding
 import 'dart:typed_data'; // For Uint8List
+import 'package:http/http.dart' as http; // For API calls to OpenAI
 
 // Custom scroll physics optimized for mouse wheel
 class SlowScrollPhysics extends ScrollPhysics {
@@ -1104,6 +1105,46 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     // If it's a number, convert to string with full precision
     return "$calories kcal";
+  }
+
+  // Calculate calories using OpenAI API based on food name and serving size
+  Future<double> _calculateCaloriesWithAI(
+      String foodName, String servingSize) async {
+    try {
+      // Render.com proxy URL to avoid exposing API key in client code
+      final url = Uri.parse(
+          'https://gym-app-proxy.onrender.com/api/calculate-calories');
+
+      // Prepare the request with food details
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'foodName': foodName,
+          'servingSize': servingSize,
+        }),
+      );
+
+      // Check if request was successful
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Extract calories from response
+        if (data.containsKey('calories')) {
+          return double.tryParse(data['calories'].toString()) ?? 0;
+        }
+      }
+
+      // Log the error if there's an issue
+      print(
+          'Error getting calories estimation: Status ${response.statusCode}, Body: ${response.body}');
+      return 0; // Return 0 as fallback
+    } catch (e) {
+      // Handle any exceptions
+      print('Exception when calculating calories: $e');
+      return 0; // Return 0 as fallback
+    }
   }
 
   @override
@@ -2460,7 +2501,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                               ),
                               child: TextButton(
                                 onPressed: isFormValid
-                                    ? () {
+                                    ? () async {
                                         // Get values from text fields
                                         String foodName =
                                             foodController.text.trim();
@@ -2507,11 +2548,59 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                           size = size.replaceAll(' kg', 'kg');
                                         }
 
-                                        // Parse calories with fallback to 0
+                                        // Parse calories with fallback to AI calculation
                                         double calories = 0;
-                                        if (caloriesText.isNotEmpty) {
+
+                                        // Show loading indicator if we need to calculate calories
+                                        if (caloriesText.isEmpty) {
+                                          // Show loading indicator
+                                          showDialog(
+                                            context: context,
+                                            barrierDismissible: false,
+                                            builder: (BuildContext context) {
+                                              return Center(
+                                                child: Container(
+                                                  width: 100,
+                                                  height: 100,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            10),
+                                                  ),
+                                                  child: Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      CircularProgressIndicator(
+                                                        color: Colors.black,
+                                                      ),
+                                                      SizedBox(height: 10),
+                                                      Text(
+                                                        "Calculating",
+                                                        style: TextStyle(
+                                                          fontFamily:
+                                                              'SF Pro Display',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          );
+
+                                          // Calculate calories using AI
+                                          calories =
+                                              await _calculateCaloriesWithAI(
+                                                  foodName, size);
+
+                                          // Close loading dialog
+                                          Navigator.of(context).pop();
+                                        } else {
+                                          // Try to extract calories from user input
                                           try {
-                                            // Try to extract just the number part if text contains non-numeric characters
                                             final match = RegExp(r'(\d+\.?\d*)')
                                                 .firstMatch(caloriesText);
                                             if (match != null &&

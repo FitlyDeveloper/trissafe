@@ -1,0 +1,21 @@
+{
+  "name": "gym-app-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server for GYM APP to handle OpenAI API calls",
+  "main": "proxy.js",
+  "scripts": {
+    "start": "node proxy.js",
+    "dev": "nodemon proxy.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "openai": "^4.12.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+} 
