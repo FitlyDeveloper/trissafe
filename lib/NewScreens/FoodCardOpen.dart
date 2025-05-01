@@ -1115,9 +1115,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     while (retryCount < maxRetries) {
       try {
-        // Use Render.com proxy URL
-        final url = Uri.parse(
-            'https://gym-app-proxy.onrender.com/api/calculate-calories');
+        // Use localhost for direct server connection instead of Render.com
+        // This connects directly to the server.js that's running locally
+        final url = Uri.parse('http://localhost:3000/api/calculate-calories');
 
         print(
             'Calling nutrition API for: $foodName ($servingSize) - Attempt ${retryCount + 1}');
@@ -1134,7 +1134,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 'servingSize': servingSize,
               }),
             )
-            .timeout(const Duration(seconds: 15)); // Add timeout
+            .timeout(const Duration(
+                seconds: 10)); // Shorter timeout for local server
 
         // Check if request was successful
         if (response.statusCode == 200) {
@@ -2326,45 +2327,60 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               // Close the ingredient dialog first
               Navigator.pop(context);
 
+              // Define a variable to track if our loading dialog is showing
+              bool isLoadingDialogShowing = false;
+
               // Handle empty calories field - calculate with AI
               if (caloriesText.isEmpty) {
-                // Show loading indicator
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (BuildContext context) {
-                    return Center(
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(
-                              color: Colors.black,
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              "Calculating",
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-
                 try {
-                  // Call AI to calculate nutrition
+                  // Show loading indicator
+                  isLoadingDialogShowing = true;
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (BuildContext context) {
+                      return Center(
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                color: Colors.black,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                "Calculating",
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+
+                  // Call AI to calculate nutrition with timeout
                   final nutritionData =
-                      await _calculateNutritionWithAI(foodName, size);
+                      await _calculateNutritionWithAI(foodName, size).timeout(
+                    const Duration(seconds: 15),
+                    onTimeout: () {
+                      print('Nutrition calculation timed out');
+                      return {
+                        'calories': 0.0,
+                        'protein': 0.0,
+                        'carbs': 0.0,
+                        'fat': 0.0
+                      };
+                    },
+                  );
 
                   // Extract values
                   calories = nutritionData['calories'];
@@ -2388,8 +2404,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 } catch (e) {
                   print('Error calculating nutrition: $e');
                 } finally {
-                  // Close loading dialog
-                  Navigator.of(context).pop();
+                  // Always close loading dialog if it's showing
+                  if (isLoadingDialogShowing && Navigator.canPop(context)) {
+                    Navigator.of(context).pop();
+                    isLoadingDialogShowing = false;
+                  }
                 }
               } else {
                 // Parse user-entered calories
