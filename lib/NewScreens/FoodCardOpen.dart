@@ -2311,11 +2311,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                   ),
                                   SizedBox(
                                       width:
-                                          12), // 12px away from calories label
+                                          10), // Reduced from 12px to 10px (2px closer)
                                   Text(
                                     "(optional)",
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize:
+                                          13, // Increased from 12px to 13px
                                       color: Colors.black.withOpacity(0.5),
                                       fontFamily: 'SF Pro Display',
                                     ),
@@ -2411,7 +2412,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   Positioned(
                     top:
                         19, // Adjusted to center with the "Add Ingredient" title (14px + 24px font size / 2 - 22px icon / 2)
-                    right: 18, // Moved 2px to the left from original 20px
+                    right: 22, // Moved 4px to the left (from 18px to 22px)
                     child: GestureDetector(
                       onTap: () {
                         Navigator.pop(context);
