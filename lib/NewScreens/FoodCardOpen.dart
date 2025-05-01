@@ -1107,44 +1107,103 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     return "$calories kcal";
   }
 
-  // Calculate calories using OpenAI API based on food name and serving size
-  Future<double> _calculateCaloriesWithAI(
+  // Calculate nutrition using OpenAI API based on food name and serving size
+  Future<Map<String, dynamic>> _calculateNutritionWithAI(
       String foodName, String servingSize) async {
-    try {
-      // Render.com proxy URL to avoid exposing API key in client code
-      final url = Uri.parse(
-          'https://gym-app-proxy.onrender.com/api/calculate-calories');
+    const int maxRetries = 3;
+    int retryCount = 0;
 
-      // Prepare the request with food details
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'foodName': foodName,
-          'servingSize': servingSize,
-        }),
-      );
+    while (retryCount < maxRetries) {
+      try {
+        // Use Render.com proxy URL
+        final url = Uri.parse(
+            'https://gym-app-proxy.onrender.com/api/calculate-calories');
 
-      // Check if request was successful
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        // Extract calories from response
-        if (data.containsKey('calories')) {
-          return double.tryParse(data['calories'].toString()) ?? 0;
+        print(
+            'Calling nutrition API for: $foodName ($servingSize) - Attempt ${retryCount + 1}');
+
+        // Prepare the request with food details
+        final response = await http
+            .post(
+              url,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: jsonEncode({
+                'foodName': foodName,
+                'servingSize': servingSize,
+              }),
+            )
+            .timeout(const Duration(seconds: 15)); // Add timeout
+
+        // Check if request was successful
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          print('Nutrition API response: $data');
+
+          // Return full nutritional information with proper type handling
+          return {
+            'calories': data['calories'] != null
+                ? double.tryParse(data['calories'].toString()) ?? 0.0
+                : 0.0,
+            'protein': data['protein'] != null
+                ? double.tryParse(data['protein'].toString()) ?? 0.0
+                : 0.0,
+            'carbs': data['carbs'] != null
+                ? double.tryParse(data['carbs'].toString()) ?? 0.0
+                : 0.0,
+            'fat': data['fat'] != null
+                ? double.tryParse(data['fat'].toString()) ?? 0.0
+                : 0.0,
+          };
+        } else {
+          print(
+              'Error getting nutrition estimation: Status ${response.statusCode}, Body: ${response.body}');
+          // Increase retry count and try again
+          retryCount++;
+
+          if (retryCount < maxRetries) {
+            // Wait before retrying with exponential backoff
+            await Future.delayed(Duration(seconds: retryCount * 2));
+            continue;
+          }
+
+          // Default nutrition values when all retries fail
+          return {
+            'calories': 0.0,
+            'protein': 0.0,
+            'carbs': 0.0,
+            'fat': 0.0,
+          };
         }
-      }
+      } catch (e) {
+        print('Exception when calculating nutrition: $e');
+        // Increase retry count and try again
+        retryCount++;
 
-      // Log the error if there's an issue
-      print(
-          'Error getting calories estimation: Status ${response.statusCode}, Body: ${response.body}');
-      return 0; // Return 0 as fallback
-    } catch (e) {
-      // Handle any exceptions
-      print('Exception when calculating calories: $e');
-      return 0; // Return 0 as fallback
+        if (retryCount < maxRetries) {
+          // Wait before retrying with exponential backoff
+          await Future.delayed(Duration(seconds: retryCount * 2));
+          continue;
+        }
+
+        // Default nutrition values when all retries fail
+        return {
+          'calories': 0.0,
+          'protein': 0.0,
+          'carbs': 0.0,
+          'fat': 0.0,
+        };
+      }
     }
+
+    // Default nutrition values when all retries fail (should not reach here)
+    return {
+      'calories': 0.0,
+      'protein': 0.0,
+      'carbs': 0.0,
+      'fat': 0.0,
+    };
   }
 
   @override
@@ -1453,31 +1512,36 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                 Padding(
                                   padding: const EdgeInsets.only(
                                       left: 29, right: 29, top: 14, bottom: 0),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _foodName,
-                                        style: TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'SF Pro Display',
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 70, // Fixed height for consistency
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _foodName,
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'SF Pro Display',
+                                          ),
                                         ),
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        'Rusty Pelican is so good',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          color: Colors.grey[600],
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Rusty Pelican is so good',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            color: Colors.grey[600],
+                                          ),
                                         ),
-                                      ),
-                                      // Add 20px gap between subtitle and divider
-                                      SizedBox(height: 20),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
+
+                                // Add 20px gap between subtitle and divider
+                                SizedBox(height: 20),
 
                                 // Only show social interaction area if not Private
                                 if (_privacyStatus != 'Private') ...[
@@ -1574,7 +1638,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                     ),
                                   ),
                                 ] else
-                                  // Empty container with exact same padding as the social interaction area
+                                  // Empty container with exact same height as the social interaction area
                                   Container(
                                     height:
                                         33, // 0.5px divider + 16px vertical padding*2 + 0.5px divider
@@ -2074,7 +2138,10 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       return Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildIngredient('Add ingredient', '', ''),
+          GestureDetector(
+            onTap: _showAddIngredientDialog, // Make the entire box clickable
+            child: _buildIngredient('Add', '', ''),
+          ),
           SizedBox(), // Empty spacer
         ],
       );
@@ -2121,19 +2188,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   _ingredients[i]['amount'],
                   _formatIngredientCalories(_ingredients[i]['calories']),
                 ),
-                // Add button
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Add box
-                    GestureDetector(
-                      onTap: _showAddIngredientDialog,
-                      child: _buildIngredient('Add', '', ''),
-                    ),
-                    // Add icon overlay - wrap with GestureDetector to make it clickable too
-                    GestureDetector(
-                      onTap: _showAddIngredientDialog,
-                      child: Padding(
+                // Add button with clickable box
+                GestureDetector(
+                  onTap: _showAddIngredientDialog,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Add box
+                      _buildIngredient('Add', '', ''),
+                      // Add icon overlay
+                      Padding(
                         padding: const EdgeInsets.only(top: 20.0),
                         child: Image.asset(
                           'assets/images/add.png',
@@ -2141,8 +2205,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                           height: 29.0,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -2159,19 +2223,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Add button
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Add box
-                  GestureDetector(
-                    onTap: _showAddIngredientDialog,
-                    child: _buildIngredient('Add', '', ''),
-                  ),
-                  // Add icon overlay - wrap with GestureDetector to make it clickable too
-                  GestureDetector(
-                    onTap: _showAddIngredientDialog,
-                    child: Padding(
+              // Add button with clickable box
+              GestureDetector(
+                onTap: _showAddIngredientDialog,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Add box
+                    _buildIngredient('Add', '', ''),
+                    // Add icon overlay
+                    Padding(
                       padding: const EdgeInsets.only(top: 20.0),
                       child: Image.asset(
                         'assets/images/add.png',
@@ -2179,8 +2240,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                         height: 29.0,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               SizedBox(
                 width: (MediaQuery.of(context).size.width - 78) / 2,
@@ -2206,493 +2267,459 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     showDialog(
       context: context,
-      barrierColor: Colors.black
-          .withOpacity(0.5), // Same blackish overlay as Delete meal popup
+      barrierColor: Colors.black.withOpacity(0.5),
       builder: (BuildContext context) {
-        return StatefulBuilder(builder: (context, setDialogState) {
-          // Check form validity
-          void updateFormValidity() {
-            bool foodValid = foodController.text.trim().isNotEmpty;
-            bool sizeValid = sizeController.text.trim().isNotEmpty;
-            setDialogState(() {
-              isFormValid = foodValid && sizeValid;
-            });
-          }
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Check form validity
+            void updateFormValidity() {
+              bool foodValid = foodController.text.trim().isNotEmpty;
+              bool sizeValid = sizeController.text.trim().isNotEmpty;
+              setDialogState(() {
+                isFormValid = foodValid && sizeValid;
+              });
+            }
 
-          return Theme(
-            // Apply theme override to match text selection highlight color from Coach.dart
-            data: Theme.of(context).copyWith(
-              textSelectionTheme: TextSelectionThemeData(
-                selectionColor: Colors.grey.withOpacity(0.3),
-                cursorColor: Colors.black,
-                selectionHandleColor: Colors.black,
-              ),
-            ),
-            child: Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              elevation: 0,
-              backgroundColor: Colors.white,
-              insetPadding: EdgeInsets.symmetric(horizontal: 32),
-              child: Container(
-                width: 326,
-                height: 530, // Adjusted to have 24px below button (526 + 4px)
-                child: Stack(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal:
-                              10), // Reduced horizontal padding to allow wider fields
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Title with exact spacing (24px from top)
-                          SizedBox(height: 14), // Reduced from 24px to 14px
-                          Text(
-                            "Add Ingredient",
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'SF Pro Display',
+            // Function to handle form submission with nutrition calculation
+            void handleSubmit() async {
+              if (!isFormValid) return;
+
+              // Get values from text fields
+              String foodName = foodController.text.trim();
+              String size = sizeController.text.trim();
+              String caloriesText = caloriesController.text.trim();
+
+              // Apply proper case to food name
+              if (foodName.isNotEmpty) {
+                // Check if text is all uppercase
+                bool isAllCaps = foodName == foodName.toUpperCase() &&
+                    foodName != foodName.toLowerCase();
+
+                // Convert all caps to lowercase before formatting
+                if (isAllCaps) foodName = foodName.toLowerCase();
+
+                // Apply title case formatting with improved handling
+                List<String> words = foodName.split(' ');
+                for (int i = 0; i < words.length; i++) {
+                  if (words[i].isNotEmpty) {
+                    words[i] = words[i][0].toUpperCase() +
+                        (words[i].length > 1 ? words[i].substring(1) : '');
+                  }
+                }
+                foodName = words.join(' ');
+              }
+
+              // Format size by removing spaces before 'g' and 'kg'
+              if (size.isNotEmpty) {
+                // Handle '150 g' format
+                size = size.replaceAll(' g', 'g');
+                // Handle '1.5 kg' format
+                size = size.replaceAll(' kg', 'kg');
+              }
+
+              // Initialize nutritional values
+              double calories = 0;
+              String protein = "0";
+              String fat = "0";
+              String carbs = "0";
+
+              // Close the ingredient dialog first
+              Navigator.pop(context);
+
+              // Handle empty calories field - calculate with AI
+              if (caloriesText.isEmpty) {
+                // Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext context) {
+                    return Center(
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              color: Colors.black,
                             ),
-                          ),
-
-                          // Plus icon (45x45) - centered between title and "Food" label, but moved down 4px
-                          SizedBox(
-                              height:
-                                  29), // Increased by 4px (from 25px to 29px)
-                          Image.asset(
-                            'assets/images/add.png',
-                            width: 45.0,
-                            height: 45.0,
-                          ),
-
-                          // Food field
-                          SizedBox(
-                              height:
-                                  25), // Adjusted to match spacing above the icon
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal:
-                                    20), // Reduced padding to allow wider fields
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "Food",
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight
-                                        .w500, // Ensuring medium weight
-                                    fontFamily: 'SF Pro Display',
-                                  ),
-                                ),
-                                SizedBox(
-                                    height:
-                                        7), // Changed to exactly 7px for label to input spacing
-                                Container(
-                                  width:
-                                      280, // Increased to 280px to ensure visible width of 265px
-                                  height: 50, // Match Coach.dart's height
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(
-                                        25), // Match Coach.dart's radius
-                                    border:
-                                        Border.all(color: Colors.grey[300]!),
-                                  ),
-                                  padding: EdgeInsets.symmetric(horizontal: 15),
-                                  child: TextField(
-                                    controller: foodController,
-                                    cursorColor: Colors.black,
-                                    cursorWidth: 1.2,
-                                    onChanged: (value) {
-                                      updateFormValidity();
-                                    },
-                                    style: TextStyle(
-                                      fontSize: 13.6,
-                                      fontFamily: '.SF Pro Display',
-                                      color: Colors.black,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: "Pasta, Tomato, etc",
-                                      hintStyle: TextStyle(
-                                        color:
-                                            Colors.grey[600]!.withOpacity(0.7),
-                                        fontSize: 13.6,
-                                        fontFamily: '.SF Pro Display',
-                                      ),
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      contentPadding:
-                                          EdgeInsets.symmetric(vertical: 15),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Size field
-                          SizedBox(height: 10), // Reduced from 20px to 10px
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal:
-                                    20), // Reduced padding to allow wider fields
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "Size",
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight
-                                        .w500, // Ensuring medium weight
-                                    fontFamily: 'SF Pro Display',
-                                  ),
-                                ),
-                                SizedBox(
-                                    height:
-                                        7), // Changed to exactly 7px for label to input spacing
-                                Container(
-                                  width:
-                                      280, // Increased to 280px to ensure visible width of 265px
-                                  height: 50, // Match Coach.dart's height
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(
-                                        25), // Match Coach.dart's radius
-                                    border:
-                                        Border.all(color: Colors.grey[300]!),
-                                  ),
-                                  padding: EdgeInsets.symmetric(horizontal: 15),
-                                  child: TextField(
-                                    controller: sizeController,
-                                    cursorColor: Colors.black,
-                                    cursorWidth: 1.2,
-                                    onChanged: (value) {
-                                      updateFormValidity();
-                                    },
-                                    style: TextStyle(
-                                      fontSize: 13.6,
-                                      fontFamily: '.SF Pro Display',
-                                      color: Colors.black,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: "150g, 3/4 cup, etc",
-                                      hintStyle: TextStyle(
-                                        color:
-                                            Colors.grey[600]!.withOpacity(0.7),
-                                        fontSize: 13.6,
-                                        fontFamily: '.SF Pro Display',
-                                      ),
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      contentPadding:
-                                          EdgeInsets.symmetric(vertical: 15),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Calories field
-                          SizedBox(height: 10), // Reduced from 20px to 10px
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal:
-                                    20), // Reduced padding to allow wider fields
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      "Calories",
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight
-                                            .w500, // Ensuring medium weight
-                                        fontFamily: 'SF Pro Display',
-                                      ),
-                                    ),
-                                    SizedBox(
-                                        width:
-                                            10), // Reduced from 12px to 10px (2px closer)
-                                    Text(
-                                      "(optional)",
-                                      style: TextStyle(
-                                        fontSize:
-                                            13, // Increased from 12px to 13px
-                                        color: Colors.black.withOpacity(0.5),
-                                        fontFamily: 'SF Pro Display',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(
-                                    height:
-                                        7), // Changed to exactly 7px for label to input spacing
-                                Container(
-                                  width:
-                                      280, // Increased to 280px to ensure visible width of 265px
-                                  height: 50, // Match Coach.dart's height
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(
-                                        25), // Match Coach.dart's radius
-                                    border:
-                                        Border.all(color: Colors.grey[300]!),
-                                  ),
-                                  padding: EdgeInsets.symmetric(horizontal: 15),
-                                  child: TextField(
-                                    controller: caloriesController,
-                                    cursorColor: Colors.black,
-                                    cursorWidth: 1.2,
-                                    style: TextStyle(
-                                      fontSize: 13.6,
-                                      fontFamily: '.SF Pro Display',
-                                      color: Colors.black,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: "450 kcal",
-                                      hintStyle: TextStyle(
-                                        color:
-                                            Colors.grey[600]!.withOpacity(0.7),
-                                        fontSize: 13.6,
-                                        fontFamily: '.SF Pro Display',
-                                      ),
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      contentPadding:
-                                          EdgeInsets.symmetric(vertical: 15),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // 32px spacing between last input field and Add button
-                          SizedBox(
-                              height:
-                                  30), // Reduced from 32px to 30px (moving button up by 2px)
-
-                          // Add button - no longer using Spacer() to allow exact positioning
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 20), // Same padding as input fields
-                            child: Container(
-                              width:
-                                  280, // Exactly the same width as input fields
-                              height:
-                                  48, // Exactly 48px height (already correct)
-                              margin: EdgeInsets.only(
-                                  bottom:
-                                      24), // Changed to exactly 24px from bottom of popup
-                              decoration: BoxDecoration(
-                                color: isFormValid
-                                    ? Colors.black
-                                    : Colors.grey[400],
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                              child: TextButton(
-                                onPressed: isFormValid
-                                    ? () async {
-                                        // Get values from text fields
-                                        String foodName =
-                                            foodController.text.trim();
-                                        String size =
-                                            sizeController.text.trim();
-                                        String caloriesText =
-                                            caloriesController.text.trim();
-
-                                        // Apply proper case to food name (capitalize first letter and letters after spaces)
-                                        // Also handle all-caps case by converting to lowercase first
-                                        if (foodName.isNotEmpty) {
-                                          // Check if text is all uppercase
-                                          bool isAllCaps = foodName ==
-                                                  foodName.toUpperCase() &&
-                                              foodName !=
-                                                  foodName.toLowerCase();
-
-                                          // Convert all caps to lowercase before formatting
-                                          if (isAllCaps)
-                                            foodName = foodName.toLowerCase();
-
-                                          // Apply title case formatting
-                                          List<String> words =
-                                              foodName.split(' ');
-                                          for (int i = 0;
-                                              i < words.length;
-                                              i++) {
-                                            if (words[i].isNotEmpty) {
-                                              words[i] = words[i][0]
-                                                      .toUpperCase() +
-                                                  (words[i].length > 1
-                                                      ? words[i].substring(1)
-                                                      : '');
-                                            }
-                                          }
-                                          foodName = words.join(' ');
-                                        }
-
-                                        // Format size by removing spaces before 'g' and 'kg'
-                                        if (size.isNotEmpty) {
-                                          // Handle '150 g' format
-                                          size = size.replaceAll(' g', 'g');
-                                          // Handle '1.5 kg' format
-                                          size = size.replaceAll(' kg', 'kg');
-                                        }
-
-                                        // Parse calories with fallback to AI calculation
-                                        double calories = 0;
-
-                                        // Show loading indicator if we need to calculate calories
-                                        if (caloriesText.isEmpty) {
-                                          // Show loading indicator
-                                          showDialog(
-                                            context: context,
-                                            barrierDismissible: false,
-                                            builder: (BuildContext context) {
-                                              return Center(
-                                                child: Container(
-                                                  width: 100,
-                                                  height: 100,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            10),
-                                                  ),
-                                                  child: Column(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      CircularProgressIndicator(
-                                                        color: Colors.black,
-                                                      ),
-                                                      SizedBox(height: 10),
-                                                      Text(
-                                                        "Calculating",
-                                                        style: TextStyle(
-                                                          fontFamily:
-                                                              'SF Pro Display',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          );
-
-                                          // Calculate calories using AI
-                                          calories =
-                                              await _calculateCaloriesWithAI(
-                                                  foodName, size);
-
-                                          // Close loading dialog
-                                          Navigator.of(context).pop();
-                                        } else {
-                                          // Try to extract calories from user input
-                                          try {
-                                            final match = RegExp(r'(\d+\.?\d*)')
-                                                .firstMatch(caloriesText);
-                                            if (match != null &&
-                                                match.group(1) != null) {
-                                              calories = double.tryParse(
-                                                      match.group(1)!) ??
-                                                  0;
-                                            }
-                                          } catch (e) {
-                                            print('Error parsing calories: $e');
-                                          }
-                                        }
-
-                                        // Create new ingredient
-                                        Map<String, dynamic> newIngredient = {
-                                          'name': foodName,
-                                          'amount': size,
-                                          'calories': calories
-                                        };
-
-                                        // Add to ingredient list and sort by calories
-                                        setState(() {
-                                          _ingredients.add(newIngredient);
-
-                                          // Sort ingredients by calories (highest to lowest)
-                                          _ingredients.sort((a, b) {
-                                            final caloriesA = a
-                                                    .containsKey('calories')
-                                                ? double.tryParse(a['calories']
-                                                        .toString()) ??
-                                                    0
-                                                : 0;
-                                            final caloriesB = b
-                                                    .containsKey('calories')
-                                                ? double.tryParse(b['calories']
-                                                        .toString()) ??
-                                                    0
-                                                : 0;
-                                            return caloriesB
-                                                .compareTo(caloriesA);
-                                          });
-                                        });
-
-                                        // Save data to persist ingredients
-                                        _saveData();
-
-                                        // Close dialog
-                                        Navigator.pop(context);
-                                      }
-                                    : null, // Disable button if form is invalid
-                                style: ButtonStyle(
-                                  overlayColor: MaterialStateProperty.all(
-                                      Colors.transparent),
-                                ),
-                                child: const Text(
-                                  'Add',
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w500,
-                                    fontFamily: '.SF Pro Display',
-                                    color: Colors.white,
-                                  ),
-                                ),
+                            SizedBox(height: 10),
+                            Text(
+                              "Calculating",
+                              style: TextStyle(
+                                fontFamily: 'SF Pro Display',
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Close button in top right corner
-                    Positioned(
-                      top:
-                          19, // Adjusted to center with the "Add Ingredient" title (14px + 24px font size / 2 - 22px icon / 2)
-                      right: 22, // Moved 4px to the left (from 18px to 22px)
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.pop(context);
-                        },
-                        child: Image.asset(
-                          'assets/images/closeicon.png',
-                          width: 22,
-                          height: 22,
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                    );
+                  },
+                );
+
+                try {
+                  // Call AI to calculate nutrition
+                  final nutritionData =
+                      await _calculateNutritionWithAI(foodName, size);
+
+                  // Extract values
+                  calories = nutritionData['calories'];
+                  protein = nutritionData['protein'].toString();
+                  fat = nutritionData['fat'].toString();
+                  carbs = nutritionData['carbs'].toString();
+
+                  print(
+                      'Nutrition API response: calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
+
+                  // Update main nutritional values if we got a valid calorie count
+                  if (calories > 0) {
+                    setState(() {
+                      _calories = calories.toString();
+                      _protein = protein;
+                      _fat = fat;
+                      _carbs = carbs;
+                    });
+                    print('Updated main nutrition values');
+                  }
+                } catch (e) {
+                  print('Error calculating nutrition: $e');
+                } finally {
+                  // Close loading dialog
+                  Navigator.of(context).pop();
+                }
+              } else {
+                // Parse user-entered calories
+                try {
+                  final match = RegExp(r'(\d+\.?\d*)').firstMatch(caloriesText);
+                  if (match != null && match.group(1) != null) {
+                    calories = double.tryParse(match.group(1)!) ?? 0;
+                  }
+                } catch (e) {
+                  print('Error parsing calories: $e');
+                }
+              }
+
+              // Create new ingredient and add to list
+              setState(() {
+                Map<String, dynamic> newIngredient = {
+                  'name': foodName,
+                  'amount': size,
+                  'calories': calories
+                };
+
+                _ingredients.add(newIngredient);
+
+                // Sort ingredients by calories (highest to lowest)
+                _ingredients.sort((a, b) {
+                  final caloriesA = a.containsKey('calories')
+                      ? double.tryParse(a['calories'].toString()) ?? 0
+                      : 0;
+                  final caloriesB = b.containsKey('calories')
+                      ? double.tryParse(b['calories'].toString()) ?? 0
+                      : 0;
+                  return caloriesB.compareTo(caloriesA);
+                });
+              });
+
+              // Save data to persist ingredients
+              _saveData();
+            }
+
+            return Theme(
+              data: Theme.of(context).copyWith(
+                textSelectionTheme: TextSelectionThemeData(
+                  selectionColor: Colors.grey.withOpacity(0.3),
+                  cursorColor: Colors.black,
+                  selectionHandleColor: Colors.black,
                 ),
               ),
-            ),
-          );
-        });
+              child: Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 0,
+                backgroundColor: Colors.white,
+                insetPadding: EdgeInsets.symmetric(horizontal: 32),
+                child: Container(
+                  width: 326,
+                  height: 530,
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Title
+                            SizedBox(height: 14),
+                            Text(
+                              "Add Ingredient",
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                            ),
+
+                            // Plus icon
+                            SizedBox(height: 29),
+                            Image.asset(
+                              'assets/images/add.png',
+                              width: 45.0,
+                              height: 45.0,
+                            ),
+
+                            // Food field
+                            SizedBox(height: 25),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Food",
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: 'SF Pro Display',
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Container(
+                                    width: 280,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(25),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 15),
+                                    child: TextField(
+                                      controller: foodController,
+                                      cursorColor: Colors.black,
+                                      cursorWidth: 1.2,
+                                      onChanged: (value) {
+                                        updateFormValidity();
+                                      },
+                                      style: TextStyle(
+                                        fontSize: 13.6,
+                                        fontFamily: '.SF Pro Display',
+                                        color: Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: "Pasta, Tomato, etc",
+                                        hintStyle: TextStyle(
+                                          color: Colors.grey[600]!
+                                              .withOpacity(0.7),
+                                          fontSize: 13.6,
+                                          fontFamily: '.SF Pro Display',
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        contentPadding:
+                                            EdgeInsets.symmetric(vertical: 15),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Size field
+                            SizedBox(height: 10),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Size",
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: 'SF Pro Display',
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Container(
+                                    width: 280,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(25),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 15),
+                                    child: TextField(
+                                      controller: sizeController,
+                                      cursorColor: Colors.black,
+                                      cursorWidth: 1.2,
+                                      onChanged: (value) {
+                                        updateFormValidity();
+                                      },
+                                      style: TextStyle(
+                                        fontSize: 13.6,
+                                        fontFamily: '.SF Pro Display',
+                                        color: Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: "150g, 3/4 cup, etc",
+                                        hintStyle: TextStyle(
+                                          color: Colors.grey[600]!
+                                              .withOpacity(0.7),
+                                          fontSize: 13.6,
+                                          fontFamily: '.SF Pro Display',
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        contentPadding:
+                                            EdgeInsets.symmetric(vertical: 15),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Calories field
+                            SizedBox(height: 10),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        "Calories",
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w500,
+                                          fontFamily: 'SF Pro Display',
+                                        ),
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        "(optional)",
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.black.withOpacity(0.5),
+                                          fontFamily: 'SF Pro Display',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 7),
+                                  Container(
+                                    width: 280,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(25),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 15),
+                                    child: TextField(
+                                      controller: caloriesController,
+                                      cursorColor: Colors.black,
+                                      cursorWidth: 1.2,
+                                      style: TextStyle(
+                                        fontSize: 13.6,
+                                        fontFamily: '.SF Pro Display',
+                                        color: Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: "450 kcal",
+                                        hintStyle: TextStyle(
+                                          color: Colors.grey[600]!
+                                              .withOpacity(0.7),
+                                          fontSize: 13.6,
+                                          fontFamily: '.SF Pro Display',
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        contentPadding:
+                                            EdgeInsets.symmetric(vertical: 15),
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Add button
+                            SizedBox(height: 30),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Container(
+                                width: 280,
+                                height: 48,
+                                margin: EdgeInsets.only(bottom: 24),
+                                decoration: BoxDecoration(
+                                  color: isFormValid
+                                      ? Colors.black
+                                      : Colors.grey[400],
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                                child: TextButton(
+                                  onPressed: isFormValid ? handleSubmit : null,
+                                  style: ButtonStyle(
+                                    overlayColor: MaterialStateProperty.all(
+                                        Colors.transparent),
+                                  ),
+                                  child: const Text(
+                                    'Add',
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: '.SF Pro Display',
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Close button
+                      Positioned(
+                        top: 19,
+                        right: 22,
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                          },
+                          child: Image.asset(
+                            'assets/images/closeicon.png',
+                            width: 22,
+                            height: 22,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
       },
     );
   }
