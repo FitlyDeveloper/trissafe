@@ -1213,14 +1213,23 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
       print('FOOD ANALYZER: Calling API endpoint: $baseUrl$analyzeEndpoint');
 
-      // SIMPLIFIED REQUEST - ONLY TEXT, NO IMAGE REFERENCES
+      // Create a map for the request body with only the necessary fields
+      final Map<String, dynamic> requestBody = {
+        'text_query': query,
+        'type': 'nutrition'
+      };
+
+      // COMPLETELY SIMPLIFIED REQUEST - ONLY ESSENTIAL HEADERS
+      // AVOID HEADERS THAT WOULD TRIGGER X-FORWARDED-FOR VALIDATION
       final response = await http
           .post(
             Uri.parse('$baseUrl$analyzeEndpoint'),
             headers: {
               'Content-Type': 'application/json',
+              // Do NOT include Accept, User-Agent or X-Forwarded-For headers
+              // These are causing the Express rate-limit validation error
             },
-            body: jsonEncode({'text_query': query, 'type': 'nutrition'}),
+            body: jsonEncode(requestBody),
           )
           .timeout(const Duration(seconds: 30));
 
