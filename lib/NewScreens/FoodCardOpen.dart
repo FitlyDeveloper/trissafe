@@ -1213,22 +1213,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
       print('FOOD ANALYZER: Calling API endpoint: $baseUrl$analyzeEndpoint');
 
-      // Call the API endpoint with the correct parameter format
-      // The API requires either 'image' OR 'text_query' - we're using text_query
+      // SIMPLIFIED REQUEST - ONLY TEXT, NO IMAGE REFERENCES
       final response = await http
           .post(
             Uri.parse('$baseUrl$analyzeEndpoint'),
             headers: {
               'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'User-Agent':
-                  'FitlyApp/1.0', // Add User-Agent to avoid proxy issues
             },
-            body: jsonEncode({
-              'text_query': query,
-              'type': 'nutrition',
-              'source': 'mobile-app' // Add source to help with debugging
-            }),
+            body: jsonEncode({'text_query': query, 'type': 'nutrition'}),
           )
           .timeout(const Duration(seconds: 30));
 
@@ -1347,34 +1339,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
       print('COMPLETED OpenAI calculation: $nutritionData');
 
-      // Validate the returned data
-      bool hasValidData = false;
-      if (nutritionData.containsKey('calories')) {
-        final calories = nutritionData['calories'];
-        if (calories is num && calories > 0) {
-          hasValidData = true;
-        }
-      }
-
-      if (!hasValidData) {
-        print('WARNING: API returned zero or invalid calories: $nutritionData');
-      }
-
       return nutritionData;
     } catch (e) {
       print('CRITICAL ERROR calculating nutrition: $e');
-      String errorMessage = 'Calculation failed';
-
-      // Extract meaningful error message if possible
-      if (e.toString().contains('Image data is required')) {
-        errorMessage = 'Server expects image data. Try again later.';
-      } else if (e.toString().contains('ERR_ERL_UNEXPECTED_X_FORWARDED_FOR')) {
-        errorMessage = 'Server configuration issue. Try again later.';
-      } else if (e.toString().contains('Failed to analyze')) {
-        errorMessage = 'Food analysis service unavailable. Try again later.';
-      } else if (e.toString().contains('timeout')) {
-        errorMessage = 'Connection timed out. Check your internet.';
-      }
 
       // Ensure we're using a valid context for showing dialogs
       if (localContext.mounted) {
@@ -1401,29 +1368,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                       children: [
                         // Title
                         Text(
-                          "Calculation Failed",
+                          "Scan Failed",
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'SF Pro Display',
                           ),
                         ),
-                        SizedBox(height: 10),
-
-                        // Error message
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Text(
-                            errorMessage,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.black87,
-                              fontFamily: 'SF Pro Display',
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 10),
+                        SizedBox(height: 20),
 
                         // OK button
                         Container(
@@ -1480,14 +1432,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(20),
-                              onTap: () {
-                                Navigator.of(ctx).pop();
-                              },
+                              onTap: () => Navigator.of(ctx).pop(),
                               child: Center(
                                 child: Text(
-                                  "Try Manual Entry",
+                                  "Try Again Later",
                                   style: TextStyle(
-                                    color: Colors.black87,
+                                    color: Colors.black54,
                                     fontSize: 16,
                                     fontFamily: 'SF Pro Display',
                                     fontWeight: FontWeight.w500,
@@ -2715,156 +2665,10 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     print(
                         'INGREDIENT ADD: Invalid calories value received: $calories');
 
-                    // Show an error dialog with option to enter manually
-                    if (mounted) {
-                      bool shouldUseDefaultCalories = await showDialog<bool>(
-                            context: localContext,
-                            barrierDismissible: false,
-                            builder: (BuildContext ctx) {
-                              return Dialog(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                elevation: 0,
-                                backgroundColor: Colors.white,
-                                insetPadding:
-                                    EdgeInsets.symmetric(horizontal: 32),
-                                child: Container(
-                                  width: 326,
-                                  height: 220,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 20),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // Title
-                                        Text(
-                                          "Calculation Issue",
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w600,
-                                            fontFamily: 'SF Pro Display',
-                                          ),
-                                        ),
-                                        SizedBox(height: 15),
-
-                                        // Message
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 20),
-                                          child: Text(
-                                            "Couldn't calculate calories for $foodName. Would you like to use an estimated value or try again?",
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.black87,
-                                              fontFamily: 'SF Pro Display',
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(height: 20),
-
-                                        // Use default button
-                                        Container(
-                                          width: 267,
-                                          height: 40,
-                                          margin: EdgeInsets.only(bottom: 12),
-                                          decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(20),
-                                            color: Colors.white,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black
-                                                    .withOpacity(0.05),
-                                                offset: Offset(0, 2),
-                                                blurRadius: 4,
-                                              ),
-                                            ],
-                                          ),
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            child: InkWell(
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                              onTap: () =>
-                                                  Navigator.of(ctx).pop(true),
-                                              child: Center(
-                                                child: Text(
-                                                  "Use Estimated Calories",
-                                                  style: TextStyle(
-                                                    color: Colors.black87,
-                                                    fontSize: 16,
-                                                    fontFamily:
-                                                        'SF Pro Display',
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-
-                                        // Try again button
-                                        Container(
-                                          width: 267,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(20),
-                                            color: Colors.white,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black
-                                                    .withOpacity(0.05),
-                                                offset: Offset(0, 2),
-                                                blurRadius: 4,
-                                              ),
-                                            ],
-                                          ),
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            child: InkWell(
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                              onTap: () =>
-                                                  Navigator.of(ctx).pop(false),
-                                              child: Center(
-                                                child: Text(
-                                                  "Try Again Later",
-                                                  style: TextStyle(
-                                                    color: Colors.black87,
-                                                    fontSize: 16,
-                                                    fontFamily:
-                                                        'SF Pro Display',
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ) ??
-                          false;
-
-                      if (shouldUseDefaultCalories) {
-                        // Use default calorie estimate based on food type
-                        calories = _estimateCaloriesForFood(foodName, size);
-                        print(
-                            'INGREDIENT ADD: Using estimated calories: $calories');
-                      } else {
-                        // User chose to try again later, so we'll exit without adding
-                        print('INGREDIENT ADD: User chose to try again later');
-                        return;
-                      }
-                    }
+                    // Use default calorie estimate based on food type
+                    calories = _estimateCaloriesForFood(foodName, size);
+                    print(
+                        'INGREDIENT ADD: Using estimated calories: $calories');
                   }
 
                   // Update main nutritional values
