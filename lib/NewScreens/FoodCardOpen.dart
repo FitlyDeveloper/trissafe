@@ -1110,101 +1110,61 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   // Calculate nutrition using OpenAI API based on food name and serving size
   Future<Map<String, dynamic>> _calculateNutritionWithAI(
       String foodName, String servingSize) async {
-    const int maxRetries = 3;
-    int retryCount = 0;
+    // No retry logic - just a direct call like in SnapFood.dart
+    try {
+      // Use the same Render.com URL that SnapFood.dart successfully uses
+      final url = Uri.parse(
+          'https://gym-app-proxy.onrender.com/api/calculate-calories');
 
-    while (retryCount < maxRetries) {
-      try {
-        // Use localhost for direct server connection instead of Render.com
-        // This connects directly to the server.js that's running locally
-        final url = Uri.parse('http://localhost:3000/api/calculate-calories');
+      print('Calling nutrition API for: $foodName ($servingSize)');
 
-        print(
-            'Calling nutrition API for: $foodName ($servingSize) - Attempt ${retryCount + 1}');
+      // Prepare the request with food details
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'foodName': foodName,
+              'servingSize': servingSize,
+            }),
+          )
+          .timeout(const Duration(
+              seconds: 20)); // Longer timeout for Render.com server
 
-        // Prepare the request with food details
-        final response = await http
-            .post(
-              url,
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: jsonEncode({
-                'foodName': foodName,
-                'servingSize': servingSize,
-              }),
-            )
-            .timeout(const Duration(
-                seconds: 10)); // Shorter timeout for local server
+      // Check if request was successful
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('Nutrition API response: $data');
 
-        // Check if request was successful
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          print('Nutrition API response: $data');
-
-          // Return full nutritional information with proper type handling
-          return {
-            'calories': data['calories'] != null
-                ? double.tryParse(data['calories'].toString()) ?? 0.0
-                : 0.0,
-            'protein': data['protein'] != null
-                ? double.tryParse(data['protein'].toString()) ?? 0.0
-                : 0.0,
-            'carbs': data['carbs'] != null
-                ? double.tryParse(data['carbs'].toString()) ?? 0.0
-                : 0.0,
-            'fat': data['fat'] != null
-                ? double.tryParse(data['fat'].toString()) ?? 0.0
-                : 0.0,
-          };
-        } else {
-          print(
-              'Error getting nutrition estimation: Status ${response.statusCode}, Body: ${response.body}');
-          // Increase retry count and try again
-          retryCount++;
-
-          if (retryCount < maxRetries) {
-            // Wait before retrying with exponential backoff
-            await Future.delayed(Duration(seconds: retryCount * 2));
-            continue;
-          }
-
-          // Default nutrition values when all retries fail
-          return {
-            'calories': 0.0,
-            'protein': 0.0,
-            'carbs': 0.0,
-            'fat': 0.0,
-          };
-        }
-      } catch (e) {
-        print('Exception when calculating nutrition: $e');
-        // Increase retry count and try again
-        retryCount++;
-
-        if (retryCount < maxRetries) {
-          // Wait before retrying with exponential backoff
-          await Future.delayed(Duration(seconds: retryCount * 2));
-          continue;
-        }
-
-        // Default nutrition values when all retries fail
+        // Return full nutritional information - no fallbacks
         return {
-          'calories': 0.0,
-          'protein': 0.0,
-          'carbs': 0.0,
-          'fat': 0.0,
+          'calories': data['calories'] != null
+              ? double.tryParse(data['calories'].toString()) ?? 0.0
+              : 0.0,
+          'protein': data['protein'] != null
+              ? double.tryParse(data['protein'].toString()) ?? 0.0
+              : 0.0,
+          'carbs': data['carbs'] != null
+              ? double.tryParse(data['carbs'].toString()) ?? 0.0
+              : 0.0,
+          'fat': data['fat'] != null
+              ? double.tryParse(data['fat'].toString()) ?? 0.0
+              : 0.0,
         };
+      } else {
+        print(
+            'Error getting nutrition estimation: Status ${response.statusCode}, Body: ${response.body}');
+        // No fallback - throw error to trigger catch block
+        throw Exception(
+            'API responded with status code ${response.statusCode}');
       }
+    } catch (e) {
+      print('Exception when calculating nutrition: $e');
+      // No fallback - just rethrow the error
+      rethrow;
     }
-
-    // Default nutrition values when all retries fail (should not reach here)
-    return {
-      'calories': 0.0,
-      'protein': 0.0,
-      'carbs': 0.0,
-      'fat': 0.0,
-    };
   }
 
   @override
@@ -2327,37 +2287,47 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               // Close the ingredient dialog first
               Navigator.pop(context);
 
-              // Define a variable to track if our loading dialog is showing
-              bool isLoadingDialogShowing = false;
-
               // Handle empty calories field - calculate with AI
               if (caloriesText.isEmpty) {
+                // Track loading dialog for proper cleanup
+                bool isLoadingDialogShowing = false;
+                late BuildContext loadingDialogContext;
+
                 try {
-                  // Show loading indicator
+                  // Show loading indicator (fixed to avoid overflow)
                   isLoadingDialogShowing = true;
                   showDialog(
                     context: context,
                     barrierDismissible: false,
                     builder: (BuildContext context) {
-                      return Center(
+                      loadingDialogContext = context;
+                      return Dialog(
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         child: Container(
                           width: 100,
                           height: 100,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                          padding: EdgeInsets.all(20),
                           child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              CircularProgressIndicator(
-                                color: Colors.black,
+                              SizedBox(
+                                width: 30,
+                                height: 30,
+                                child: CircularProgressIndicator(
+                                  color: Colors.black,
+                                  strokeWidth: 3,
+                                ),
                               ),
-                              SizedBox(height: 10),
+                              SizedBox(height: 16),
                               Text(
                                 "Calculating",
                                 style: TextStyle(
                                   fontFamily: 'SF Pro Display',
+                                  fontSize: 14,
                                 ),
                               ),
                             ],
@@ -2367,20 +2337,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     },
                   );
 
-                  // Call AI to calculate nutrition with timeout
+                  // Call OpenAI API to calculate nutrition
                   final nutritionData =
-                      await _calculateNutritionWithAI(foodName, size).timeout(
-                    const Duration(seconds: 15),
-                    onTimeout: () {
-                      print('Nutrition calculation timed out');
-                      return {
-                        'calories': 0.0,
-                        'protein': 0.0,
-                        'carbs': 0.0,
-                        'fat': 0.0
-                      };
-                    },
-                  );
+                      await _calculateNutritionWithAI(foodName, size);
 
                   // Extract values
                   calories = nutritionData['calories'];
@@ -2391,23 +2350,170 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   print(
                       'Nutrition API response: calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
 
-                  // Update main nutritional values if we got a valid calorie count
-                  if (calories > 0) {
-                    setState(() {
-                      _calories = calories.toString();
-                      _protein = protein;
-                      _fat = fat;
-                      _carbs = carbs;
+                  // Update main nutritional values
+                  setState(() {
+                    _calories = calories.toString();
+                    _protein = protein;
+                    _fat = fat;
+                    _carbs = carbs;
+                  });
+                  print('Updated main nutrition values');
+
+                  // Create new ingredient and add to list
+                  setState(() {
+                    Map<String, dynamic> newIngredient = {
+                      'name': foodName,
+                      'amount': size,
+                      'calories': calories
+                    };
+
+                    _ingredients.add(newIngredient);
+
+                    // Sort ingredients by calories (highest to lowest)
+                    _ingredients.sort((a, b) {
+                      final caloriesA = a.containsKey('calories')
+                          ? double.tryParse(a['calories'].toString()) ?? 0
+                          : 0;
+                      final caloriesB = b.containsKey('calories')
+                          ? double.tryParse(b['calories'].toString()) ?? 0
+                          : 0;
+                      return caloriesB.compareTo(caloriesA);
                     });
-                    print('Updated main nutrition values');
-                  }
+                  });
+
+                  // Save data to persist ingredients
+                  _saveData();
                 } catch (e) {
                   print('Error calculating nutrition: $e');
-                } finally {
-                  // Always close loading dialog if it's showing
-                  if (isLoadingDialogShowing && Navigator.canPop(context)) {
-                    Navigator.of(context).pop();
+
+                  // Close the loading dialog if it's still showing
+                  if (isLoadingDialogShowing) {
+                    try {
+                      Navigator.of(loadingDialogContext).pop();
+                    } catch (dialogError) {
+                      print('Error closing dialog: $dialogError');
+                    }
                     isLoadingDialogShowing = false;
+                  }
+
+                  // Show error dialog in the same style as delete meal confirmation
+                  showDialog(
+                    context: context,
+                    barrierColor: Colors.black.withOpacity(0.5),
+                    builder: (BuildContext context) {
+                      return Dialog(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        elevation: 0,
+                        backgroundColor: Colors.white,
+                        insetPadding: EdgeInsets.symmetric(horizontal: 32),
+                        child: Container(
+                          width: 326,
+                          height: 182,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Title
+                                Text(
+                                  "Scan Failed",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'SF Pro Display',
+                                  ),
+                                ),
+                                SizedBox(height: 20),
+
+                                // OK button
+                                Container(
+                                  width: 267,
+                                  height: 40,
+                                  margin: EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                    color: Colors.white,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap: () => Navigator.of(context).pop(),
+                                      child: Center(
+                                        child: Text(
+                                          "OK",
+                                          style: TextStyle(
+                                            color: Colors.black87,
+                                            fontSize: 16,
+                                            fontFamily: 'SF Pro Display',
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // Cancel button
+                                Container(
+                                  width: 267,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                    color: Colors.white,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap: () => Navigator.of(context).pop(),
+                                      child: Center(
+                                        child: Text(
+                                          "Try Again Later",
+                                          style: TextStyle(
+                                            color: Colors.black54,
+                                            fontSize: 16,
+                                            fontFamily: 'SF Pro Display',
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+
+                  return; // Exit the method - don't add ingredient on error
+                } finally {
+                  // Close the loading dialog if it's still showing
+                  if (isLoadingDialogShowing) {
+                    try {
+                      Navigator.of(loadingDialogContext).pop();
+                    } catch (dialogError) {
+                      print('Error closing dialog: $dialogError');
+                    }
                   }
                 }
               } else {
@@ -2420,32 +2526,32 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 } catch (e) {
                   print('Error parsing calories: $e');
                 }
-              }
 
-              // Create new ingredient and add to list
-              setState(() {
-                Map<String, dynamic> newIngredient = {
-                  'name': foodName,
-                  'amount': size,
-                  'calories': calories
-                };
+                // Create new ingredient and add to list
+                setState(() {
+                  Map<String, dynamic> newIngredient = {
+                    'name': foodName,
+                    'amount': size,
+                    'calories': calories
+                  };
 
-                _ingredients.add(newIngredient);
+                  _ingredients.add(newIngredient);
 
-                // Sort ingredients by calories (highest to lowest)
-                _ingredients.sort((a, b) {
-                  final caloriesA = a.containsKey('calories')
-                      ? double.tryParse(a['calories'].toString()) ?? 0
-                      : 0;
-                  final caloriesB = b.containsKey('calories')
-                      ? double.tryParse(b['calories'].toString()) ?? 0
-                      : 0;
-                  return caloriesB.compareTo(caloriesA);
+                  // Sort ingredients by calories (highest to lowest)
+                  _ingredients.sort((a, b) {
+                    final caloriesA = a.containsKey('calories')
+                        ? double.tryParse(a['calories'].toString()) ?? 0
+                        : 0;
+                    final caloriesB = b.containsKey('calories')
+                        ? double.tryParse(b['calories'].toString()) ?? 0
+                        : 0;
+                    return caloriesB.compareTo(caloriesA);
+                  });
                 });
-              });
 
-              // Save data to persist ingredients
-              _saveData();
+                // Save data to persist ingredients
+                _saveData();
+              }
             }
 
             return Theme(
