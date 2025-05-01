@@ -1107,11 +1107,101 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     return "$calories kcal";
   }
 
+  // Helper method to estimate calories when API fails
+  double _estimateCaloriesForFood(String foodName, String servingSize) {
+    // Default values based on common food categories
+    double caloriesPerGram = 2.0; // Average default
+    double grams = 100.0; // Default serving size
+
+    // Extract numeric value and unit from serving size if possible
+    RegExp servingSizeRegex = RegExp(r'(\d+\.?\d*)\s*([a-zA-Z]*)');
+    Match? match = servingSizeRegex.firstMatch(servingSize);
+
+    if (match != null && match.groupCount >= 1) {
+      double? extractedGrams = double.tryParse(match.group(1) ?? '100');
+      if (extractedGrams != null) {
+        grams = extractedGrams;
+
+        // Check if unit is kg, convert to grams
+        if (match.groupCount >= 2 && match.group(2) == 'kg') {
+          grams *= 1000;
+        }
+      }
+    }
+
+    // Categorize the food based on name for better estimates
+    String lowercaseName = foodName.toLowerCase();
+
+    // Vegetables and leafy greens (low calorie density)
+    if (lowercaseName.contains('salad') ||
+        lowercaseName.contains('lettuce') ||
+        lowercaseName.contains('spinach') ||
+        lowercaseName.contains('broccoli') ||
+        lowercaseName.contains('asparagus') ||
+        lowercaseName.contains('cucumber') ||
+        lowercaseName.contains('zucchini')) {
+      caloriesPerGram = 0.3;
+    }
+    // Fruits (medium-low calorie density)
+    else if (lowercaseName.contains('apple') ||
+        lowercaseName.contains('orange') ||
+        lowercaseName.contains('berry') ||
+        lowercaseName.contains('banana') ||
+        lowercaseName.contains('pear') ||
+        lowercaseName.contains('fruit')) {
+      caloriesPerGram = 0.6;
+    }
+    // Lean proteins
+    else if (lowercaseName.contains('chicken') ||
+        lowercaseName.contains('turkey') ||
+        lowercaseName.contains('fish') ||
+        lowercaseName.contains('tuna') ||
+        lowercaseName.contains('shrimp') ||
+        lowercaseName.contains('egg')) {
+      caloriesPerGram = 1.5;
+    }
+    // Grains, pasta, rice
+    else if (lowercaseName.contains('rice') ||
+        lowercaseName.contains('pasta') ||
+        lowercaseName.contains('bread') ||
+        lowercaseName.contains('cereal') ||
+        lowercaseName.contains('oat')) {
+      caloriesPerGram = 1.3;
+    }
+    // High fat foods
+    else if (lowercaseName.contains('cheese') ||
+        lowercaseName.contains('butter') ||
+        lowercaseName.contains('oil') ||
+        lowercaseName.contains('cream') ||
+        lowercaseName.contains('avocado')) {
+      caloriesPerGram = 4.0;
+    }
+    // Desserts and sweets
+    else if (lowercaseName.contains('cake') ||
+        lowercaseName.contains('cookie') ||
+        lowercaseName.contains('chocolate') ||
+        lowercaseName.contains('ice cream') ||
+        lowercaseName.contains('candy') ||
+        lowercaseName.contains('dessert')) {
+      caloriesPerGram = 3.5;
+    }
+    // Nuts and seeds
+    else if (lowercaseName.contains('nut') ||
+        lowercaseName.contains('seed') ||
+        lowercaseName.contains('almond') ||
+        lowercaseName.contains('peanut')) {
+      caloriesPerGram = 6.0;
+    }
+
+    // Calculate total calories
+    return grams * caloriesPerGram;
+  }
+
   // Add the food analyzer service directly to FoodCardOpen to handle text analysis for ingredients
   Future<Map<String, dynamic>> _analyzeIngredientWithAPI(
       String foodName, String servingSize, BuildContext dialogContext) async {
     try {
-      // Since we can't use images here, we need to create a text-based query
+      // Format the query for the text-based analysis
       final query =
           "Calculate nutrition for $foodName, serving size: $servingSize";
 
@@ -1123,17 +1213,21 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
       print('FOOD ANALYZER: Calling API endpoint: $baseUrl$analyzeEndpoint');
 
-      // Call the API endpoint with the text_query parameter
+      // Call the API endpoint with the correct parameter format
+      // The API requires either 'image' OR 'text_query' - we're using text_query
       final response = await http
           .post(
             Uri.parse('$baseUrl$analyzeEndpoint'),
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'User-Agent':
+                  'FitlyApp/1.0', // Add User-Agent to avoid proxy issues
             },
             body: jsonEncode({
-              'text_query':
-                  query, // Use text_query parameter for text-based analysis
-              'type': 'nutrition'
+              'text_query': query,
+              'type': 'nutrition',
+              'source': 'mobile-app' // Add source to help with debugging
             }),
           )
           .timeout(const Duration(seconds: 30));
@@ -1159,8 +1253,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         throw Exception('FOOD ANALYZER API error: ${responseData['error']}');
       }
 
-      // Extract the data portion
+      // Extract the data portion with more careful null checking
       final data = responseData['data'];
+      if (data == null) {
+        throw Exception('No data returned from API');
+      }
+
       print('FOOD ANALYZER: Data extracted: $data');
 
       // Process the nutritional data
@@ -1182,11 +1280,25 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           // Format: data itself contains the values
           nutrition = Map<String, dynamic>.from(data);
         }
+      } else if (data is List && data.isNotEmpty && data[0] is Map) {
+        // Sometimes API might return an array with first element containing nutrition
+        var firstItem = data[0];
+        if (firstItem.containsKey('nutrition')) {
+          nutrition = firstItem['nutrition'] is Map
+              ? Map<String, dynamic>.from(firstItem['nutrition'])
+              : {};
+        } else if (firstItem.containsKey('nutrients')) {
+          nutrition = firstItem['nutrients'] is Map
+              ? Map<String, dynamic>.from(firstItem['nutrients'])
+              : {};
+        } else {
+          nutrition = Map<String, dynamic>.from(firstItem);
+        }
       }
 
       print('FOOD ANALYZER: Extracted nutrition values: $nutrition');
 
-      // Return standardized nutrition values
+      // Return standardized nutrition values with fallbacks
       return {
         'calories':
             _extractNumericValue(nutrition, ['calories', 'kcal', 'energy']),
@@ -1235,9 +1347,34 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
       print('COMPLETED OpenAI calculation: $nutritionData');
 
+      // Validate the returned data
+      bool hasValidData = false;
+      if (nutritionData.containsKey('calories')) {
+        final calories = nutritionData['calories'];
+        if (calories is num && calories > 0) {
+          hasValidData = true;
+        }
+      }
+
+      if (!hasValidData) {
+        print('WARNING: API returned zero or invalid calories: $nutritionData');
+      }
+
       return nutritionData;
     } catch (e) {
       print('CRITICAL ERROR calculating nutrition: $e');
+      String errorMessage = 'Calculation failed';
+
+      // Extract meaningful error message if possible
+      if (e.toString().contains('Image data is required')) {
+        errorMessage = 'Server expects image data. Try again later.';
+      } else if (e.toString().contains('ERR_ERL_UNEXPECTED_X_FORWARDED_FOR')) {
+        errorMessage = 'Server configuration issue. Try again later.';
+      } else if (e.toString().contains('Failed to analyze')) {
+        errorMessage = 'Food analysis service unavailable. Try again later.';
+      } else if (e.toString().contains('timeout')) {
+        errorMessage = 'Connection timed out. Check your internet.';
+      }
 
       // Ensure we're using a valid context for showing dialogs
       if (localContext.mounted) {
@@ -1271,7 +1408,22 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                             fontFamily: 'SF Pro Display',
                           ),
                         ),
-                        SizedBox(height: 20),
+                        SizedBox(height: 10),
+
+                        // Error message
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            errorMessage,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                              fontFamily: 'SF Pro Display',
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 10),
 
                         // OK button
                         Container(
@@ -1333,7 +1485,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                               },
                               child: Center(
                                 child: Text(
-                                  "Try Again",
+                                  "Try Manual Entry",
                                   style: TextStyle(
                                     color: Colors.black87,
                                     fontSize: 16,
@@ -2538,16 +2690,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                 try {
                   // Call the OpenAI API to calculate nutrition
-                  // We don't pass BuildContext here anymore, as we've fixed the implementation
                   final nutritionData =
                       await _calculateNutritionWithAI(foodName, size);
 
                   // Close the loading dialog only if we're still mounted and dialog is showing
-                  if (mounted) {
+                  if (mounted && Navigator.canPop(localContext)) {
                     Navigator.of(localContext).pop();
                   }
 
-                  print('INGREDIENT ADD: Got response from API');
+                  print(
+                      'INGREDIENT ADD: Got response from API: $nutritionData');
 
                   // Extract values with more careful parsing
                   calories = nutritionData['calories'] ?? 0.0;
@@ -2558,12 +2710,161 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   print(
                       'INGREDIENT ADD: Processed values - calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
 
-                  // Only proceed if we got valid data
-                  if (calories <= 0 &&
-                      protein == "0" &&
-                      fat == "0" &&
-                      carbs == "0") {
-                    throw Exception('Invalid nutrition data returned from API');
+                  // Check if we got valid calorie data
+                  if (calories <= 0) {
+                    print(
+                        'INGREDIENT ADD: Invalid calories value received: $calories');
+
+                    // Show an error dialog with option to enter manually
+                    if (mounted) {
+                      bool shouldUseDefaultCalories = await showDialog<bool>(
+                            context: localContext,
+                            barrierDismissible: false,
+                            builder: (BuildContext ctx) {
+                              return Dialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                elevation: 0,
+                                backgroundColor: Colors.white,
+                                insetPadding:
+                                    EdgeInsets.symmetric(horizontal: 32),
+                                child: Container(
+                                  width: 326,
+                                  height: 220,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 20),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // Title
+                                        Text(
+                                          "Calculation Issue",
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                            fontFamily: 'SF Pro Display',
+                                          ),
+                                        ),
+                                        SizedBox(height: 15),
+
+                                        // Message
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 20),
+                                          child: Text(
+                                            "Couldn't calculate calories for $foodName. Would you like to use an estimated value or try again?",
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.black87,
+                                              fontFamily: 'SF Pro Display',
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(height: 20),
+
+                                        // Use default button
+                                        Container(
+                                          width: 267,
+                                          height: 40,
+                                          margin: EdgeInsets.only(bottom: 12),
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            color: Colors.white,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.05),
+                                                offset: Offset(0, 2),
+                                                blurRadius: 4,
+                                              ),
+                                            ],
+                                          ),
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              onTap: () =>
+                                                  Navigator.of(ctx).pop(true),
+                                              child: Center(
+                                                child: Text(
+                                                  "Use Estimated Calories",
+                                                  style: TextStyle(
+                                                    color: Colors.black87,
+                                                    fontSize: 16,
+                                                    fontFamily:
+                                                        'SF Pro Display',
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+
+                                        // Try again button
+                                        Container(
+                                          width: 267,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            color: Colors.white,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.05),
+                                                offset: Offset(0, 2),
+                                                blurRadius: 4,
+                                              ),
+                                            ],
+                                          ),
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              onTap: () =>
+                                                  Navigator.of(ctx).pop(false),
+                                              child: Center(
+                                                child: Text(
+                                                  "Try Again Later",
+                                                  style: TextStyle(
+                                                    color: Colors.black87,
+                                                    fontSize: 16,
+                                                    fontFamily:
+                                                        'SF Pro Display',
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ) ??
+                          false;
+
+                      if (shouldUseDefaultCalories) {
+                        // Use default calorie estimate based on food type
+                        calories = _estimateCaloriesForFood(foodName, size);
+                        print(
+                            'INGREDIENT ADD: Using estimated calories: $calories');
+                      } else {
+                        // User chose to try again later, so we'll exit without adding
+                        print('INGREDIENT ADD: User chose to try again later');
+                        return;
+                      }
+                    }
                   }
 
                   // Update main nutritional values
