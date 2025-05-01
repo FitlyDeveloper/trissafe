@@ -1112,58 +1112,81 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       String foodName, String servingSize) async {
     // No retry logic - just a direct call like in SnapFood.dart
     try {
-      // Use the same Render.com URL that SnapFood.dart successfully uses
-      final url = Uri.parse(
-          'https://gym-app-proxy.onrender.com/api/calculate-calories');
+      // Add debug print at start of method
+      print('STARTING OpenAI calculation for: $foodName ($servingSize)');
 
-      print('Calling nutrition API for: $foodName ($servingSize)');
+      // Use the Render.com URL for OpenAI proxy
+      final url = Uri.parse('https://snap-food.onrender.com/api/analyze-food');
 
-      // Prepare the request with food details
+      print('SENDING API REQUEST to ${url.toString()}');
+
+      // Prepare the request with food details in proper format for the API
       final response = await http
           .post(
             url,
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
             },
             body: jsonEncode({
-              'foodName': foodName,
-              'servingSize': servingSize,
+              'query':
+                  'Calculate nutrition for $foodName, portion size: $servingSize',
+              'type': 'nutrition'
             }),
           )
-          .timeout(const Duration(
-              seconds: 20)); // Longer timeout for Render.com server
+          .timeout(const Duration(seconds: 30)); // Longer timeout for API call
+
+      print('RECEIVED API RESPONSE: Status ${response.statusCode}');
+      print('RESPONSE BODY: ${response.body}');
 
       // Check if request was successful
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Nutrition API response: $data');
+        print('PARSED Nutrition API response: $data');
 
-        // Return full nutritional information - no fallbacks
+        // Extract nutrition data from the response format
+        var nutritionData = data;
+        if (data.containsKey('data')) {
+          nutritionData = data['data'];
+        }
+
+        // Return nutritional information in expected format
         return {
-          'calories': data['calories'] != null
-              ? double.tryParse(data['calories'].toString()) ?? 0.0
-              : 0.0,
-          'protein': data['protein'] != null
-              ? double.tryParse(data['protein'].toString()) ?? 0.0
-              : 0.0,
-          'carbs': data['carbs'] != null
-              ? double.tryParse(data['carbs'].toString()) ?? 0.0
-              : 0.0,
-          'fat': data['fat'] != null
-              ? double.tryParse(data['fat'].toString()) ?? 0.0
-              : 0.0,
+          'calories': _extractNutritionValue(nutritionData, 'calories'),
+          'protein': _extractNutritionValue(nutritionData, 'protein'),
+          'carbs': _extractNutritionValue(nutritionData, 'carbs'),
+          'fat': _extractNutritionValue(nutritionData, 'fat'),
         };
       } else {
         print(
-            'Error getting nutrition estimation: Status ${response.statusCode}, Body: ${response.body}');
+            'ERROR API call failed: Status ${response.statusCode}, Body: ${response.body}');
         // No fallback - throw error to trigger catch block
         throw Exception(
-            'API responded with status code ${response.statusCode}');
+            'API call failed with status code ${response.statusCode}');
       }
     } catch (e) {
-      print('Exception when calculating nutrition: $e');
+      print('CRITICAL ERROR calculating nutrition: $e');
       // No fallback - just rethrow the error
       rethrow;
+    }
+  }
+
+  // Helper method to extract nutrition values from API response
+  double _extractNutritionValue(Map<String, dynamic> data, String key) {
+    try {
+      // Try different possible paths where the value might be found
+      if (data.containsKey(key)) {
+        return double.tryParse(data[key].toString()) ?? 0.0;
+      } else if (data.containsKey('nutrition') && data['nutrition'] is Map) {
+        var nutrition = data['nutrition'];
+        if (nutrition.containsKey(key)) {
+          return double.tryParse(nutrition[key].toString()) ?? 0.0;
+        }
+      }
+      return 0.0;
+    } catch (e) {
+      print('Error extracting $key: $e');
+      return 0.0;
     }
   }
 
@@ -2294,6 +2317,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 late BuildContext loadingDialogContext;
 
                 try {
+                  print(
+                      'INGREDIENT ADD: Started calculation for $foodName ($size)');
+
                   // Show loading indicator (fixed to avoid overflow)
                   isLoadingDialogShowing = true;
                   showDialog(
@@ -2307,16 +2333,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Container(
-                          width: 100,
-                          height: 100,
+                          width: 110, // Slightly wider to avoid text wrapping
+                          height: 110, // Slightly taller
                           padding: EdgeInsets.all(20),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               SizedBox(
-                                width: 30,
-                                height: 30,
+                                width: 32,
+                                height: 32,
                                 child: CircularProgressIndicator(
                                   color: Colors.black,
                                   strokeWidth: 3,
@@ -2324,7 +2350,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                               ),
                               SizedBox(height: 16),
                               Text(
-                                "Calculating",
+                                "Calculating...", // Added ellipsis for clarity
                                 style: TextStyle(
                                   fontFamily: 'SF Pro Display',
                                   fontSize: 14,
@@ -2337,9 +2363,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     },
                   );
 
+                  // Force a minimum delay to ensure the loading animation is visible
+                  await Future.delayed(Duration(seconds: 2));
+
+                  print('INGREDIENT ADD: Calling OpenAI API');
+
                   // Call OpenAI API to calculate nutrition
                   final nutritionData =
                       await _calculateNutritionWithAI(foodName, size);
+
+                  print('INGREDIENT ADD: Got response from API');
 
                   // Extract values
                   calories = nutritionData['calories'];
@@ -2348,7 +2381,25 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   carbs = nutritionData['carbs'].toString();
 
                   print(
-                      'Nutrition API response: calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
+                      'INGREDIENT ADD: Processed values - calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
+
+                  // Close the loading dialog
+                  if (isLoadingDialogShowing) {
+                    try {
+                      Navigator.of(loadingDialogContext).pop();
+                      isLoadingDialogShowing = false;
+                    } catch (dialogError) {
+                      print('Error closing loading dialog: $dialogError');
+                    }
+                  }
+
+                  // Only proceed if we got valid data
+                  if (calories <= 0 &&
+                      protein == "0" &&
+                      fat == "0" &&
+                      carbs == "0") {
+                    throw Exception('Invalid nutrition data returned from API');
+                  }
 
                   // Update main nutritional values
                   setState(() {
@@ -2357,7 +2408,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     _fat = fat;
                     _carbs = carbs;
                   });
-                  print('Updated main nutrition values');
+                  print('INGREDIENT ADD: Updated main nutrition values');
 
                   // Create new ingredient and add to list
                   setState(() {
@@ -2383,22 +2434,28 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                   // Save data to persist ingredients
                   _saveData();
+                  print('INGREDIENT ADD: Successfully added ingredient');
                 } catch (e) {
-                  print('Error calculating nutrition: $e');
+                  print('CRITICAL ERROR calculating nutrition: $e');
 
                   // Close the loading dialog if it's still showing
                   if (isLoadingDialogShowing) {
                     try {
                       Navigator.of(loadingDialogContext).pop();
+                      isLoadingDialogShowing = false;
                     } catch (dialogError) {
-                      print('Error closing dialog: $dialogError');
+                      print('Error closing loading dialog: $dialogError');
                     }
-                    isLoadingDialogShowing = false;
                   }
 
+                  // Add small delay to ensure loading dialog is closed
+                  await Future.delayed(Duration(milliseconds: 300));
+
                   // Show error dialog in the same style as delete meal confirmation
-                  showDialog(
+                  print('INGREDIENT ADD: Displaying error dialog');
+                  await showDialog(
                     context: context,
+                    barrierDismissible: false, // Force user to respond
                     barrierColor: Colors.black.withOpacity(0.5),
                     builder: (BuildContext context) {
                       return Dialog(
@@ -2463,7 +2520,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                   ),
                                 ),
 
-                                // Cancel button
+                                // Try Again button
                                 Container(
                                   width: 267,
                                   height: 40,
@@ -2504,15 +2561,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                       );
                     },
                   );
+                  print('INGREDIENT ADD: Error dialog closed');
 
                   return; // Exit the method - don't add ingredient on error
                 } finally {
-                  // Close the loading dialog if it's still showing
+                  // Close the loading dialog if it's still showing (belt and suspenders approach)
                   if (isLoadingDialogShowing) {
                     try {
                       Navigator.of(loadingDialogContext).pop();
                     } catch (dialogError) {
-                      print('Error closing dialog: $dialogError');
+                      print(
+                          'Error in finally block closing dialog: $dialogError');
                     }
                   }
                 }
