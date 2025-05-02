@@ -76,6 +76,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       _storedImageBase64; // For storing retrieved image from SharedPreferences
   List<Map<String, dynamic>> _ingredients = []; // Store ingredients list
   Map<String, bool> _isIngredientFlipped = {};
+  Set<String> _flippedCards = {}; // Track flipped cards
 
   @override
   void initState() {
@@ -343,14 +344,49 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   item['calories'] = item['calories'] ?? 0;
                 }
 
+                // Ensure macronutrient values are properly converted to doubles
+                double protein = 0.0;
+                double fat = 0.0;
+                double carbs = 0.0;
+
+                // Process protein value
+                if (item.containsKey('protein')) {
+                  var proteinValue = item['protein'];
+                  if (proteinValue is String) {
+                    protein = double.tryParse(proteinValue) ?? 0.0;
+                  } else if (proteinValue is num) {
+                    protein = proteinValue.toDouble();
+                  }
+                }
+
+                // Process fat value
+                if (item.containsKey('fat')) {
+                  var fatValue = item['fat'];
+                  if (fatValue is String) {
+                    fat = double.tryParse(fatValue) ?? 0.0;
+                  } else if (fatValue is num) {
+                    fat = fatValue.toDouble();
+                  }
+                }
+
+                // Process carbs value
+                if (item.containsKey('carbs')) {
+                  var carbsValue = item['carbs'];
+                  if (carbsValue is String) {
+                    carbs = double.tryParse(carbsValue) ?? 0.0;
+                  } else if (carbsValue is num) {
+                    carbs = carbsValue.toDouble();
+                  }
+                }
+
                 // Also include macro values with fallbacks
                 Map<String, dynamic> validIngredient = {
                   'name': item['name'] ?? 'Ingredient',
                   'amount': item['amount'] ?? '1 serving',
                   'calories': item['calories'] ?? 0,
-                  'protein': item['protein'] ?? '0',
-                  'fat': item['fat'] ?? '0',
-                  'carbs': item['carbs'] ?? '0',
+                  'protein': protein,
+                  'fat': fat,
+                  'carbs': carbs,
                 };
 
                 _ingredients.add(validIngredient);
@@ -361,9 +397,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   'name': item,
                   'amount': '1 serving',
                   'calories': 100,
-                  'protein': '5.0',
-                  'fat': '2.0',
-                  'carbs': '15.0',
+                  'protein': 5.0,
+                  'fat': 2.0,
+                  'carbs': 15.0,
                 };
                 _ingredients.add(validIngredient);
               }
@@ -2370,6 +2406,21 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     );
   }
 
+  // Helper method to format macronutrient values
+  String _formatMacroValue(dynamic value) {
+    if (value == null) return "0g";
+
+    double numValue = 0.0;
+
+    if (value is String) {
+      numValue = double.tryParse(value) ?? 0.0;
+    } else if (value is num) {
+      numValue = value.toDouble();
+    }
+
+    return "${numValue.toStringAsFixed(1)}g";
+  }
+
   // Build a flippable ingredient card
   Widget _buildIngredient(String name, String amount, String calories,
       {String protein = "0", String fat = "0", String carbs = "0"}) {
@@ -2473,7 +2524,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          "Protein: ${protein}g",
+                          "Protein: ${_formatMacroValue(protein)}",
                           style: TextStyle(
                             fontSize: 16,
                             fontFamily: 'SF Pro Display',
@@ -2482,7 +2533,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                         ),
                         SizedBox(height: 10),
                         Text(
-                          "Fat: ${fat}g",
+                          "Fat: ${_formatMacroValue(fat)}",
                           style: TextStyle(
                             fontSize: 16,
                             fontFamily: 'SF Pro Display',
@@ -2491,7 +2542,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                         ),
                         SizedBox(height: 10),
                         Text(
-                          "Carbs: ${carbs}g",
+                          "Carbs: ${_formatMacroValue(carbs)}",
                           style: TextStyle(
                             fontSize: 16,
                             fontFamily: 'SF Pro Display',
@@ -3276,6 +3327,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     double totalCarbs = 0;
 
     for (var ingredient in _ingredients) {
+      print('Processing ingredient: ${ingredient['name']}, ' +
+          'Protein: ${ingredient['protein']} (${ingredient['protein'].runtimeType}), ' +
+          'Fat: ${ingredient['fat']} (${ingredient['fat'].runtimeType}), ' +
+          'Carbs: ${ingredient['carbs']} (${ingredient['carbs'].runtimeType})');
+
       // Add calories
       if (ingredient.containsKey('calories')) {
         var calories = ingredient['calories'];
