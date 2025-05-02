@@ -106,14 +106,14 @@ app.post('/api/analyze-food', limiter, checkApiKey, async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name for the entire image (e.g., "Pasta Meal", "Breakfast Plate")\n2. List ingredients with weights and calories (e.g., "Pasta (100g) 200kcal")\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. IMPORTANT: Provide ACCURATE macronutrient breakdown for EACH ingredient (protein, fat, carbs) with realistic values\n6. Use decimal places and realistic estimates\n7. DO NOT respond with markdown code blocks or text explanations\n8. DO NOT prefix your response with "json" or ```\n9. ONLY RETURN A RAW JSON OBJECT\n10. ENSURE ingredient_macros array contains the same number of items as ingredients array\n11. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "ingredient_macros": [\n    {"name": "Item1", "protein": number, "fat": number, "carbs": number},\n    {"name": "Item2", "protein": number, "fat": number, "carbs": number}\n  ],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
+            content: '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name for the entire image (e.g., "Pasta Meal", "Breakfast Plate")\n2. List ingredients with weights and calories (e.g., "Pasta (100g) 200kcal")\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. CRITICAL: provide EXACT macronutrient breakdown for EACH ingredient (protein, fat, carbs) - THIS IS THE MOST IMPORTANT PART\n6. Use decimal places and realistic estimates\n7. DO NOT respond with markdown code blocks or text explanations\n8. DO NOT prefix your response with "json" or ```\n9. ONLY RETURN A RAW JSON OBJECT\n10. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "ingredient_macros": [\n    {"protein": 12.5, "fat": 5.2, "carbs": 45.7},\n    {"protein": 8.3, "fat": 3.1, "carbs": 28.3}\n  ],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string (single name for entire meal),\n  \"ingredients\": array of strings with weights and calories,\n  \"ingredient_macros\": array of objects with name, protein, fat, carbs for EACH ingredient,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}\n\nINCLUDE REALISTIC MACRONUTRIENT VALUES FOR EACH INGREDIENT! The protein, fat, and carbs values must be accurate for each food type."
+                text: "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations. YOU MUST PROVIDE ACCURATE PROTEIN, FAT, AND CARB VALUES FOR EACH INGREDIENT:\n\n{\n  \"meal_name\": string (single name for entire meal),\n  \"ingredients\": array of strings with weights and calories,\n  \"ingredient_macros\": array of objects with protein, fat, carbs for each ingredient,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}"
               },
               {
                 type: 'image_url',
@@ -251,81 +251,146 @@ function transformToRequiredFormat(data) {
       let carbs = 0;
       
       // Try to estimate weights, calories and macros for common ingredients
-      if (ingredientName.toLowerCase().includes('pasta')) {
+      if (ingredientName.toLowerCase().includes('pasta') || 
+          ingredientName.toLowerCase().includes('noodle')) {
         ingredientWeight = '100g';
         ingredientCalories = 200;
-        protein = 7.0;
-        fat = 1.5;
-        carbs = 40.0;
-      } else if (ingredientName.toLowerCase().includes('bread')) {
+        protein = 7.5;
+        fat = 1.1;
+        carbs = 43.2;
+      } else if (ingredientName.toLowerCase().includes('rice')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 130;
+        protein = 2.7;
+        fat = 0.3;
+        carbs = 28.2;
+      } else if (ingredientName.toLowerCase().includes('bread') || 
+                ingredientName.toLowerCase().includes('toast')) {
         ingredientWeight = '60g';
         ingredientCalories = 150;
-        protein = 4.0;
-        fat = 1.0;
-        carbs = 30.0;
-      } else if (ingredientName.toLowerCase().includes('salad')) {
+        protein = 5.4;
+        fat = 1.8;
+        carbs = 28.2;
+      } else if (ingredientName.toLowerCase().includes('potato')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 80;
+        protein = 2.0;
+        fat = 0.1;
+        carbs = 17.0;
+      } else if (ingredientName.toLowerCase().includes('salad') || 
+                ingredientName.toLowerCase().includes('lettuce')) {
         ingredientWeight = '50g';
         ingredientCalories = 25;
-        protein = 1.0;
+        protein = 1.2;
         fat = 0.2;
-        carbs = 5.0;
+        carbs = 3.0;
+      } else if (ingredientName.toLowerCase().includes('tomato')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 18;
+        protein = 0.9;
+        fat = 0.2;
+        carbs = 3.9;
       } else if (ingredientName.toLowerCase().includes('cheese')) {
         ingredientWeight = '30g';
         ingredientCalories = 120;
-        protein = 8.0;
-        fat = 9.0;
-        carbs = 1.0;
+        protein = 7.8;
+        fat = 9.9;
+        carbs = 0.4;
+      } else if (ingredientName.toLowerCase().includes('milk')) {
+        ingredientWeight = '100ml';
+        ingredientCalories = 42;
+        protein = 3.4;
+        fat = 1.0;
+        carbs = 5.0;
+      } else if (ingredientName.toLowerCase().includes('egg')) {
+        ingredientWeight = '50g';
+        ingredientCalories = 78;
+        protein = 6.3;
+        fat = 5.3;
+        carbs = 0.6;
+      } else if (ingredientName.toLowerCase().includes('chicken') || 
+                ingredientName.toLowerCase().includes('poultry')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 165;
+        protein = 31.0;
+        fat = 3.6;
+        carbs = 0.0;
+      } else if (ingredientName.toLowerCase().includes('beef') || 
+                ingredientName.toLowerCase().includes('steak')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 250;
+        protein = 26.0;
+        fat = 17.0;
+        carbs = 0.0;
+      } else if (ingredientName.toLowerCase().includes('pork')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 242;
+        protein = 29.0;
+        fat = 14.0;
+        carbs = 0.0;
+      } else if (ingredientName.toLowerCase().includes('fish') || 
+                ingredientName.toLowerCase().includes('salmon')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 206;
+        protein = 22.0;
+        fat = 13.0;
+        carbs = 0.0;
       } else if (ingredientName.toLowerCase().includes('meat') || 
-                ingredientName.toLowerCase().includes('chicken') ||
                 ingredientName.toLowerCase().includes('salami')) {
         ingredientWeight = '85g';
         ingredientCalories = 250;
         protein = 25.0;
         fat = 15.0;
         carbs = 0.0;
-      } else if (ingredientName.toLowerCase().includes('egg')) {
-        ingredientWeight = '50g';
-        ingredientCalories = 70;
-        protein = 6.0;
-        fat = 5.0;
-        carbs = 0.5;
-      } else if (ingredientName.toLowerCase().includes('milk')) {
-        ingredientWeight = '240ml';
-        ingredientCalories = 120;
-        protein = 8.0;
-        fat = 4.5;
-        carbs = 12.0;
-      } else if (ingredientName.toLowerCase().includes('flour')) {
-        ingredientWeight = '100g';
-        ingredientCalories = 360;
-        protein = 10.0;
-        fat = 1.0;
-        carbs = 75.0;
-      } else if (ingredientName.toLowerCase().includes('sugar')) {
-        ingredientWeight = '20g';
-        ingredientCalories = 80;
+      } else if (ingredientName.toLowerCase().includes('oil') || 
+                ingredientName.toLowerCase().includes('butter')) {
+        ingredientWeight = '15g';
+        ingredientCalories = 135;
+        protein = 0.0;
+        fat = 15.0;
+        carbs = 0.0;
+      } else if (ingredientName.toLowerCase().includes('sugar') || 
+                ingredientName.toLowerCase().includes('sweetener')) {
+        ingredientWeight = '10g';
+        ingredientCalories = 40;
         protein = 0.0;
         fat = 0.0;
-        carbs = 20.0;
-      } else if (ingredientName.toLowerCase().includes('oil')) {
-        ingredientWeight = '15ml';
-        ingredientCalories = 120;
-        protein = 0.0;
-        fat = 14.0;
-        carbs = 0.0;
+        carbs = 10.0;
+      } else if (ingredientName.toLowerCase().includes('fruit') || 
+                ingredientName.toLowerCase().includes('apple') || 
+                ingredientName.toLowerCase().includes('banana')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 60;
+        protein = 0.7;
+        fat = 0.3;
+        carbs = 14.0;
+      } else if (ingredientName.toLowerCase().includes('chocolate') || 
+                ingredientName.toLowerCase().includes('candy')) {
+        ingredientWeight = '25g';
+        ingredientCalories = 130;
+        protein = 1.5;
+        fat = 8.0;
+        carbs = 14.0;
+      } else if (ingredientName.toLowerCase().includes('nut') || 
+                ingredientName.toLowerCase().includes('peanut') || 
+                ingredientName.toLowerCase().includes('almond')) {
+        ingredientWeight = '30g';
+        ingredientCalories = 180;
+        protein = 6.0;
+        fat = 16.0;
+        carbs = 5.0;
       } else {
         // Default values
-        protein = 3.0;
-        fat = 2.0;
-        carbs = 10.0;
+        protein = ingredientCalories * 0.15 / 4; // Estimate 15% of calories from protein
+        fat = ingredientCalories * 0.30 / 9;     // Estimate 30% of calories from fat
+        carbs = ingredientCalories * 0.55 / 4;   // Estimate 55% of calories from carbs
       }
       
-      // Save macros for this ingredient
+      // Save macros for this ingredient with 1 decimal precision
       ingredientMacros.push({
-        name: ingredientName.split("(")[0].trim(),
-        protein: protein,
-        fat: fat,
-        carbs: carbs
+        protein: parseFloat(protein.toFixed(1)),
+        fat: parseFloat(fat.toFixed(1)),
+        carbs: parseFloat(carbs.toFixed(1))
       });
       
       // Return formatted ingredient text
@@ -356,10 +421,9 @@ function transformToRequiredFormat(data) {
     ],
     ingredient_macros: [
       {
-        name: "Mixed ingredients",
-        protein: 10,
-        fat: 7,
-        carbs: 30
+        protein: 10.5,
+        fat: 7.3,
+        carbs: 30.2
       }
     ],
     calories: 500,
@@ -409,69 +473,140 @@ function transformTextToRequiredFormat(text) {
           let ingredientFat = 2.0;
           let ingredientCarbs = 10.0;
           
-          // Customize based on ingredient type
-          if (ingredient.toLowerCase().includes('pasta')) {
+          // Customize based on ingredient type - using same logic as above for consistency
+          if (ingredient.toLowerCase().includes('pasta') || 
+              ingredient.toLowerCase().includes('noodle')) {
             ingredientWeight = '100g';
             ingredientCalories = 200;
-            ingredientProtein = 7.0;
-            ingredientFat = 1.5;
-            ingredientCarbs = 40.0;
-          } else if (ingredient.toLowerCase().includes('bread')) {
+            ingredientProtein = 7.5;
+            ingredientFat = 1.1;
+            ingredientCarbs = 43.2;
+          } else if (ingredient.toLowerCase().includes('rice')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 130;
+            ingredientProtein = 2.7;
+            ingredientFat = 0.3;
+            ingredientCarbs = 28.2;
+          } else if (ingredient.toLowerCase().includes('bread') || 
+                    ingredient.toLowerCase().includes('toast')) {
             ingredientWeight = '60g';
             ingredientCalories = 150;
-            ingredientProtein = 4.0;
-            ingredientFat = 1.0;
-            ingredientCarbs = 30.0;
-          } else if (ingredient.toLowerCase().includes('salad')) {
+            ingredientProtein = 5.4;
+            ingredientFat = 1.8;
+            ingredientCarbs = 28.2;
+          } else if (ingredient.toLowerCase().includes('potato')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 80;
+            ingredientProtein = 2.0;
+            ingredientFat = 0.1;
+            ingredientCarbs = 17.0;
+          } else if (ingredient.toLowerCase().includes('salad') || 
+                    ingredient.toLowerCase().includes('lettuce')) {
             ingredientWeight = '50g';
             ingredientCalories = 25;
-            ingredientProtein = 1.0;
+            ingredientProtein = 1.2;
             ingredientFat = 0.2;
-            ingredientCarbs = 5.0;
+            ingredientCarbs = 3.0;
+          } else if (ingredient.toLowerCase().includes('tomato')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 18;
+            ingredientProtein = 0.9;
+            ingredientFat = 0.2;
+            ingredientCarbs = 3.9;
           } else if (ingredient.toLowerCase().includes('cheese')) {
             ingredientWeight = '30g';
             ingredientCalories = 120;
-            ingredientProtein = 8.0;
-            ingredientFat = 9.0;
-            ingredientCarbs = 1.0;
+            ingredientProtein = 7.8;
+            ingredientFat = 9.9;
+            ingredientCarbs = 0.4;
+          } else if (ingredient.toLowerCase().includes('milk')) {
+            ingredientWeight = '100ml';
+            ingredientCalories = 42;
+            ingredientProtein = 3.4;
+            ingredientFat = 1.0;
+            ingredientCarbs = 5.0;
+          } else if (ingredient.toLowerCase().includes('egg')) {
+            ingredientWeight = '50g';
+            ingredientCalories = 78;
+            ingredientProtein = 6.3;
+            ingredientFat = 5.3;
+            ingredientCarbs = 0.6;
+          } else if (ingredient.toLowerCase().includes('chicken') || 
+                    ingredient.toLowerCase().includes('poultry')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 165;
+            ingredientProtein = 31.0;
+            ingredientFat = 3.6;
+            ingredientCarbs = 0.0;
+          } else if (ingredient.toLowerCase().includes('beef') || 
+                    ingredient.toLowerCase().includes('steak')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 250;
+            ingredientProtein = 26.0;
+            ingredientFat = 17.0;
+            ingredientCarbs = 0.0;
+          } else if (ingredient.toLowerCase().includes('pork')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 242;
+            ingredientProtein = 29.0;
+            ingredientFat = 14.0;
+            ingredientCarbs = 0.0;
+          } else if (ingredient.toLowerCase().includes('fish') || 
+                    ingredient.toLowerCase().includes('salmon')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 206;
+            ingredientProtein = 22.0;
+            ingredientFat = 13.0;
+            ingredientCarbs = 0.0;
           } else if (ingredient.toLowerCase().includes('meat') || 
-                    ingredient.toLowerCase().includes('chicken') ||
                     ingredient.toLowerCase().includes('salami')) {
             ingredientWeight = '85g';
             ingredientCalories = 250;
             ingredientProtein = 25.0;
             ingredientFat = 15.0;
             ingredientCarbs = 0.0;
-          } else if (ingredient.toLowerCase().includes('egg')) {
-            ingredientWeight = '50g';
-            ingredientCalories = 70;
-            ingredientProtein = 6.0;
-            ingredientFat = 5.0;
-            ingredientCarbs = 0.5;
-          } else if (ingredient.toLowerCase().includes('milk')) {
-            ingredientWeight = '240ml';
-            ingredientCalories = 120;
-            ingredientProtein = 8.0;
-            ingredientFat = 4.5;
-            ingredientCarbs = 12.0;
-          } else if (ingredient.toLowerCase().includes('flour')) {
-            ingredientWeight = '100g';
-            ingredientCalories = 360;
-            ingredientProtein = 10.0;
-            ingredientFat = 1.0;
-            ingredientCarbs = 75.0;
-          } else if (ingredient.toLowerCase().includes('sugar')) {
-            ingredientWeight = '20g';
-            ingredientCalories = 80;
+          } else if (ingredient.toLowerCase().includes('oil') || 
+                    ingredient.toLowerCase().includes('butter')) {
+            ingredientWeight = '15g';
+            ingredientCalories = 135;
+            ingredientProtein = 0.0;
+            ingredientFat = 15.0;
+            ingredientCarbs = 0.0;
+          } else if (ingredient.toLowerCase().includes('sugar') || 
+                    ingredient.toLowerCase().includes('sweetener')) {
+            ingredientWeight = '10g';
+            ingredientCalories = 40;
             ingredientProtein = 0.0;
             ingredientFat = 0.0;
-            ingredientCarbs = 20.0;
-          } else if (ingredient.toLowerCase().includes('oil')) {
-            ingredientWeight = '15ml';
-            ingredientCalories = 120;
-            ingredientProtein = 0.0;
-            ingredientFat = 14.0;
-            ingredientCarbs = 0.0;
+            ingredientCarbs = 10.0;
+          } else if (ingredient.toLowerCase().includes('fruit') || 
+                    ingredient.toLowerCase().includes('apple') || 
+                    ingredient.toLowerCase().includes('banana')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 60;
+            ingredientProtein = 0.7;
+            ingredientFat = 0.3;
+            ingredientCarbs = 14.0;
+          } else if (ingredient.toLowerCase().includes('chocolate') || 
+                    ingredient.toLowerCase().includes('candy')) {
+            ingredientWeight = '25g';
+            ingredientCalories = 130;
+            ingredientProtein = 1.5;
+            ingredientFat = 8.0;
+            ingredientCarbs = 14.0;
+          } else if (ingredient.toLowerCase().includes('nut') || 
+                    ingredient.toLowerCase().includes('peanut') || 
+                    ingredient.toLowerCase().includes('almond')) {
+            ingredientWeight = '30g';
+            ingredientCalories = 180;
+            ingredientProtein = 6.0;
+            ingredientFat = 16.0;
+            ingredientCarbs = 5.0;
+          } else {
+            // Default value calculation
+            ingredientProtein = ingredientCalories * 0.15 / 4;
+            ingredientFat = ingredientCalories * 0.30 / 9;
+            ingredientCarbs = ingredientCalories * 0.55 / 4;
           }
           
           if (ingredient.includes('(') && ingredient.includes(')')) {
@@ -481,12 +616,11 @@ function transformTextToRequiredFormat(text) {
             ingredients.push(`${ingredient} (${ingredientWeight}) ${ingredientCalories}kcal`);
           }
           
-          // Add macros for this ingredient
+          // Add macros for this ingredient with 1 decimal precision
           ingredientMacros.push({
-            name: ingredient.split("(")[0].trim(),
-            protein: ingredientProtein,
-            fat: ingredientFat,
-            carbs: ingredientCarbs
+            protein: parseFloat(ingredientProtein.toFixed(1)),
+            fat: parseFloat(ingredientFat.toFixed(1)),
+            carbs: parseFloat(ingredientCarbs.toFixed(1))
           });
         }
       }
@@ -520,12 +654,6 @@ function transformTextToRequiredFormat(text) {
     // If we don't have any ingredients, add placeholders
     if (ingredients.length === 0) {
       ingredients.push("Mixed ingredients (100g) 200kcal");
-      ingredientMacros.push({
-        name: "Mixed ingredients",
-        protein: 10,
-        fat: 7,
-        carbs: 30
-      });
     }
     
     // Calculate a health score (simple algorithm based on macros)
@@ -553,7 +681,6 @@ function transformTextToRequiredFormat(text) {
     ],
     ingredient_macros: [
       {
-        name: "Mixed ingredients",
         protein: 10,
         fat: 7,
         carbs: 30

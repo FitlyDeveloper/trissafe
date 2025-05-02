@@ -598,36 +598,87 @@ class _SnapFoodState extends State<SnapFood> {
 
           // Add macronutrient data if available
           if (i < ingredientMacros.length && ingredientMacros[i] is Map) {
-            Map<String, dynamic> macros = ingredientMacros[i];
+            Map<String, dynamic> macros =
+                Map<String, dynamic>.from(ingredientMacros[i]);
 
             // Add protein, fat, and carbs data if available
             if (macros.containsKey('protein')) {
-              ingredientData['protein'] = macros['protein'].toString();
+              // Convert the value to a number if it's not already
+              var proteinValue = macros['protein'];
+              if (proteinValue is String) {
+                ingredientData['protein'] =
+                    double.tryParse(proteinValue) ?? 0.0;
+              } else if (proteinValue is num) {
+                ingredientData['protein'] = proteinValue.toDouble();
+              } else {
+                ingredientData['protein'] = 0.0;
+              }
+            } else {
+              ingredientData['protein'] = 0.0;
             }
+
             if (macros.containsKey('fat')) {
-              ingredientData['fat'] = macros['fat'].toString();
+              // Convert the value to a number if it's not already
+              var fatValue = macros['fat'];
+              if (fatValue is String) {
+                ingredientData['fat'] = double.tryParse(fatValue) ?? 0.0;
+              } else if (fatValue is num) {
+                ingredientData['fat'] = fatValue.toDouble();
+              } else {
+                ingredientData['fat'] = 0.0;
+              }
+            } else {
+              ingredientData['fat'] = 0.0;
             }
+
             if (macros.containsKey('carbs') ||
                 macros.containsKey('carbohydrates')) {
-              ingredientData['carbs'] =
-                  (macros['carbs'] ?? macros['carbohydrates']).toString();
+              // Convert the value to a number if it's not already
+              var carbsValue = macros['carbs'] ?? macros['carbohydrates'];
+              if (carbsValue is String) {
+                ingredientData['carbs'] = double.tryParse(carbsValue) ?? 0.0;
+              } else if (carbsValue is num) {
+                ingredientData['carbs'] = carbsValue.toDouble();
+              } else {
+                ingredientData['carbs'] = 0.0;
+              }
+            } else {
+              ingredientData['carbs'] = 0.0;
             }
           } else {
             // If no specific macros data for this ingredient, estimate based on calories
             // These are very rough estimates
-            double estimatedProtein = (ingredientData['calories'] * 0.15) /
-                4; // ~15% protein, 4kcal/g
-            double estimatedFat =
-                (ingredientData['calories'] * 0.3) / 9; // ~30% fat, 9kcal/g
-            double estimatedCarbs =
-                (ingredientData['calories'] * 0.55) / 4; // ~55% carbs, 4kcal/g
+            double estimatedProtein = (ingredientData['calories'] is num)
+                ? (ingredientData['calories'] * 0.15) /
+                    4 // ~15% protein, 4kcal/g
+                : 3.0;
+            double estimatedFat = (ingredientData['calories'] is num)
+                ? (ingredientData['calories'] * 0.3) / 9 // ~30% fat, 9kcal/g
+                : 2.0;
+            double estimatedCarbs = (ingredientData['calories'] is num)
+                ? (ingredientData['calories'] * 0.55) / 4 // ~55% carbs, 4kcal/g
+                : 10.0;
 
-            ingredientData['protein'] = estimatedProtein.toStringAsFixed(1);
-            ingredientData['fat'] = estimatedFat.toStringAsFixed(1);
-            ingredientData['carbs'] = estimatedCarbs.toStringAsFixed(1);
+            ingredientData['protein'] = estimatedProtein;
+            ingredientData['fat'] = estimatedFat;
+            ingredientData['carbs'] = estimatedCarbs;
           }
 
           ingredientsList.add(ingredientData);
+        }
+
+        // Print debug information about the ingredients
+        print("Ingredient list with macros:");
+        for (var ingredient in ingredientsList) {
+          String name = ingredient['name'] ?? 'NO NAME';
+          String amount = ingredient['amount'] ?? 'NO AMOUNT';
+          var calories = ingredient['calories'] ?? 'NO CALORIES';
+          var protein = ingredient['protein'] ?? '0';
+          var fat = ingredient['fat'] ?? '0';
+          var carbs = ingredient['carbs'] ?? '0';
+
+          print('- $name - $amount - $calories kcal - ' +
+              'P: $protein, F: $fat, C: $carbs');
         }
 
         // Save the food card
@@ -737,15 +788,15 @@ class _SnapFoodState extends State<SnapFood> {
                 Map<String, dynamic> macros = ingredientMacros[j];
 
                 if (macros.containsKey('protein')) {
-                  ingredientData['protein'] = macros['protein'].toString();
+                  ingredientData['protein'] = macros['protein'];
                 }
                 if (macros.containsKey('fat')) {
-                  ingredientData['fat'] = macros['fat'].toString();
+                  ingredientData['fat'] = macros['fat'];
                 }
                 if (macros.containsKey('carbs') ||
                     macros.containsKey('carbohydrates')) {
                   ingredientData['carbs'] =
-                      (macros['carbs'] ?? macros['carbohydrates']).toString();
+                      macros['carbs'] ?? macros['carbohydrates'];
                 }
               } else {
                 // Add estimated macros based on calories
