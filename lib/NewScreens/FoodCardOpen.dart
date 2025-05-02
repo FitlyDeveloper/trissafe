@@ -198,6 +198,41 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           }
         }
 
+        // Get macronutrient values with proper handling
+        double protein = 0.0;
+        double fat = 0.0;
+        double carbs = 0.0;
+
+        // Process protein value
+        if (ingredient.containsKey('protein')) {
+          var proteinValue = ingredient['protein'];
+          if (proteinValue is String) {
+            protein = double.tryParse(proteinValue) ?? 0.0;
+          } else if (proteinValue is num) {
+            protein = proteinValue.toDouble();
+          }
+        }
+
+        // Process fat value
+        if (ingredient.containsKey('fat')) {
+          var fatValue = ingredient['fat'];
+          if (fatValue is String) {
+            fat = double.tryParse(fatValue) ?? 0.0;
+          } else if (fatValue is num) {
+            fat = fatValue.toDouble();
+          }
+        }
+
+        // Process carbs value
+        if (ingredient.containsKey('carbs')) {
+          var carbsValue = ingredient['carbs'];
+          if (carbsValue is String) {
+            carbs = double.tryParse(carbsValue) ?? 0.0;
+          } else if (carbsValue is num) {
+            carbs = carbsValue.toDouble();
+          }
+        }
+
         // Skip ingredients containing "with"
         if (name.toLowerCase().contains(' with ')) {
           // Split at "with" instead of skipping
@@ -209,6 +244,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 'name': parts[0].trim(),
                 'amount': amount, // Keep original amount
                 'calories': calories, // Keep original calories
+                'protein': protein,
+                'fat': fat,
+                'carbs': carbs
               });
             }
 
@@ -219,6 +257,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 'amount': amount, // Keep original amount
                 'calories':
                     calories / 2, // Split calories between two ingredients
+                'protein': protein / 2,
+                'fat': fat / 2,
+                'carbs': carbs / 2
               });
             }
           }
@@ -239,6 +280,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 'name': currentSegment.trim(),
                 'amount': amount, // Keep original amount
                 'calories': calories, // Keep original calories
+                'protein': protein,
+                'fat': fat,
+                'carbs': carbs
               });
               currentSegment = word;
             } else {
@@ -257,12 +301,21 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               'name': currentSegment.trim(),
               'amount': amount, // Keep original amount
               'calories': calories, // Keep original calories
+              'protein': protein,
+              'fat': fat,
+              'carbs': carbs
             });
           }
         } else {
           // Name is within limit, add as is with original values
-          _ingredients
-              .add({'name': name, 'amount': amount, 'calories': calories});
+          _ingredients.add({
+            'name': name,
+            'amount': amount,
+            'calories': calories,
+            'protein': protein,
+            'fat': fat,
+            'carbs': carbs
+          });
         }
       }
 
@@ -509,10 +562,10 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               'name': ingredient['name'] ?? 'Ingredient',
               'amount': ingredient['amount'] ?? '1 serving',
               'calories': ingredient['calories'] ?? 0,
-              // Include macros with fallbacks
-              'protein': ingredient['protein'] ?? '0',
-              'fat': ingredient['fat'] ?? '0',
-              'carbs': ingredient['carbs'] ?? '0',
+              // Include macros with proper type conversion
+              'protein': _convertToDouble(ingredient['protein']),
+              'fat': _convertToDouble(ingredient['fat']),
+              'carbs': _convertToDouble(ingredient['carbs']),
             };
             validIngredients.add(validIngredient);
           }
@@ -545,15 +598,24 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 // Also create ingredient lookup maps for future use
                 Map<String, dynamic> ingredientAmounts = {};
                 Map<String, dynamic> ingredientCalories = {};
+                Map<String, dynamic> ingredientProteins = {};
+                Map<String, dynamic> ingredientFats = {};
+                Map<String, dynamic> ingredientCarbs = {};
 
                 for (var ingredient in validIngredients) {
                   String name = ingredient['name'];
                   ingredientAmounts[name] = ingredient['amount'];
                   ingredientCalories[name] = ingredient['calories'];
+                  ingredientProteins[name] = ingredient['protein'];
+                  ingredientFats[name] = ingredient['fat'];
+                  ingredientCarbs[name] = ingredient['carbs'];
                 }
 
                 cardData['ingredient_amounts'] = ingredientAmounts;
                 cardData['ingredient_calories'] = ingredientCalories;
+                cardData['ingredient_proteins'] = ingredientProteins;
+                cardData['ingredient_fats'] = ingredientFats;
+                cardData['ingredient_carbs'] = ingredientCarbs;
 
                 // Update with our high quality image - preserve original quality
                 if (_storedImageBase64 != null &&
@@ -661,6 +723,18 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     } catch (e) {
       print('Error saving food data: $e');
     }
+  }
+
+  // Helper method to convert various types to double
+  double _convertToDouble(dynamic value) {
+    if (value == null) return 0.0;
+
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value) ?? 0.0;
+    }
+    return 0.0;
   }
 
   @override
@@ -2418,7 +2492,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       numValue = value.toDouble();
     }
 
-    return "${numValue.toStringAsFixed(1)}g";
+    // Round to nearest whole number using standard rounding rules
+    // (0-0.4 rounds down, 0.5-0.9 rounds up)
+    int roundedValue = numValue.round();
+
+    return "${roundedValue}g";
   }
 
   // Build a flippable ingredient card
@@ -3327,6 +3405,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     double totalCarbs = 0;
 
     for (var ingredient in _ingredients) {
+      // Debug output for each ingredient
       print('Processing ingredient: ${ingredient['name']}, ' +
           'Protein: ${ingredient['protein']} (${ingredient['protein'].runtimeType}), ' +
           'Fat: ${ingredient['fat']} (${ingredient['fat'].runtimeType}), ' +
@@ -3373,12 +3452,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       }
     }
 
-    // Update state with calculated totals
+    // Update state with calculated totals using standard rounding (0-0.4 down, 0.5-0.9 up)
     setState(() {
       _calories = totalCalories.toStringAsFixed(0); // Format as whole number
-      _protein = totalProtein.toStringAsFixed(1); // Format with 1 decimal place
-      _fat = totalFat.toStringAsFixed(1); // Format with 1 decimal place
-      _carbs = totalCarbs.toStringAsFixed(1); // Format with 1 decimal place
+      _protein = totalProtein.round().toString(); // Round to whole number
+      _fat = totalFat.round().toString(); // Round to whole number
+      _carbs = totalCarbs.round().toString(); // Round to whole number
     });
 
     print(

@@ -648,15 +648,22 @@ class _SnapFoodState extends State<SnapFood> {
           } else {
             // If no specific macros data for this ingredient, estimate based on calories
             // These are very rough estimates
-            double estimatedProtein = (ingredientData['calories'] is num)
-                ? (ingredientData['calories'] * 0.15) /
-                    4 // ~15% protein, 4kcal/g
+            double estimatedCalories = 0.0;
+            if (ingredientData['calories'] is num) {
+              estimatedCalories = ingredientData['calories'].toDouble();
+            } else if (ingredientData['calories'] is String) {
+              estimatedCalories =
+                  double.tryParse(ingredientData['calories']) ?? 0.0;
+            }
+
+            double estimatedProtein = estimatedCalories > 0
+                ? (estimatedCalories * 0.15) / 4 // ~15% protein, 4kcal/g
                 : 3.0;
-            double estimatedFat = (ingredientData['calories'] is num)
-                ? (ingredientData['calories'] * 0.3) / 9 // ~30% fat, 9kcal/g
+            double estimatedFat = estimatedCalories > 0
+                ? (estimatedCalories * 0.3) / 9 // ~30% fat, 9kcal/g
                 : 2.0;
-            double estimatedCarbs = (ingredientData['calories'] is num)
-                ? (ingredientData['calories'] * 0.55) / 4 // ~55% carbs, 4kcal/g
+            double estimatedCarbs = estimatedCalories > 0
+                ? (estimatedCalories * 0.55) / 4 // ~55% carbs, 4kcal/g
                 : 10.0;
 
             ingredientData['protein'] = estimatedProtein;

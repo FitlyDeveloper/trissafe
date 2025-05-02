@@ -741,6 +741,31 @@ class _CodiaPageState extends State<CodiaPage> {
     return tdee.round();
   }
 
+  // Helper method to ensure consistent formatting of ingredient values
+  dynamic normalizeIngredientValue(dynamic value) {
+    if (value == null) return 0;
+
+    // If it's a string that should be a number, convert it
+    if (value is String && RegExp(r'^\d+(\.\d+)?$').hasMatch(value)) {
+      try {
+        // Try to parse as integer first
+        return int.tryParse(value) ?? double.tryParse(value) ?? 0;
+      } catch (e) {
+        return 0;
+      }
+    }
+
+    return value;
+  }
+
+  // Helper method to preserve high quality image data
+  String preserveImageQuality(String? base64Data) {
+    if (base64Data == null || base64Data.isEmpty) return '';
+
+    // Keep original high-quality data without any re-processing
+    return base64Data;
+  }
+
   // Load food cards from SharedPreferences
   Future<void> _loadFoodCards() async {
     try {
@@ -761,6 +786,52 @@ class _CodiaPageState extends State<CodiaPage> {
             // Check if the card is less than 12 hours old
             int timestamp = cardData['timestamp'] ?? 0;
             if (currentTime - timestamp < twelveHoursInMillis) {
+              // Ensure ingredients data structure is properly maintained
+              if (cardData.containsKey('ingredients')) {
+                List<dynamic> ingredients = cardData['ingredients'];
+
+                // For each ingredient, ensure we have a properly structured map
+                List<dynamic> validIngredients = [];
+                Map<String, dynamic> ingredientAmounts = {};
+                Map<String, dynamic> ingredientCalories = {};
+
+                for (var ingredient in ingredients) {
+                  if (ingredient is Map<String, dynamic>) {
+                    // Normalize values to ensure proper data types
+                    Map<String, dynamic> normalizedIngredient = {
+                      'name': ingredient['name'] ?? 'Ingredient',
+                      'amount': ingredient['amount'] ?? '1 serving',
+                      'calories':
+                          normalizeIngredientValue(ingredient['calories']),
+                    };
+
+                    // Use the normalized ingredient
+                    validIngredients.add(normalizedIngredient);
+
+                    // Store the name, amount and calories in separate maps for lookup
+                    String name = normalizedIngredient['name'];
+                    ingredientAmounts[name] = normalizedIngredient['amount'];
+                    ingredientCalories[name] = normalizedIngredient['calories'];
+                  } else if (ingredient is String) {
+                    // If it's a string, we need to create a map and add it
+                    validIngredients.add(ingredient);
+                  }
+                }
+
+                // Replace the ingredients list with our validated list
+                cardData['ingredients'] = validIngredients;
+
+                // Add the lookup maps for amounts and calories
+                cardData['ingredient_amounts'] = ingredientAmounts;
+                cardData['ingredient_calories'] = ingredientCalories;
+              }
+
+              // Preserve the original high-quality image if it exists
+              if (cardData.containsKey('image') &&
+                  cardData['image'] is String) {
+                cardData['image'] = preserveImageQuality(cardData['image']);
+              }
+
               cards.add(cardData);
             }
           } catch (e) {
@@ -773,7 +844,6 @@ class _CodiaPageState extends State<CodiaPage> {
           final List<String> updatedCards =
               cards.map((card) => jsonEncode(card)).toList();
           await prefs.setStringList('food_cards', updatedCards);
-        }
       }
 
       // Sort by timestamp (most recent first)
@@ -786,6 +856,7 @@ class _CodiaPageState extends State<CodiaPage> {
       });
 
       print("Loaded ${cards.length} food cards");
+      }
     } catch (e) {
       print("Error loading food cards: $e");
       setState(() {
@@ -839,7 +910,7 @@ class _CodiaPageState extends State<CodiaPage> {
     return calories.toInt();
   }
 
-  // Build default image container for food cards without images
+  // Helper method to build default image container
   Widget _buildDefaultImageContainer() {
     return Container(
       width: 92,
@@ -853,6 +924,37 @@ class _CodiaPageState extends State<CodiaPage> {
         ),
       ),
     );
+  }
+
+  // Helper method to create a square food card image
+  Widget _buildFoodCardImage(String? base64Image) {
+    if (base64Image == null || base64Image.isEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _buildDefaultImageContainer(),
+      );
+    }
+
+    try {
+      Uint8List bytes = base64Decode(base64Image);
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.memory(
+          bytes,
+          width: 92,
+          height: 92,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
+          alignment: Alignment.center,
+        ),
+      );
+    } catch (e) {
+      print("Error decoding image: $e");
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _buildDefaultImageContainer(),
+      );
+    }
   }
 
   // Build a food card widget from food card data
@@ -882,26 +984,71 @@ class _CodiaPageState extends State<CodiaPage> {
     String? base64Image = foodCard['image'];
     List<dynamic> ingredients = foodCard['ingredients'] ?? [];
 
-    // Decode image if available
-    Widget imageWidget;
-    if (base64Image != null && base64Image.isNotEmpty) {
-      try {
-        Uint8List bytes = base64Decode(base64Image);
-        imageWidget = ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.memory(
-            bytes,
-            width: 92,
-            height: 92,
-            fit: BoxFit.cover,
-          ),
-        );
+    // Properly convert ingredients to ensure they are all Map<String, dynamic>
+    List<Map<String, dynamic>> processedIngredients = [];
+    for (var ingredient in ingredients) {
+      if (ingredient is Map<String, dynamic>) {
+        // Already a Map<String, dynamic>, just add it
+        processedIngredients.add(ingredient);
+      } else if (ingredient is String) {
+        // Convert String to Map<String, dynamic>
+        // BUT preserve original calories and amount if found in the parent foodCard
+        String ingredientName = ingredient.toString();
+
+        // Try to find amount and calories by examining foodCard
+        String amount = '1 serving';
+        dynamic calories = 0;
+
+        // If the parent foodCard has calories data for this specific ingredient, use it
+        if (foodCard.containsKey('ingredient_amounts') &&
+            foodCard['ingredient_amounts'] is Map &&
+            foodCard['ingredient_amounts'].containsKey(ingredientName)) {
+          amount = foodCard['ingredient_amounts'][ingredientName] ?? amount;
+        }
+
+        if (foodCard.containsKey('ingredient_calories') &&
+            foodCard['ingredient_calories'] is Map &&
+            foodCard['ingredient_calories'].containsKey(ingredientName)) {
+          calories =
+              foodCard['ingredient_calories'][ingredientName] ?? calories;
+        }
+
+        processedIngredients.add({
+          'name': ingredientName,
+          'amount': amount,
+          'calories': calories,
+        });
+      } else {
+        // Try to convert other types to String then to Map
+        try {
+          String ingredientStr = ingredient.toString();
+
+          // Use the same logic as above to try to find amount and calories
+          String amount = '1 serving';
+          dynamic calories = 0;
+
+          if (foodCard.containsKey('ingredient_amounts') &&
+              foodCard['ingredient_amounts'] is Map &&
+              foodCard['ingredient_amounts'].containsKey(ingredientStr)) {
+            amount = foodCard['ingredient_amounts'][ingredientStr] ?? amount;
+          }
+
+          if (foodCard.containsKey('ingredient_calories') &&
+              foodCard['ingredient_calories'] is Map &&
+              foodCard['ingredient_calories'].containsKey(ingredientStr)) {
+            calories =
+                foodCard['ingredient_calories'][ingredientStr] ?? calories;
+          }
+
+          processedIngredients.add({
+            'name': ingredientStr,
+            'amount': amount,
+            'calories': calories,
+          });
       } catch (e) {
-        print("Error decoding image: $e");
-        imageWidget = _buildDefaultImageContainer();
+          print("Skipping invalid ingredient: $e");
       }
-    } else {
-      imageWidget = _buildDefaultImageContainer();
+      }
     }
 
     return Padding(
@@ -911,7 +1058,16 @@ class _CodiaPageState extends State<CodiaPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => FoodCardOpen(foodName: name),
+              builder: (context) => FoodCardOpen(
+                foodName: name,
+                calories: calories.toString(),
+                protein: protein.toString(),
+                fat: fat.toString(),
+                carbs: carbs.toString(),
+                imageBase64: base64Image,
+                ingredients: processedIngredients,
+                healthScore: foodCard['health_score'] ?? '8/10',
+              ),
             ),
           );
         },
@@ -930,10 +1086,11 @@ class _CodiaPageState extends State<CodiaPage> {
           ),
           child: Row(
             children: [
-              // Food image or placeholder
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: imageWidget,
+              // Food image or placeholder - maintain perfect square shape
+              SizedBox(
+                width: 92,
+                height: 92,
+                child: _buildFoodCardImage(base64Image),
               ),
               SizedBox(width: 12),
 
@@ -1069,8 +1226,8 @@ class _CodiaPageState extends State<CodiaPage> {
   List<Widget> _buildDynamicFoodCards() {
     final List<Widget> widgets = [];
 
-    // Show loading indicator if still loading
-    if (_isLoadingFoodCards) {
+    // Only show loading indicator if we're still loading AND there are food cards to show
+    if (_isLoadingFoodCards && _foodCards.isNotEmpty) {
       widgets.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 20),
@@ -1081,12 +1238,13 @@ class _CodiaPageState extends State<CodiaPage> {
       );
     }
     // Display food cards loaded from SharedPreferences
-    else if (!_foodCards.isEmpty) {
+    else if (_foodCards.isNotEmpty) {
       for (var foodCard in _foodCards) {
         widgets.add(_buildFoodCard(foodCard));
       }
     }
-    // Nothing to show if the list is empty - no message
+    // No loading animation when there are no food cards to show
+    // Just return an empty list of widgets
 
     return widgets;
   }
@@ -1095,10 +1253,17 @@ class _CodiaPageState extends State<CodiaPage> {
   Widget build(BuildContext context) {
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
-    return Stack(
+    return Scaffold(
+      // Ensure the entire screen is filled with the background color
+      backgroundColor:
+          Color(0xFFF5F5F5), // Light background color to match the app's theme
+      body: Stack(
       children: [
         // Background and scrollable content
         Container(
+            // Ensure the container fills the entire screen
+            width: MediaQuery.of(context).size.width,
+            height: MediaQuery.of(context).size.height,
           decoration: BoxDecoration(
             image: DecorationImage(
               image: AssetImage('assets/images/background4.jpg'),
@@ -1106,6 +1271,7 @@ class _CodiaPageState extends State<CodiaPage> {
             ),
           ),
           child: SingleChildScrollView(
+              // Ensure the scrollable content fills the available space
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1114,8 +1280,8 @@ class _CodiaPageState extends State<CodiaPage> {
 
                 // Header with Fitly title and icons
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 29, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 29, vertical: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1130,8 +1296,8 @@ class _CodiaPageState extends State<CodiaPage> {
                           );
                         },
                         child: Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 26, vertical: 8),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 26, vertical: 8),
                           width: 70,
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -1188,7 +1354,8 @@ class _CodiaPageState extends State<CodiaPage> {
                               print('Error reading $key: $e');
                             }
                           }
-                          print('==========================================\n');
+                            print(
+                                '==========================================\n');
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1233,7 +1400,8 @@ class _CodiaPageState extends State<CodiaPage> {
 
                 // Today text
                 Padding(
-                  padding: const EdgeInsets.only(left: 29, top: 8, bottom: 16),
+                    padding:
+                        const EdgeInsets.only(left: 29, top: 8, bottom: 16),
                   child: Text(
                     'Today',
                     style: TextStyle(
@@ -1404,7 +1572,8 @@ class _CodiaPageState extends State<CodiaPage> {
 
                 // Recent Activity section
                 Padding(
-                  padding: const EdgeInsets.only(left: 29, top: 24, bottom: 16),
+                    padding:
+                        const EdgeInsets.only(left: 29, top: 24, bottom: 16),
                   child: Text(
                     'Recent Activity',
                     style: TextStyle(
@@ -1468,6 +1637,7 @@ class _CodiaPageState extends State<CodiaPage> {
           ),
         ),
       ],
+      ),
     );
   }
 
