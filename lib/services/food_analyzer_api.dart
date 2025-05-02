@@ -26,7 +26,12 @@ class FoodAnalyzerApi {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: jsonEncode({'image': dataUri}),
+            body: jsonEncode({
+              'image': dataUri,
+              'detail_level': 'high',
+              'include_ingredient_macros': true,
+              'return_ingredient_nutrition': true,
+            }),
           )
           .timeout(const Duration(seconds: 30));
 
@@ -45,7 +50,8 @@ class FoodAnalyzerApi {
       }
 
       // If we got here, confirm that we received the expected format
-      print('API response format: ${responseData['data'] is Map ? 'Map' : 'Other type'}');
+      print(
+          'API response format: ${responseData['data'] is Map ? 'Map' : 'Other type'}');
       if (responseData['data'] is Map) {
         print('Keys in data: ${(responseData['data'] as Map).keys.join(', ')}');
       }

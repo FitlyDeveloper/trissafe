@@ -106,14 +106,14 @@ app.post('/api/analyze-food', limiter, checkApiKey, async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name for the entire image (e.g., "Pasta Meal", "Breakfast Plate")\n2. List ingredients with weights and calories (e.g., "Pasta (100g) 200kcal")\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. Use decimal places and realistic estimates\n6. DO NOT respond with markdown code blocks or text explanations\n7. DO NOT prefix your response with "json" or ```\n8. ONLY RETURN A RAW JSON OBJECT\n9. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
+            content: '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name for the entire image (e.g., "Pasta Meal", "Breakfast Plate")\n2. List ingredients with weights and calories (e.g., "Pasta (100g) 200kcal")\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. Additionally, provide macronutrient breakdown for EACH ingredient (protein, fat, carbs)\n6. Use decimal places and realistic estimates\n7. DO NOT respond with markdown code blocks or text explanations\n8. DO NOT prefix your response with "json" or ```\n9. ONLY RETURN A RAW JSON OBJECT\n10. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "ingredient_macros": [\n    {"protein": number, "fat": number, "carbs": number},\n    {"protein": number, "fat": number, "carbs": number}\n  ],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string (single name for entire meal),\n  \"ingredients\": array of strings with weights and calories,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}"
+                text: "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string (single name for entire meal),\n  \"ingredients\": array of strings with weights and calories,\n  \"ingredient_macros\": array of objects with protein, fat, carbs for each ingredient,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}"
               },
               {
                 type: 'image_url',
@@ -235,29 +235,79 @@ function transformToRequiredFormat(data) {
   if (data.meal && Array.isArray(data.meal) && data.meal.length > 0) {
     const mealItem = data.meal[0];
     
+    // Ingredient macros array to match the number of ingredients
+    const ingredientsList = mealItem.ingredients || [];
+    const ingredientMacros = [];
+    
+    // Create ingredient macros array
+    const transformedIngredients = ingredientsList.map((ingredient, index) => {
+      let ingredientName = typeof ingredient === 'string' ? ingredient : '';
+      let ingredientWeight = '30g';
+      let ingredientCalories = 75;
+      
+      // Estimate ingredient macros based on name
+      let protein = 0;
+      let fat = 0;
+      let carbs = 0;
+      
+      // Try to estimate weights, calories and macros for common ingredients
+      if (ingredientName.toLowerCase().includes('pasta')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 200;
+        protein = 7.0;
+        fat = 1.5;
+        carbs = 40.0;
+      } else if (ingredientName.toLowerCase().includes('bread')) {
+        ingredientWeight = '60g';
+        ingredientCalories = 150;
+        protein = 4.0;
+        fat = 1.0;
+        carbs = 30.0;
+      } else if (ingredientName.toLowerCase().includes('salad')) {
+        ingredientWeight = '50g';
+        ingredientCalories = 25;
+        protein = 1.0;
+        fat = 0.2;
+        carbs = 5.0;
+      } else if (ingredientName.toLowerCase().includes('cheese')) {
+        ingredientWeight = '30g';
+        ingredientCalories = 120;
+        protein = 8.0;
+        fat = 9.0;
+        carbs = 1.0;
+      } else if (ingredientName.toLowerCase().includes('meat') || 
+                ingredientName.toLowerCase().includes('chicken') ||
+                ingredientName.toLowerCase().includes('salami')) {
+        ingredientWeight = '85g';
+        ingredientCalories = 250;
+        protein = 25.0;
+        fat = 15.0;
+        carbs = 0.0;
+      } else {
+        // Default values
+        protein = 3.0;
+        fat = 2.0;
+        carbs = 10.0;
+      }
+      
+      // Save macros for this ingredient
+      ingredientMacros.push({
+        protein: protein,
+        fat: fat,
+        carbs: carbs
+      });
+      
+      // Return formatted ingredient text
+      if (typeof ingredient === 'string') {
+        return `${ingredient} (${ingredientWeight}) ${ingredientCalories}kcal`;
+      }
+      return ingredient;
+    });
+    
     return {
       meal_name: mealItem.dish || "Mixed Meal",
-      ingredients: mealItem.ingredients.map(ingredient => {
-        if (typeof ingredient === 'string') {
-          // Try to estimate weights and calories
-          if (ingredient.toLowerCase().includes('pasta')) {
-            return `${ingredient} (100g) 200kcal`;
-          } else if (ingredient.toLowerCase().includes('bread')) {
-            return `${ingredient} (60g) 150kcal`;
-          } else if (ingredient.toLowerCase().includes('salad')) {
-            return `${ingredient} (50g) 25kcal`;
-          } else if (ingredient.toLowerCase().includes('cheese')) {
-            return `${ingredient} (30g) 120kcal`;
-          } else if (ingredient.toLowerCase().includes('meat') || 
-                    ingredient.toLowerCase().includes('chicken') ||
-                    ingredient.toLowerCase().includes('salami')) {
-            return `${ingredient} (85g) 250kcal`;
-          } else {
-            return `${ingredient} (30g) 75kcal`;
-          }
-        }
-        return ingredient;
-      }),
+      ingredients: transformedIngredients,
+      ingredient_macros: ingredientMacros,
       calories: mealItem.calories || 0,
       protein: mealItem.macronutrients?.protein || 0,
       fat: mealItem.macronutrients?.fat || 0,
@@ -272,6 +322,13 @@ function transformToRequiredFormat(data) {
     meal_name: "Mixed Meal",
     ingredients: [
       "Mixed ingredients (100g) 200kcal"
+    ],
+    ingredient_macros: [
+      {
+        protein: 10,
+        fat: 7,
+        carbs: 30
+      }
     ],
     calories: 500,
     protein: 20,
@@ -288,6 +345,7 @@ function transformTextToRequiredFormat(text) {
   if (text.includes('Food item') || text.includes('FOOD ANALYSIS RESULTS')) {
     const lines = text.split('\n');
     const ingredients = [];
+    const ingredientMacros = [];
     let calories = 0;
     let protein = 0;
     let fat = 0;
@@ -313,12 +371,60 @@ function transformTextToRequiredFormat(text) {
         
         for (const part of ingredientParts) {
           let ingredient = part.trim();
+          let ingredientWeight = '30g';
+          let ingredientCalories = 75;
+          let ingredientProtein = 3.0;
+          let ingredientFat = 2.0;
+          let ingredientCarbs = 10.0;
+          
+          // Customize based on ingredient type
+          if (ingredient.toLowerCase().includes('pasta')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 200;
+            ingredientProtein = 7.0;
+            ingredientFat = 1.5;
+            ingredientCarbs = 40.0;
+          } else if (ingredient.toLowerCase().includes('bread')) {
+            ingredientWeight = '60g';
+            ingredientCalories = 150;
+            ingredientProtein = 4.0;
+            ingredientFat = 1.0;
+            ingredientCarbs = 30.0;
+          } else if (ingredient.toLowerCase().includes('salad')) {
+            ingredientWeight = '50g';
+            ingredientCalories = 25;
+            ingredientProtein = 1.0;
+            ingredientFat = 0.2;
+            ingredientCarbs = 5.0;
+          } else if (ingredient.toLowerCase().includes('cheese')) {
+            ingredientWeight = '30g';
+            ingredientCalories = 120;
+            ingredientProtein = 8.0;
+            ingredientFat = 9.0;
+            ingredientCarbs = 1.0;
+          } else if (ingredient.toLowerCase().includes('meat') || 
+                    ingredient.toLowerCase().includes('chicken') ||
+                    ingredient.toLowerCase().includes('salami')) {
+            ingredientWeight = '85g';
+            ingredientCalories = 250;
+            ingredientProtein = 25.0;
+            ingredientFat = 15.0;
+            ingredientCarbs = 0.0;
+          }
+          
           if (ingredient.includes('(') && ingredient.includes(')')) {
             ingredients.push(ingredient);
           } else {
-            // Estimate weight and calories if not provided
-            ingredients.push(`${ingredient} (30g) 75kcal`);
+            // Add estimated weight and calories if not provided
+            ingredients.push(`${ingredient} (${ingredientWeight}) ${ingredientCalories}kcal`);
           }
+          
+          // Add macros for this ingredient
+          ingredientMacros.push({
+            protein: ingredientProtein,
+            fat: ingredientFat,
+            carbs: ingredientCarbs
+          });
         }
       }
       
@@ -360,6 +466,7 @@ function transformTextToRequiredFormat(text) {
     return {
       meal_name: mealName,
       ingredients: ingredients,
+      ingredient_macros: ingredientMacros,
       calories: calories || 500,
       protein: protein || 15,
       fat: fat || 10,
@@ -374,6 +481,13 @@ function transformTextToRequiredFormat(text) {
     meal_name: "Mixed Meal",
     ingredients: [
       "Mixed ingredients (100g) 200kcal"
+    ],
+    ingredient_macros: [
+      {
+        protein: 10,
+        fat: 7,
+        carbs: 30
+      }
     ],
     calories: 500,
     protein: 20,

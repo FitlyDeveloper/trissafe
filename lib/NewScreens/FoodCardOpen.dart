@@ -5,6 +5,7 @@ import '../Features/codia/codia_page.dart';
 import 'dart:convert'; // For base64 decoding
 import 'dart:typed_data'; // For Uint8List
 import 'package:http/http.dart' as http; // For API calls to OpenAI
+import 'package:cloud_functions/cloud_functions.dart'; // For Firebase Functions integration
 
 // Custom scroll physics optimized for mouse wheel
 class SlowScrollPhysics extends ScrollPhysics {
@@ -1197,122 +1198,6 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     return grams * caloriesPerGram;
   }
 
-  // Add the food analyzer service directly to FoodCardOpen to handle text analysis for ingredients
-  Future<Map<String, dynamic>> _analyzeIngredientWithAPI(
-      String foodName, String servingSize, BuildContext dialogContext) async {
-    try {
-      // Format the query for the text-based analysis
-      final query =
-          "Calculate nutrition for $foodName, serving size: $servingSize";
-
-      print('FOOD ANALYZER: Creating text analysis request for "$query"');
-
-      // Use the same API endpoint as in food_analyzer_api.dart
-      final String baseUrl = 'https://snap-food.onrender.com';
-      final String analyzeEndpoint = '/api/analyze-food';
-
-      print('FOOD ANALYZER: Calling API endpoint: $baseUrl$analyzeEndpoint');
-
-      // Create a map for the request body with only the necessary fields
-      final Map<String, dynamic> requestBody = {
-        'text_query': query,
-        'type': 'nutrition'
-      };
-
-      // COMPLETELY SIMPLIFIED REQUEST - ONLY ESSENTIAL HEADERS
-      // AVOID HEADERS THAT WOULD TRIGGER X-FORWARDED-FOR VALIDATION
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl$analyzeEndpoint'),
-            headers: {
-              'Content-Type': 'application/json',
-              // Do NOT include Accept, User-Agent or X-Forwarded-For headers
-              // These are causing the Express rate-limit validation error
-            },
-            body: jsonEncode(requestBody),
-          )
-          .timeout(const Duration(seconds: 30));
-
-      print(
-          'FOOD ANALYZER: Received response with status: ${response.statusCode}');
-      print('FOOD ANALYZER: Response body: ${response.body}');
-
-      // Check for HTTP errors
-      if (response.statusCode != 200) {
-        print(
-            'FOOD ANALYZER API error: ${response.statusCode}, ${response.body}');
-        throw Exception(
-            'Failed to analyze ingredients: ${response.statusCode}');
-      }
-
-      // Parse the response
-      final Map<String, dynamic> responseData = jsonDecode(response.body);
-      print('FOOD ANALYZER: Parsed response: $responseData');
-
-      // Check for API-level errors
-      if (responseData['success'] != true) {
-        throw Exception('FOOD ANALYZER API error: ${responseData['error']}');
-      }
-
-      // Extract the data portion with more careful null checking
-      final data = responseData['data'];
-      if (data == null) {
-        throw Exception('No data returned from API');
-      }
-
-      print('FOOD ANALYZER: Data extracted: $data');
-
-      // Process the nutritional data
-      Map<String, dynamic> nutrition = {};
-
-      if (data is Map) {
-        // Check different possible structures in the response
-        if (data.containsKey('nutrition')) {
-          // Format: data.nutrition contains the values
-          nutrition = data['nutrition'] is Map
-              ? Map<String, dynamic>.from(data['nutrition'])
-              : {};
-        } else if (data.containsKey('nutrients')) {
-          // Format: data.nutrients contains the values
-          nutrition = data['nutrients'] is Map
-              ? Map<String, dynamic>.from(data['nutrients'])
-              : {};
-        } else {
-          // Format: data itself contains the values
-          nutrition = Map<String, dynamic>.from(data);
-        }
-      } else if (data is List && data.isNotEmpty && data[0] is Map) {
-        // Sometimes API might return an array with first element containing nutrition
-        var firstItem = data[0];
-        if (firstItem.containsKey('nutrition')) {
-          nutrition = firstItem['nutrition'] is Map
-              ? Map<String, dynamic>.from(firstItem['nutrition'])
-              : {};
-        } else if (firstItem.containsKey('nutrients')) {
-          nutrition = firstItem['nutrients'] is Map
-              ? Map<String, dynamic>.from(firstItem['nutrients'])
-              : {};
-        } else {
-          nutrition = Map<String, dynamic>.from(firstItem);
-        }
-      }
-
-      print('FOOD ANALYZER: Extracted nutrition values: $nutrition');
-
-      // Return standardized nutrition values with fallbacks
-      return {
-        'calories':
-            _extractNumericValue(nutrition, ['calories', 'kcal', 'energy']),
-        'protein': _extractNumericValue(nutrition, ['protein', 'proteins']),
-        'carbs': _extractNumericValue(nutrition, ['carbs', 'carbohydrates']),
-        'fat': _extractNumericValue(nutrition, ['fat', 'fats', 'total_fat']),
-      };
-    } catch (e) {
-      print('FOOD ANALYZER error: $e');
-      rethrow;
-    }
-  }
-
   // Helper method to extract numeric values from different possible field names
   double _extractNumericValue(
       Map<String, dynamic> data, List<String> possibleKeys) {
@@ -1333,24 +1218,61 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     return 0.0;
   }
 
-  // Calculate nutrition using the Food Analyzer API with proper context handling
-  Future<Map<String, dynamic>> _calculateNutritionWithAI(
+  // Calculate nutrition using Firebase Functions (similar to Coach.dart's DeepSeek AI integration)
+  Future<Map<String, dynamic>> _calculateNutritionWithFirebase(
       String foodName, String servingSize) async {
     // Store a local copy of the context to avoid BuildContext issues
     final BuildContext localContext = context;
 
     try {
-      print('STARTING OpenAI calculation for: $foodName ($servingSize)');
+      print(
+          'STARTING Firebase nutrition calculation for: $foodName ($servingSize)');
 
-      // Use the Food Analyzer service directly
-      final nutritionData =
-          await _analyzeIngredientWithAPI(foodName, servingSize, localContext);
+      // Create the query to send to Firebase Functions
+      final query =
+          "Calculate nutrition information (calories, protein, carbs, and fat) for $foodName, serving size: $servingSize";
 
-      print('COMPLETED OpenAI calculation: $nutritionData');
+      // Prepare data for Firebase Function call
+      final Map<String, dynamic> requestData = {
+        'query': query,
+        'food': foodName,
+        'serving_size': servingSize,
+        'type': 'nutrition_analysis'
+      };
 
-      return nutritionData;
+      // Set up Firebase Functions call
+      final HttpsCallable callable = FirebaseFunctions.instance.httpsCallable(
+        'getNutritionData',
+        options: HttpsCallableOptions(
+          timeout: const Duration(seconds: 30),
+        ),
+      );
+
+      // Call the Firebase Function
+      final result = await callable.call(requestData);
+      final data = result.data as Map<String, dynamic>;
+
+      print('FIREBASE: Got response: $data');
+
+      // Extract nutrition data from response
+      if (data['success'] == true && data.containsKey('nutrition')) {
+        final nutrition = data['nutrition'] as Map<String, dynamic>;
+
+        // Standard response format matching our app's needs
+        return {
+          'calories':
+              _extractNumericValue(nutrition, ['calories', 'kcal', 'energy']),
+          'protein': _extractNumericValue(nutrition, ['protein', 'proteins']),
+          'carbs': _extractNumericValue(nutrition, ['carbs', 'carbohydrates']),
+          'fat': _extractNumericValue(nutrition, ['fat', 'fats', 'total_fat']),
+        };
+      } else if (data.containsKey('error')) {
+        throw Exception('Firebase Function error: ${data['error']}');
+      } else {
+        throw Exception('Invalid response format from Firebase');
+      }
     } catch (e) {
-      print('CRITICAL ERROR calculating nutrition: $e');
+      print('CRITICAL ERROR calculating nutrition with Firebase: $e');
 
       // Ensure we're using a valid context for showing dialogs
       if (localContext.mounted) {
@@ -1466,12 +1388,15 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         });
       }
 
-      // Return default values after displaying the error
+      // Use our fallback calorie estimation when Firebase call fails
+      final estimatedCalories = _estimateCaloriesForFood(foodName, servingSize);
+
+      // Return estimated values with defaults for other macros
       return {
-        'calories': 0.0,
-        'protein': 0.0,
-        'carbs': 0.0,
-        'fat': 0.0,
+        'calories': estimatedCalories,
+        'protein': estimatedCalories * 0.2, // Estimate 20% protein
+        'carbs': estimatedCalories * 0.5, // Estimate 50% carbs
+        'fat': estimatedCalories * 0.3, // Estimate 30% fat
       };
     }
   }
@@ -2648,9 +2573,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 print('INGREDIENT ADD: Loading dialog shown');
 
                 try {
-                  // Call the OpenAI API to calculate nutrition
+                  // Call the Firebase Functions service instead of OpenAI API
                   final nutritionData =
-                      await _calculateNutritionWithAI(foodName, size);
+                      await _calculateNutritionWithFirebase(foodName, size);
 
                   // Close the loading dialog only if we're still mounted and dialog is showing
                   if (mounted && Navigator.canPop(localContext)) {
@@ -2658,7 +2583,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   }
 
                   print(
-                      'INGREDIENT ADD: Got response from API: $nutritionData');
+                      'INGREDIENT ADD: Got response from Firebase: $nutritionData');
 
                   // Extract values with more careful parsing
                   calories = nutritionData['calories'] ?? 0.0;
@@ -2726,7 +2651,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     Navigator.of(localContext).pop();
                   }
 
-                  // No need to show error dialog here as our _calculateNutritionWithAI
+                  // No need to show error dialog here as our _calculateNutritionWithFirebase
                   // already handles showing the error dialog
                 }
               } else {
