@@ -602,15 +602,15 @@ class _SnapFoodState extends State<SnapFood> {
 
             // Add protein, fat, and carbs data if available
             if (macros.containsKey('protein')) {
-              ingredientData['protein'] = macros['protein'];
+              ingredientData['protein'] = macros['protein'].toString();
             }
             if (macros.containsKey('fat')) {
-              ingredientData['fat'] = macros['fat'];
+              ingredientData['fat'] = macros['fat'].toString();
             }
             if (macros.containsKey('carbs') ||
                 macros.containsKey('carbohydrates')) {
               ingredientData['carbs'] =
-                  macros['carbs'] ?? macros['carbohydrates'];
+                  (macros['carbs'] ?? macros['carbohydrates']).toString();
             }
           } else {
             // If no specific macros data for this ingredient, estimate based on calories
@@ -737,15 +737,15 @@ class _SnapFoodState extends State<SnapFood> {
                 Map<String, dynamic> macros = ingredientMacros[j];
 
                 if (macros.containsKey('protein')) {
-                  ingredientData['protein'] = macros['protein'];
+                  ingredientData['protein'] = macros['protein'].toString();
                 }
                 if (macros.containsKey('fat')) {
-                  ingredientData['fat'] = macros['fat'];
+                  ingredientData['fat'] = macros['fat'].toString();
                 }
                 if (macros.containsKey('carbs') ||
                     macros.containsKey('carbohydrates')) {
                   ingredientData['carbs'] =
-                      macros['carbs'] ?? macros['carbohydrates'];
+                      (macros['carbs'] ?? macros['carbohydrates']).toString();
                 }
               } else {
                 // Add estimated macros based on calories

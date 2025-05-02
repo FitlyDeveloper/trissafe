@@ -106,14 +106,14 @@ app.post('/api/analyze-food', limiter, checkApiKey, async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name for the entire image (e.g., "Pasta Meal", "Breakfast Plate")\n2. List ingredients with weights and calories (e.g., "Pasta (100g) 200kcal")\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. Additionally, provide macronutrient breakdown for EACH ingredient (protein, fat, carbs)\n6. Use decimal places and realistic estimates\n7. DO NOT respond with markdown code blocks or text explanations\n8. DO NOT prefix your response with "json" or ```\n9. ONLY RETURN A RAW JSON OBJECT\n10. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "ingredient_macros": [\n    {"protein": number, "fat": number, "carbs": number},\n    {"protein": number, "fat": number, "carbs": number}\n  ],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
+            content: '[STRICTLY JSON ONLY] You are a nutrition expert analyzing food images. OUTPUT MUST BE VALID JSON AND NOTHING ELSE.\n\nFORMAT RULES:\n1. Return a single meal name for the entire image (e.g., "Pasta Meal", "Breakfast Plate")\n2. List ingredients with weights and calories (e.g., "Pasta (100g) 200kcal")\n3. Return total values for calories, protein, fat, carbs, vitamin C\n4. Add a health score (1-10)\n5. IMPORTANT: Provide ACCURATE macronutrient breakdown for EACH ingredient (protein, fat, carbs) with realistic values\n6. Use decimal places and realistic estimates\n7. DO NOT respond with markdown code blocks or text explanations\n8. DO NOT prefix your response with "json" or ```\n9. ONLY RETURN A RAW JSON OBJECT\n10. ENSURE ingredient_macros array contains the same number of items as ingredients array\n11. FAILURE TO FOLLOW THESE INSTRUCTIONS WILL RESULT IN REJECTION\n\nEXACT FORMAT REQUIRED:\n{\n  "meal_name": "Meal Name",\n  "ingredients": ["Item1 (weight) calories", "Item2 (weight) calories"],\n  "ingredient_macros": [\n    {"name": "Item1", "protein": number, "fat": number, "carbs": number},\n    {"name": "Item2", "protein": number, "fat": number, "carbs": number}\n  ],\n  "calories": number,\n  "protein": number,\n  "fat": number,\n  "carbs": number,\n  "vitamin_c": number,\n  "health_score": "score/10"\n}'
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string (single name for entire meal),\n  \"ingredients\": array of strings with weights and calories,\n  \"ingredient_macros\": array of objects with protein, fat, carbs for each ingredient,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}"
+                text: "RETURN ONLY RAW JSON - NO TEXT, NO CODE BLOCKS, NO EXPLANATIONS. Analyze this food image and return nutrition data in this EXACT format with no deviations:\n\n{\n  \"meal_name\": string (single name for entire meal),\n  \"ingredients\": array of strings with weights and calories,\n  \"ingredient_macros\": array of objects with name, protein, fat, carbs for EACH ingredient,\n  \"calories\": number,\n  \"protein\": number,\n  \"fat\": number,\n  \"carbs\": number,\n  \"vitamin_c\": number,\n  \"health_score\": string\n}\n\nINCLUDE REALISTIC MACRONUTRIENT VALUES FOR EACH INGREDIENT! The protein, fat, and carbs values must be accurate for each food type."
               },
               {
                 type: 'image_url',
@@ -283,6 +283,36 @@ function transformToRequiredFormat(data) {
         protein = 25.0;
         fat = 15.0;
         carbs = 0.0;
+      } else if (ingredientName.toLowerCase().includes('egg')) {
+        ingredientWeight = '50g';
+        ingredientCalories = 70;
+        protein = 6.0;
+        fat = 5.0;
+        carbs = 0.5;
+      } else if (ingredientName.toLowerCase().includes('milk')) {
+        ingredientWeight = '240ml';
+        ingredientCalories = 120;
+        protein = 8.0;
+        fat = 4.5;
+        carbs = 12.0;
+      } else if (ingredientName.toLowerCase().includes('flour')) {
+        ingredientWeight = '100g';
+        ingredientCalories = 360;
+        protein = 10.0;
+        fat = 1.0;
+        carbs = 75.0;
+      } else if (ingredientName.toLowerCase().includes('sugar')) {
+        ingredientWeight = '20g';
+        ingredientCalories = 80;
+        protein = 0.0;
+        fat = 0.0;
+        carbs = 20.0;
+      } else if (ingredientName.toLowerCase().includes('oil')) {
+        ingredientWeight = '15ml';
+        ingredientCalories = 120;
+        protein = 0.0;
+        fat = 14.0;
+        carbs = 0.0;
       } else {
         // Default values
         protein = 3.0;
@@ -292,6 +322,7 @@ function transformToRequiredFormat(data) {
       
       // Save macros for this ingredient
       ingredientMacros.push({
+        name: ingredientName.split("(")[0].trim(),
         protein: protein,
         fat: fat,
         carbs: carbs
@@ -325,6 +356,7 @@ function transformToRequiredFormat(data) {
     ],
     ingredient_macros: [
       {
+        name: "Mixed ingredients",
         protein: 10,
         fat: 7,
         carbs: 30
@@ -410,6 +442,36 @@ function transformTextToRequiredFormat(text) {
             ingredientProtein = 25.0;
             ingredientFat = 15.0;
             ingredientCarbs = 0.0;
+          } else if (ingredient.toLowerCase().includes('egg')) {
+            ingredientWeight = '50g';
+            ingredientCalories = 70;
+            ingredientProtein = 6.0;
+            ingredientFat = 5.0;
+            ingredientCarbs = 0.5;
+          } else if (ingredient.toLowerCase().includes('milk')) {
+            ingredientWeight = '240ml';
+            ingredientCalories = 120;
+            ingredientProtein = 8.0;
+            ingredientFat = 4.5;
+            ingredientCarbs = 12.0;
+          } else if (ingredient.toLowerCase().includes('flour')) {
+            ingredientWeight = '100g';
+            ingredientCalories = 360;
+            ingredientProtein = 10.0;
+            ingredientFat = 1.0;
+            ingredientCarbs = 75.0;
+          } else if (ingredient.toLowerCase().includes('sugar')) {
+            ingredientWeight = '20g';
+            ingredientCalories = 80;
+            ingredientProtein = 0.0;
+            ingredientFat = 0.0;
+            ingredientCarbs = 20.0;
+          } else if (ingredient.toLowerCase().includes('oil')) {
+            ingredientWeight = '15ml';
+            ingredientCalories = 120;
+            ingredientProtein = 0.0;
+            ingredientFat = 14.0;
+            ingredientCarbs = 0.0;
           }
           
           if (ingredient.includes('(') && ingredient.includes(')')) {
@@ -421,6 +483,7 @@ function transformTextToRequiredFormat(text) {
           
           // Add macros for this ingredient
           ingredientMacros.push({
+            name: ingredient.split("(")[0].trim(),
             protein: ingredientProtein,
             fat: ingredientFat,
             carbs: ingredientCarbs
@@ -457,6 +520,12 @@ function transformTextToRequiredFormat(text) {
     // If we don't have any ingredients, add placeholders
     if (ingredients.length === 0) {
       ingredients.push("Mixed ingredients (100g) 200kcal");
+      ingredientMacros.push({
+        name: "Mixed ingredients",
+        protein: 10,
+        fat: 7,
+        carbs: 30
+      });
     }
     
     // Calculate a health score (simple algorithm based on macros)
@@ -484,6 +553,7 @@ function transformTextToRequiredFormat(text) {
     ],
     ingredient_macros: [
       {
+        name: "Mixed ingredients",
         protein: 10,
         fat: 7,
         carbs: 30
