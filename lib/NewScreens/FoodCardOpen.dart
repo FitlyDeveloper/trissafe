@@ -64,13 +64,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   late Animation<double> _bookmarkScaleAnimation;
   late AnimationController _likeController;
   late Animation<double> _likeScaleAnimation;
-  late String _foodName;
-  late String _healthScore;
-  late double _healthScoreValue;
-  late String _calories;
-  late String _protein;
-  late String _fat;
-  late String _carbs;
+  // Initialize with default values to prevent late initialization errors
+  String _foodName = 'Delicious Meal';
+  String _healthScore = '8/10';
+  double _healthScoreValue = 0.8;
+  String _calories = '0';
+  String _protein = '0';
+  String _fat = '0';
+  String _carbs = '0';
   Uint8List? _imageBytes; // Store decoded image bytes
   String?
       _storedImageBase64; // For storing retrieved image from SharedPreferences
@@ -83,17 +84,46 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   @override
   void initState() {
     super.initState();
+    print('FoodCardOpen initState called');
     // Initialize animation controllers
     _initAnimationControllers();
 
-    // Initialize food data
-    _initFoodData();
+    // Set initial values from parameters if available
+    if (widget.foodName != null && widget.foodName!.isNotEmpty) {
+      _foodName = widget.foodName!;
+    }
+
+    if (widget.healthScore != null && widget.healthScore!.isNotEmpty) {
+      _healthScore = widget.healthScore!;
+      _healthScoreValue = _extractHealthScoreValue(_healthScore);
+    }
+
+    if (widget.calories != null && widget.calories!.isNotEmpty) {
+      _calories = _formatDecimalValue(widget.calories!);
+    }
+
+    if (widget.protein != null && widget.protein!.isNotEmpty) {
+      _protein = widget.protein!;
+    }
+
+    if (widget.fat != null && widget.fat!.isNotEmpty) {
+      _fat = widget.fat!;
+    }
+
+    if (widget.carbs != null && widget.carbs!.isNotEmpty) {
+      _carbs = widget.carbs!;
+    }
 
     // Process image if available
     _processImage();
 
     // Load saved data from SharedPreferences
     _loadSavedData().then((_) {
+      // Initialize food data if needed
+      if (_ingredients.isEmpty) {
+        _initFoodData();
+      }
+
       // Calculate total nutrition after everything is loaded
       if (mounted) {
         _calculateTotalNutrition();
@@ -159,20 +189,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   }
 
   void _initFoodData() {
-    // Initialize food name with provided value or fallback
-    _foodName = widget.foodName ?? 'Delicious Cake';
+    print(
+        'Initializing food data. Current name: $_foodName, ingredients count: ${_ingredients.length}');
 
-    // Initialize health score with provided value or fallback
-    _healthScore = widget.healthScore ?? '8/10';
+    // Skip all initialization if we already have ingredients loaded from SharedPreferences
+    if (_ingredients.isNotEmpty) {
+      print(
+          'Ingredients already loaded from SharedPreferences, skipping initialization');
+      return;
+    }
 
-    // Initialize nutritional values with provided values or fallbacks
-    _calories = _formatDecimalValue(widget.calories ?? '500');
-    _protein = widget.protein ?? '30';
-    _fat = widget.fat ?? '32';
-    _carbs = widget.carbs ?? '125';
-
-    // Initialize ingredients list with 14-character limit enforcement
-    // Don't override _ingredients if it will be loaded from SharedPreferences in _loadSavedData
+    // Initialize ingredients list with 17-character limit enforcement
     if (widget.ingredients != null && widget.ingredients!.isNotEmpty) {
       _ingredients = [];
 
@@ -188,6 +215,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         String name = ingredient['name'] ?? '';
         String amount =
             ingredient['amount'] ?? '1 serving'; // Ensure we keep the amount
+
+        // Enforce 17-character limit for amount
+        if (amount.length > 17) {
+          amount = amount.substring(0, 14) + "...";
+        }
 
         // Handle different types of calories values properly
         dynamic calories = ingredient['calories'] ?? 0;
@@ -241,7 +273,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           List<String> parts = name.split(' with ');
           if (parts.length >= 2) {
             // Add first part with original amount and calories
-            if (parts[0].isNotEmpty && parts[0].length <= 14) {
+            if (parts[0].isNotEmpty && parts[0].length <= 17) {
               _ingredients.add({
                 'name': parts[0].trim(),
                 'amount': amount, // Keep original amount
@@ -250,10 +282,20 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 'fat': fat,
                 'carbs': carbs
               });
+            } else if (parts[0].isNotEmpty) {
+              // First part exceeds 17 characters, truncate with ellipsis
+              _ingredients.add({
+                'name': parts[0].trim().substring(0, 14) + "...",
+                'amount': amount,
+                'calories': calories,
+                'protein': protein,
+                'fat': fat,
+                'carbs': carbs
+              });
             }
 
             // Add second part
-            if (parts[1].isNotEmpty && parts[1].length <= 14) {
+            if (parts[1].isNotEmpty && parts[1].length <= 17) {
               _ingredients.add({
                 'name': parts[1].trim(),
                 'amount': amount, // Keep original amount
@@ -263,13 +305,23 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 'fat': fat / 2,
                 'carbs': carbs / 2
               });
+            } else if (parts[1].isNotEmpty) {
+              // Second part exceeds 17 characters, truncate with ellipsis
+              _ingredients.add({
+                'name': parts[1].trim().substring(0, 14) + "...",
+                'amount': amount,
+                'calories': calories / 2,
+                'protein': protein / 2,
+                'fat': fat / 2,
+                'carbs': carbs / 2
+              });
             }
           }
           continue; // Skip the rest of the loop
         }
 
-        // Check if name exceeds 14 characters
-        if (name.length > 14) {
+        // Check if name exceeds 17 characters
+        if (name.length > 17) {
           // Split the name by spaces
           List<String> words = name.split(' ');
           String currentSegment = '';
@@ -277,7 +329,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           for (var word in words) {
             // If adding this word would exceed limit, create a new ingredient with current segment
             if (currentSegment.isNotEmpty &&
-                (currentSegment.length + word.length + 1) > 14) {
+                (currentSegment.length + word.length + 1) > 17) {
               _ingredients.add({
                 'name': currentSegment.trim(),
                 'amount': amount, // Keep original amount
@@ -299,14 +351,26 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
           // Add remaining segment as an ingredient
           if (currentSegment.isNotEmpty) {
-            _ingredients.add({
-              'name': currentSegment.trim(),
-              'amount': amount, // Keep original amount
-              'calories': calories, // Keep original calories
-              'protein': protein,
-              'fat': fat,
-              'carbs': carbs
-            });
+            if (currentSegment.length <= 17) {
+              _ingredients.add({
+                'name': currentSegment.trim(),
+                'amount': amount, // Keep original amount
+                'calories': calories, // Keep original calories
+                'protein': protein,
+                'fat': fat,
+                'carbs': carbs
+              });
+            } else {
+              // Truncate with ellipsis if still too long
+              _ingredients.add({
+                'name': currentSegment.trim().substring(0, 14) + "...",
+                'amount': amount,
+                'calories': calories,
+                'protein': protein,
+                'fat': fat,
+                'carbs': carbs
+              });
+            }
           }
         } else {
           // Name is within limit, add as is with original values
@@ -339,11 +403,6 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       // to make sure they persist across screens
       _saveData();
     }
-    // Note: We don't need the else clause here with default ingredients
-    // It will only be used if no ingredients are loaded from SharedPreferences
-
-    // Extract the numeric value from the health score (e.g., 8 from "8/10")
-    _healthScoreValue = _extractHealthScoreValue(_healthScore);
 
     print(
         'Initialized food data: name=$_foodName, calories=$_calories, protein=$_protein, fat=$_fat, carbs=$_carbs, healthScore=$_healthScore');
@@ -372,99 +431,98 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   Future<void> _loadSavedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final foodId =
-          widget.foodName?.replaceAll(' ', '_').toLowerCase() ?? 'default';
+      final foodId = _foodName.replaceAll(' ', '_').toLowerCase();
+
+      print('Attempting to load saved data for foodId: $foodId');
 
       // Load ingredients array
-      if (_ingredients.isEmpty) {
-        final ingredientsJson = prefs.getString('food_ingredients_$foodId');
-        print('Loaded ingredients JSON: $ingredientsJson');
+      final ingredientsJson = prefs.getString('food_ingredients_$foodId');
+      print('Loaded ingredients JSON: $ingredientsJson');
 
-        if (ingredientsJson != null) {
-          try {
-            final List<dynamic> decoded = jsonDecode(ingredientsJson);
-            _ingredients = [];
+      if (ingredientsJson != null) {
+        try {
+          final List<dynamic> decoded = jsonDecode(ingredientsJson);
+          _ingredients = [];
 
-            // Process each item in the decoded list
-            for (var item in decoded) {
-              // Handle both object and string formats
-              if (item is Map) {
-                // Make sure all required fields exist
-                if (!item.containsKey('name') ||
-                    !item.containsKey('amount') ||
-                    !item.containsKey('calories')) {
-                  // Add missing fields with defaults
-                  item['name'] = item['name'] ?? 'Ingredient';
-                  item['amount'] = item['amount'] ?? '1 serving';
-                  item['calories'] = item['calories'] ?? 0;
-                }
-
-                // Ensure macronutrient values are properly converted to doubles
-                double protein = 0.0;
-                double fat = 0.0;
-                double carbs = 0.0;
-
-                // Process protein value
-                if (item.containsKey('protein')) {
-                  var proteinValue = item['protein'];
-                  if (proteinValue is String) {
-                    protein = double.tryParse(proteinValue) ?? 0.0;
-                  } else if (proteinValue is num) {
-                    protein = proteinValue.toDouble();
-                  }
-                }
-
-                // Process fat value
-                if (item.containsKey('fat')) {
-                  var fatValue = item['fat'];
-                  if (fatValue is String) {
-                    fat = double.tryParse(fatValue) ?? 0.0;
-                  } else if (fatValue is num) {
-                    fat = fatValue.toDouble();
-                  }
-                }
-
-                // Process carbs value
-                if (item.containsKey('carbs')) {
-                  var carbsValue = item['carbs'];
-                  if (carbsValue is String) {
-                    carbs = double.tryParse(carbsValue) ?? 0.0;
-                  } else if (carbsValue is num) {
-                    carbs = carbsValue.toDouble();
-                  }
-                }
-
-                // Also include macro values with fallbacks
-                Map<String, dynamic> validIngredient = {
-                  'name': item['name'] ?? 'Ingredient',
-                  'amount': item['amount'] ?? '1 serving',
-                  'calories': item['calories'] ?? 0,
-                  'protein': protein,
-                  'fat': fat,
-                  'carbs': carbs,
-                };
-
-                _ingredients.add(validIngredient);
-              } else if (item is String) {
-                // Handle old format - string-only ingredients
-                // Create default ingredient object
-                Map<String, dynamic> validIngredient = {
-                  'name': item,
-                  'amount': '1 serving',
-                  'calories': 100,
-                  'protein': 5.0,
-                  'fat': 2.0,
-                  'carbs': 15.0,
-                };
-                _ingredients.add(validIngredient);
+          // Process each item in the decoded list
+          for (var item in decoded) {
+            // Handle both object and string formats
+            if (item is Map) {
+              // Make sure all required fields exist
+              if (!item.containsKey('name') ||
+                  !item.containsKey('amount') ||
+                  !item.containsKey('calories')) {
+                // Add missing fields with defaults
+                item['name'] = item['name'] ?? 'Ingredient';
+                item['amount'] = item['amount'] ?? '1 serving';
+                item['calories'] = item['calories'] ?? 0;
               }
+
+              // Ensure macronutrient values are properly converted to doubles
+              double protein = 0.0;
+              double fat = 0.0;
+              double carbs = 0.0;
+
+              // Process protein value
+              if (item.containsKey('protein')) {
+                var proteinValue = item['protein'];
+                if (proteinValue is String) {
+                  protein = double.tryParse(proteinValue) ?? 0.0;
+                } else if (proteinValue is num) {
+                  protein = proteinValue.toDouble();
+                }
+              }
+
+              // Process fat value
+              if (item.containsKey('fat')) {
+                var fatValue = item['fat'];
+                if (fatValue is String) {
+                  fat = double.tryParse(fatValue) ?? 0.0;
+                } else if (fatValue is num) {
+                  fat = fatValue.toDouble();
+                }
+              }
+
+              // Process carbs value
+              if (item.containsKey('carbs')) {
+                var carbsValue = item['carbs'];
+                if (carbsValue is String) {
+                  carbs = double.tryParse(carbsValue) ?? 0.0;
+                } else if (carbsValue is num) {
+                  carbs = carbsValue.toDouble();
+                }
+              }
+
+              // Also include macro values with fallbacks
+              Map<String, dynamic> validIngredient = {
+                'name': item['name'] ?? 'Ingredient',
+                'amount': item['amount'] ?? '1 serving',
+                'calories': item['calories'] ?? 0,
+                'protein': protein,
+                'fat': fat,
+                'carbs': carbs,
+              };
+
+              _ingredients.add(validIngredient);
+            } else if (item is String) {
+              // Handle old format - string-only ingredients
+              // Create default ingredient object
+              Map<String, dynamic> validIngredient = {
+                'name': item,
+                'amount': '1 serving',
+                'calories': 100,
+                'protein': 5.0,
+                'fat': 2.0,
+                'carbs': 15.0,
+              };
+              _ingredients.add(validIngredient);
             }
-            print(
-                'Loaded and validated ${_ingredients.length} ingredients from SharedPreferences');
-          } catch (e) {
-            print('Error parsing saved ingredients: $e');
-            _ingredients = []; // Reset to empty on error
           }
+          print(
+              'Loaded and validated ${_ingredients.length} ingredients from SharedPreferences');
+        } catch (e) {
+          print('Error parsing saved ingredients: $e');
+          _ingredients = []; // Reset to empty on error
         }
       }
 
@@ -519,12 +577,6 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             }
           }
         }
-
-        // Calculate total nutrition from all ingredients after loading
-        if (_ingredients.isNotEmpty) {
-          _calculateTotalNutrition();
-          print('Calculated total nutrition values from loaded ingredients');
-        }
       });
 
       // After loading - check what we have
@@ -536,6 +588,10 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           'Using nutrition data: calories=$_calories, protein=$_protein, fat=$_fat, carbs=$_carbs, healthScore=$_healthScore');
       if (_ingredients.isNotEmpty) {
         print('Loaded ${_ingredients.length} ingredients');
+
+        // Calculate total nutrition from all ingredients after loading
+        _calculateTotalNutrition();
+        print('Calculated total nutrition values from loaded ingredients');
       }
     } catch (e) {
       print('Error loading saved food data: $e');
@@ -597,6 +653,13 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 // Update with our valid ingredients
                 cardData['ingredients'] = validIngredients;
 
+                // Update the total nutrition values for the meal card
+                cardData['calories'] = _calories.toString();
+                cardData['protein'] = _protein.toString();
+                cardData['fat'] = _fat.toString();
+                cardData['carbs'] = _carbs.toString();
+                cardData['health_score'] = _healthScore;
+
                 // Also create ingredient lookup maps for future use
                 Map<String, dynamic> ingredientAmounts = {};
                 Map<String, dynamic> ingredientCalories = {};
@@ -644,7 +707,102 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           if (foundCard) {
             await prefs.setStringList('food_cards', updatedCards);
             print('Updated ingredients in food_cards list for: $_foodName');
+            print(
+                'Updated total nutrition values in food_cards list: calories=$_calories, protein=$_protein, fat=$_fat, carbs=$_carbs');
+          } else {
+            // If the card wasn't found in food_cards, we might need to add it
+            print('Card not found in food_cards list, creating new card');
+
+            // Create a new card with current data
+            Map<String, dynamic> newCard = {
+              'name': _foodName,
+              'calories': _calories.toString(),
+              'protein': _protein.toString(),
+              'fat': _fat.toString(),
+              'carbs': _carbs.toString(),
+              'health_score': _healthScore,
+              'ingredients': validIngredients,
+              'time': DateTime.now().millisecondsSinceEpoch.toString(),
+            };
+
+            // Add image if available
+            if (_storedImageBase64 != null && _storedImageBase64!.isNotEmpty) {
+              newCard['image'] = _storedImageBase64;
+            }
+
+            // Create ingredient lookup maps
+            Map<String, dynamic> ingredientAmounts = {};
+            Map<String, dynamic> ingredientCalories = {};
+            Map<String, dynamic> ingredientProteins = {};
+            Map<String, dynamic> ingredientFats = {};
+            Map<String, dynamic> ingredientCarbs = {};
+
+            for (var ingredient in validIngredients) {
+              String name = ingredient['name'];
+              ingredientAmounts[name] = ingredient['amount'];
+              ingredientCalories[name] = ingredient['calories'];
+              ingredientProteins[name] = ingredient['protein'];
+              ingredientFats[name] = ingredient['fat'];
+              ingredientCarbs[name] = ingredient['carbs'];
+            }
+
+            newCard['ingredient_amounts'] = ingredientAmounts;
+            newCard['ingredient_calories'] = ingredientCalories;
+            newCard['ingredient_proteins'] = ingredientProteins;
+            newCard['ingredient_fats'] = ingredientFats;
+            newCard['ingredient_carbs'] = ingredientCarbs;
+
+            // Add the new card to stored cards
+            updatedCards.add(jsonEncode(newCard));
+            await prefs.setStringList('food_cards', updatedCards);
+            print('Added new card to food_cards list for: $_foodName');
           }
+        } else {
+          // No stored cards yet, create a new list with just this card
+          print('No existing food_cards list, creating new one');
+
+          // Create a new card with current data
+          Map<String, dynamic> newCard = {
+            'name': _foodName,
+            'calories': _calories.toString(),
+            'protein': _protein.toString(),
+            'fat': _fat.toString(),
+            'carbs': _carbs.toString(),
+            'health_score': _healthScore,
+            'ingredients': validIngredients,
+            'time': DateTime.now().millisecondsSinceEpoch.toString(),
+          };
+
+          // Add image if available
+          if (_storedImageBase64 != null && _storedImageBase64!.isNotEmpty) {
+            newCard['image'] = _storedImageBase64;
+          }
+
+          // Create ingredient lookup maps
+          Map<String, dynamic> ingredientAmounts = {};
+          Map<String, dynamic> ingredientCalories = {};
+          Map<String, dynamic> ingredientProteins = {};
+          Map<String, dynamic> ingredientFats = {};
+          Map<String, dynamic> ingredientCarbs = {};
+
+          for (var ingredient in validIngredients) {
+            String name = ingredient['name'];
+            ingredientAmounts[name] = ingredient['amount'];
+            ingredientCalories[name] = ingredient['calories'];
+            ingredientProteins[name] = ingredient['protein'];
+            ingredientFats[name] = ingredient['fat'];
+            ingredientCarbs[name] = ingredient['carbs'];
+          }
+
+          newCard['ingredient_amounts'] = ingredientAmounts;
+          newCard['ingredient_calories'] = ingredientCalories;
+          newCard['ingredient_proteins'] = ingredientProteins;
+          newCard['ingredient_fats'] = ingredientFats;
+          newCard['ingredient_carbs'] = ingredientCarbs;
+
+          // Create a new list with just this card
+          await prefs.setStringList('food_cards', [jsonEncode(newCard)]);
+          print('Created new food_cards list with card for: $_foodName');
         }
       }
 
@@ -1239,10 +1397,24 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     // If it's already a string, ensure it has "kcal" suffix
     if (calories is String) {
-      return calories.contains("kcal") ? calories : "$calories kcal";
+      // Try to parse the string to a number to remove decimal points
+      try {
+        double calValue = double.parse(calories.replaceAll("kcal", "").trim());
+        // Round to a whole number
+        int roundedCal = calValue.round();
+        return "$roundedCal kcal";
+      } catch (e) {
+        // If parsing fails, just ensure it has kcal suffix
+        return calories.contains("kcal") ? calories : "$calories kcal";
+      }
     }
 
-    // If it's a number, convert to string with full precision
+    // If it's a number, convert to whole number string with "kcal" suffix
+    if (calories is num) {
+      return "${calories.round()} kcal";
+    }
+
+    // Fallback for any other type
     return "$calories kcal";
   }
 
@@ -1341,17 +1513,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       String foodName, String servingSize,
       [BuildContext? dialogContext]) async {
     try {
-      // Format the prompt for DeepSeek AI
+      // Format the prompt for DeepSeek AI with improved validation instructions
       final messages = [
         {
           'role': 'system',
           'content':
-              'You are a nutrition expert analyzing food items. Return ONLY RAW JSON with nutritional values that are accurate for the food type. Calculate values based on typical nutritional composition - DO NOT inflate protein content. For example, donuts should have LOW protein (3-7g), not high protein. CALORIES MUST BE PRECISE NUMBERS - not rounded to multiples of 10 or 50. For example, if a food has 283 calories, return 283 (not 280 or 300). Use accurate macronutrient distribution based on food type (e.g. more carbs for sweets, more protein for meat).'
+              'You are a nutrition expert analyzing food items. You must check TWO things:\n\n1. FIRST check if the input is a valid food name. If it contains nonsensical strings (like "hwheqhgye21" or "xyz123"), random characters, or is clearly not a food, respond with ONLY: {"invalid_food": true}.\n\n2. SECOND check if the serving size is valid and makes sense for the food. If the serving size is unclear, implausible, or nonsensical (like "xyz amount" or unspecified units), also respond with ONLY: {"invalid_food": true}.\n\nOtherwise, for valid foods with clear serving sizes, return ONLY RAW JSON with nutritional values that are accurate for the food type. Calculate values based on typical nutritional composition - DO NOT inflate protein content. For example, donuts should have LOW protein (3-7g), not high protein. CALORIES MUST BE PRECISE NUMBERS - not rounded to multiples of 10 or 50. For example, if a food has 283 calories, return 283 (not 280 or 300). Use accurate macronutrient distribution based on food type (e.g. more carbs for sweets, more protein for meat).'
         },
         {
           'role': 'user',
           'content':
-              'Calculate accurate nutritional values for $foodName, serving size: $servingSize. Return only the JSON with calories, protein, fat, and carbs. Example format: {"calories": 283, "protein": 12.5, "fat": 8.3, "carbs": 36.7}'
+              'Calculate accurate nutritional values for $foodName, serving size: $servingSize. Return only the JSON with calories, protein, fat, and carbs. If either the food name or serving size is invalid/unclear, return {"invalid_food": true}.'
         }
       ];
 
@@ -1408,6 +1580,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         // Parse the JSON content
         nutrition = jsonDecode(content);
         print('FOOD ANALYZER: Parsed nutrition data: $nutrition');
+
+        // Check if the model identified this as an invalid food or serving size
+        if (nutrition.containsKey('invalid_food') &&
+            nutrition['invalid_food'] == true) {
+          print(
+              'FOOD ANALYZER: Invalid food name or serving size detected: $foodName ($servingSize)');
+          return {'invalid_food': true};
+        }
       } catch (e) {
         print('FOOD ANALYZER: Error parsing nutrition JSON: $e');
 
@@ -1418,6 +1598,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           try {
             nutrition = jsonDecode(jsonMatch.group(0)!);
             print('FOOD ANALYZER: Extracted nutrition data: $nutrition');
+
+            // Check if the extracted JSON identifies this as an invalid food or serving size
+            if (nutrition.containsKey('invalid_food') &&
+                nutrition['invalid_food'] == true) {
+              print(
+                  'FOOD ANALYZER: Invalid food name or serving size detected: $foodName ($servingSize)');
+              return {'invalid_food': true};
+            }
           } catch (e) {
             print('FOOD ANALYZER: Error parsing extracted JSON: $e');
           }
@@ -1640,6 +1828,22 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
       // Safely dismiss the loading dialog if it's showing
       _safelyDismissDialog(dialogContext, isDialogShowing);
+
+      // Check if the food name was invalid
+      if (nutritionData.containsKey('invalid_food') &&
+          nutritionData['invalid_food'] == true) {
+        print('Invalid food name detected by API: $foodName');
+
+        // Show the invalid ingredient dialog after a short delay to ensure the loading dialog is dismissed
+        if (mounted) {
+          Future.delayed(Duration(milliseconds: 300), () {
+            _showUnclearInputDialog();
+          });
+        }
+
+        // Return an empty map to indicate invalid food
+        return {'invalid_food': true};
+      }
 
       print('COMPLETED OpenAI calculation: $nutritionData');
 
@@ -2512,6 +2716,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       {String protein = "0", String fat = "0", String carbs = "0"}) {
     final boxWidth = (MediaQuery.of(context).size.width - 78) / 2;
 
+    // Format name and amount to fit in one line with max 17 chars
+    String displayName = name;
+    if (displayName.length > 17) {
+      displayName = displayName.substring(0, 14) + "...";
+    }
+
+    String displayAmount = amount;
+    if (displayAmount.length > 17) {
+      displayAmount = displayAmount.substring(0, 14) + "...";
+    }
+
     // Check if it's an "Add" card - don't make these flippable
     if (name == "Add") {
       return Container(
@@ -2542,6 +2757,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     fontFamily: 'SF Pro Display',
                   ),
                   textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
                 SizedBox(height: 10),
                 Text(
@@ -2551,6 +2768,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     fontFamily: 'SF Pro Display',
                   ),
                   textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
                 SizedBox(height: 10),
                 Text(
@@ -2560,6 +2779,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     fontFamily: 'SF Pro Display',
                   ),
                   textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ],
             ),
@@ -2581,13 +2802,13 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     if (!_flipAnimationControllers.containsKey(cardKey)) {
       _flipAnimationControllers[cardKey] = AnimationController(
         vsync: this,
-        duration: Duration(milliseconds: 600),
+        duration: Duration(milliseconds: 400), // Slightly faster duration
       );
 
       _flipAnimations[cardKey] = Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(
           parent: _flipAnimationControllers[cardKey]!,
-          curve: Curves.easeOutBack,
+          curve: Curves.easeInOut, // Gentler animation curve
         ),
       );
     }
@@ -2612,102 +2833,117 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         builder: (context, child) {
           final value = _flipAnimations[cardKey]!.value;
 
-          // First half of animation shows front, second half shows back
+          // Determine which side to show
           final showFront = value < 0.5;
-          final t = showFront ? value : 1 - value;
 
-          return Transform(
-            // Apply perspective
-            transform: Matrix4.identity()
-              ..setEntry(3, 2, 0.001) // perspective
-              ..rotateY(showFront ? pi * value : pi * (1 - value + 1)),
-            alignment: Alignment.center,
-            child: Container(
-              width: boxWidth,
-              height: 110,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black
-                        .withOpacity(0.05 + (0.05 * value)), // Dynamic shadow
-                    blurRadius: 10 + (5 * value), // Dynamic blur
-                    offset: Offset(0, 5),
+          // Create a subtle opacity animation
+          final opacity = showFront
+              ? 1.0 -
+                  (value * 1.5).clamp(
+                      0.0, 1.0) // Front fades out in first 70% of animation
+              : (value - 0.5) * 2.0; // Back fades in in last 70% of animation
+
+          return Container(
+            width: boxWidth,
+            height: 110,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                children: [
+                  // Front content
+                  Opacity(
+                    opacity: showFront ? opacity : 0,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              displayName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 10),
+                            Text(
+                              displayAmount,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 10),
+                            Text(
+                              calories,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Back content
+                  Opacity(
+                    opacity: !showFront ? opacity : 0,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              "Protein: ${_formatMacroValue(protein)}",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 10),
+                            Text(
+                              "Fat: ${_formatMacroValue(fat)}",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 10),
+                            Text(
+                              "Carbs: ${_formatMacroValue(carbs)}",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ],
-              ),
-              child: Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Opacity(
-                    opacity: 1 - t * 2, // Fade out while flipping
-                    child: showFront
-                        ? Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                name,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'SF Pro Display',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 10),
-                              Text(
-                                amount,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontFamily: 'SF Pro Display',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 10),
-                              Text(
-                                calories,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontFamily: 'SF Pro Display',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          )
-                        : Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                "Protein: ${_formatMacroValue(protein)}",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontFamily: 'SF Pro Display',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 10),
-                              Text(
-                                "Fat: ${_formatMacroValue(fat)}",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontFamily: 'SF Pro Display',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 10),
-                              Text(
-                                "Carbs: ${_formatMacroValue(carbs)}",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontFamily: 'SF Pro Display',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
               ),
             ),
           );
@@ -2939,11 +3175,102 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           builder: (context, setDialogState) {
             // Check form validity
             void updateFormValidity() {
-              bool foodValid = foodController.text.trim().isNotEmpty;
-              bool sizeValid = sizeController.text.trim().isNotEmpty;
+              // Get trimmed values for validation
+              String foodValue = foodController.text.trim();
+              String sizeValue = sizeController.text.trim();
+
+              // Food name must have at least one character
+              bool foodValid = foodValue.isNotEmpty;
+
+              // Size must contain at least one letter (a-z, A-Z) AND at least one number (0-9)
+              bool sizeValid = sizeValue.isNotEmpty &&
+                  RegExp(r'[a-zA-Z]').hasMatch(sizeValue) &&
+                  RegExp(r'[0-9]').hasMatch(sizeValue);
+
               setDialogState(() {
                 isFormValid = foodValid && sizeValid;
               });
+            }
+
+            // Function to validate ingredient name
+            bool isValidFoodName(String name) {
+              // Check if name contains at least 3 characters
+              if (name.length < 3) return false;
+
+              // Check if name contains mostly letters (allowing spaces)
+              final letterRatio = name
+                      .replaceAll(' ', '')
+                      .split('')
+                      .where((char) => RegExp(r'[a-zA-Z]').hasMatch(char))
+                      .length /
+                  name.replaceAll(' ', '').length;
+
+              // Name should be at least 70% letters
+              if (letterRatio < 0.7) return false;
+
+              // Check for common food words (optional check)
+              final commonFoodWords = [
+                'beef',
+                'chicken',
+                'fish',
+                'pork',
+                'rice',
+                'pasta',
+                'bread',
+                'cheese',
+                'egg',
+                'milk',
+                'yogurt',
+                'fruit',
+                'apple',
+                'banana',
+                'orange',
+                'vegetable',
+                'salad',
+                'oil',
+                'butter',
+                'sauce',
+                'soup',
+                'steak',
+                'burger',
+                'pizza',
+                'cake',
+                'chocolate',
+                'coffee',
+                'tea',
+                'juice',
+                'water',
+                'corn',
+                'bean',
+                'nut',
+                'seed',
+                'avocado',
+                'tomato',
+                'potato',
+                'carrot',
+                'onion',
+                'garlic',
+                'herb',
+                'spice',
+                'sugar',
+                'salt',
+                'pepper',
+                'meal',
+                'breakfast',
+                'lunch',
+                'dinner',
+                'snack',
+                'dessert'
+              ];
+
+              // Check if entry has too many numbers or special characters
+              final hasExcessiveNonAlpha =
+                  RegExp(r'[0-9]{2,}').hasMatch(name) ||
+                      RegExp(r'[^a-zA-Z0-9\s]{2,}').hasMatch(name);
+
+              if (hasExcessiveNonAlpha) return false;
+
+              return true;
             }
 
             // Function to handle form submission with nutrition calculation
@@ -2954,6 +3281,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               String foodName = foodController.text.trim();
               String size = sizeController.text.trim();
               String caloriesText = caloriesController.text.trim();
+
+              // Validate food name for being a reasonable food
+              if (!isValidFoodName(foodName)) {
+                // Close the original dialog first
+                Navigator.pop(context);
+
+                // Show unclear input dialog
+                _showUnclearInputDialog();
+                return;
+              }
 
               // Apply proper case to food name
               if (foodName.isNotEmpty) {
@@ -2997,86 +3334,82 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 print(
                     'INGREDIENT ADD: Started calculation for $foodName ($size)');
 
-                // Store a local reference to the context to avoid issues with async operations
-                final BuildContext localContext = context;
+                // Call the OpenAI API to calculate nutrition
+                final nutritionData =
+                    await _calculateNutritionWithAI(foodName, size);
 
-                try {
-                  // Call the OpenAI API to calculate nutrition
-                  final nutritionData =
-                      await _calculateNutritionWithAI(foodName, size);
+                // Check if this was flagged as an invalid food by the API
+                if (nutritionData.containsKey('invalid_food') &&
+                    nutritionData['invalid_food'] == true) {
+                  print('INGREDIENT ADD: Invalid food name detected by API');
+                  // The _calculateNutritionWithAI function already shows the invalid input dialog
+                  return;
+                }
 
+                print('INGREDIENT ADD: Got response from API: $nutritionData');
+
+                // Extract values with more careful parsing
+                calories = nutritionData['calories'] ?? 0.0;
+                protein = (nutritionData['protein'] ?? 0.0).toString();
+                fat = (nutritionData['fat'] ?? 0.0).toString();
+                carbs = (nutritionData['carbs'] ?? 0.0).toString();
+
+                print(
+                    'INGREDIENT ADD: Processed values - calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
+
+                // Check if we got valid calorie data
+                if (calories <= 0) {
                   print(
-                      'INGREDIENT ADD: Got response from API: $nutritionData');
+                      'INGREDIENT ADD: Invalid calories value received: $calories');
 
-                  // Extract values with more careful parsing
-                  calories = nutritionData['calories'] ?? 0.0;
-                  protein = (nutritionData['protein'] ?? 0.0).toString();
-                  fat = (nutritionData['fat'] ?? 0.0).toString();
-                  carbs = (nutritionData['carbs'] ?? 0.0).toString();
+                  // Use default calorie estimate based on food type
+                  calories = _estimateCaloriesForFood(foodName, size);
+                  print('INGREDIENT ADD: Using estimated calories: $calories');
+                }
 
-                  print(
-                      'INGREDIENT ADD: Processed values - calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
+                // Update main nutritional values
+                if (mounted) {
+                  setState(() {
+                    // Create new ingredient with user-provided calories
+                    Map<String, dynamic> newIngredient = {
+                      'name': foodName,
+                      'amount': size,
+                      'calories': calories,
+                      'protein': protein,
+                      'fat': fat,
+                      'carbs': carbs
+                    };
 
-                  // Check if we got valid calorie data
-                  if (calories <= 0) {
-                    print(
-                        'INGREDIENT ADD: Invalid calories value received: $calories');
+                    _ingredients.add(newIngredient);
 
-                    // Use default calorie estimate based on food type
-                    calories = _estimateCaloriesForFood(foodName, size);
-                    print(
-                        'INGREDIENT ADD: Using estimated calories: $calories');
-                  }
-
-                  // Update main nutritional values
-                  if (mounted) {
-                    setState(() {
-                      // Create new ingredient with user-provided calories
-                      Map<String, dynamic> newIngredient = {
-                        'name': foodName,
-                        'amount': size,
-                        'calories': calories,
-                        'protein': protein,
-                        'fat': fat,
-                        'carbs': carbs
-                      };
-
-                      _ingredients.add(newIngredient);
-
-                      // Sort ingredients by calories (highest to lowest)
-                      _ingredients.sort((a, b) {
-                        final caloriesA = a.containsKey('calories')
-                            ? double.tryParse(a['calories'].toString()) ?? 0
-                            : 0;
-                        final caloriesB = b.containsKey('calories')
-                            ? double.tryParse(b['calories'].toString()) ?? 0
-                            : 0;
-                        return caloriesB.compareTo(caloriesA);
-                      });
+                    // Sort ingredients by calories (highest to lowest)
+                    _ingredients.sort((a, b) {
+                      final caloriesA = a.containsKey('calories')
+                          ? double.tryParse(a['calories'].toString()) ?? 0
+                          : 0;
+                      final caloriesB = b.containsKey('calories')
+                          ? double.tryParse(b['calories'].toString()) ?? 0
+                          : 0;
+                      return caloriesB.compareTo(caloriesA);
                     });
-
-                    // Calculate total nutrition from all ingredients
-                    _calculateTotalNutrition();
-
-                    // Save to persist the new ingredient
-                    _saveData();
-                    print(
-                        'INGREDIENT ADD: Added ingredient with provided calories');
-                  }
-                  print('INGREDIENT ADD: Updated main nutrition values');
+                  });
 
                   // Calculate total nutrition from all ingredients
                   _calculateTotalNutrition();
 
-                  // Save data to persist ingredients
+                  // Save to persist the new ingredient
                   _saveData();
-                  print('INGREDIENT ADD: Successfully added ingredient');
-                } catch (e) {
-                  print('CRITICAL ERROR calculating nutrition: $e');
-
-                  // No need to show error dialog here as our _calculateNutritionWithAI
-                  // already handles showing the error dialog and dismissing the loading dialog
+                  print(
+                      'INGREDIENT ADD: Added ingredient with provided calories');
                 }
+                print('INGREDIENT ADD: Updated main nutrition values');
+
+                // Calculate total nutrition from all ingredients
+                _calculateTotalNutrition();
+
+                // Save data to persist ingredients
+                _saveData();
+                print('INGREDIENT ADD: Successfully added ingredient');
               } else {
                 // User provided calories directly
                 try {
@@ -3501,7 +3834,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     // Update state with calculated totals using standard rounding (0-0.4 down, 0.5-0.9 up)
     setState(() {
-      _calories = totalCalories.toStringAsFixed(0); // Format as whole number
+      _calories = totalCalories.round().toString(); // Round to whole number
       _protein = totalProtein.round().toString(); // Round to whole number
       _fat = totalFat.round().toString(); // Round to whole number
       _carbs = totalCarbs.round().toString(); // Round to whole number
@@ -3509,5 +3842,316 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     print(
         'NUTRITION TOTALS: Calories=$_calories, Protein=$_protein, Fat=$_fat, Carbs=$_carbs');
+
+    // Save data to persist the new calculated values
+    _saveData();
+  }
+
+  // Helper method to show API error dialog in premium style
+  void _showApiErrorDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5), // Add dark overlay
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          insetPadding: EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            width: 326,
+            height: 182,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Title
+                  Text(
+                    "Calculation Error",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'SF Pro Display',
+                    ),
+                  ),
+                  SizedBox(height: 20),
+
+                  // Try Again button
+                  Container(
+                    width: 267,
+                    height: 40,
+                    margin: EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          offset: Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Centered text
+                        Text(
+                          "Try Again",
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        // Icon positioned to the left with exact spacing
+                        Positioned(
+                          left: 70, // Position for icon
+                          child: Icon(
+                            Icons.refresh,
+                            size: 20,
+                            color: Colors.black,
+                          ),
+                        ),
+                        // Full-width button for tap area
+                        Positioned.fill(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Cancel button
+                  Container(
+                    width: 267,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          offset: Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Centered text
+                        Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        // Icon positioned to match the other icon's position
+                        Positioned(
+                          left: 70, // Same position as other icon
+                          child: Image.asset(
+                            'assets/images/closeicon.png',
+                            width: 18,
+                            height: 18,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        // Full-width button for tap area
+                        Positioned.fill(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Helper method to show unclear input error dialog in premium style
+  void _showUnclearInputDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5), // Add dark overlay
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          insetPadding: EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            width: 326,
+            height: 250, // Increased to fix overflow
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 15),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Title
+                  Text(
+                    "Invalid Ingredient",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'SF Pro Display',
+                    ),
+                  ),
+                  SizedBox(height: 15),
+
+                  // Description text - updated to cover both food and serving size issues
+                  Text(
+                    "Please enter a valid food name and serving size that we can calculate nutrition for",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'SF Pro Display',
+                      color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: 25), // Increased spacing for better layout
+
+                  // Try Again button
+                  Container(
+                    width: 267,
+                    height: 40,
+                    margin:
+                        EdgeInsets.only(bottom: 18), // Increased bottom margin
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          offset: Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    // Rest of the button code remains the same
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Centered text
+                        Text(
+                          "Try Again",
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        // Icon positioned to the left with exact spacing
+                        Positioned(
+                          left: 70, // Position for icon
+                          child: Icon(
+                            Icons.edit_note,
+                            size: 20,
+                            color: Colors.black,
+                          ),
+                        ),
+                        // Full-width button for tap area
+                        Positioned.fill(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                // Show the add ingredient dialog again
+                                _showAddIngredientDialog();
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Cancel button
+                  Container(
+                    width: 267,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          offset: Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Centered text
+                        Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        // Icon positioned to match the other icon's position
+                        Positioned(
+                          left: 70, // Same position as other icon
+                          child: Image.asset(
+                            'assets/images/closeicon.png',
+                            width: 18,
+                            height: 18,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        // Full-width button for tap area
+                        Positioned.fill(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

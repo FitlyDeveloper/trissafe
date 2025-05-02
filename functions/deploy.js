@@ -27,10 +27,14 @@ if (!process.env.OPENAI_API_KEY) {
   console.log('Setting Firebase config values...');
   try {
     // Try to set config, but don't worry if it fails
-    const setApiKeyExampleCommand = 'firebase functions:config:set openai.api_key="YOUR_API_KEY_HERE"';
-    execSync(setApiKeyExampleCommand, {
+    const setOpenAIKeyCommand = 'firebase functions:config:set openai.api_key="YOUR_API_KEY_HERE"';
+    
+    // Set OpenAI key for image analysis
+    execSync(setOpenAIKeyCommand, {
       stdio: 'inherit'
     });
+    
+    console.log('OpenAI API key configured successfully');
   } catch (error) {
     console.warn('Warning: Could not set config values (this is not critical)');
   }
@@ -39,7 +43,7 @@ if (!process.env.OPENAI_API_KEY) {
 // Run the deploy command
 try {
   console.log('Deploying functions with forced deploy...');
-  execSync('cd .. && firebase deploy --only functions:echoTest,functions:analyzeImageSimple,functions:analyzeFoodImage,functions:testEndpoint --force', { stdio: 'inherit' });
+  execSync('cd .. && firebase deploy --only functions:echoTest,functions:analyzeImageSimple,functions:analyzeFoodImage,functions:testEndpoint,functions:streamAIResponse,functions:getAIResponse,functions:getNutritionData --force', { stdio: 'inherit' });
   console.log('Deployment completed successfully');
 } catch (error) {
   console.error('Deployment failed:', error.message);
