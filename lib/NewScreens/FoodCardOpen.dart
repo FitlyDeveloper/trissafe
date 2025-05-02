@@ -4233,17 +4233,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                       // Close button
                       Positioned(
-                        top: 19 + 1, // Moved down by 1px
-                        right: 22 -
-                            1, // Moved right by 1px (by decreasing the value since it's positioned from right)
+                        top: 21, // Move up by 2px more (from 23 to 21)
+                        right: 21, // Keep adjusted position
                         child: GestureDetector(
                           onTap: () {
                             Navigator.pop(context);
                           },
                           child: Image.asset(
                             'assets/images/closeicon.png',
-                            width: 16, // Changed from 22 to 16
-                            height: 16, // Changed from 22 to 16
+                            width: 19,
+                            height: 19,
                           ),
                         ),
                       ),
@@ -4795,16 +4794,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                   // Close button
                   Positioned(
-                    top: 19 + 1, // Moved down by 1px
-                    right: 22 - 1, // Moved right by 1px
+                    top: 32, // Move up by 2px more (from 34 to 32)
+                    right: 20,
                     child: GestureDetector(
                       onTap: () {
-                        Navigator.pop(context);
+                        Navigator.of(context).pop();
                       },
                       child: Image.asset(
                         'assets/images/closeicon.png',
-                        width: 16, // Changed from 22 to 16
-                        height: 16, // Changed from 22 to 16
+                        width: 19,
+                        height: 19,
                       ),
                     ),
                   ),
@@ -4997,7 +4996,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                 // Close button in top-right corner
                 Positioned(
-                  top: 19 + 1, // Moved down by 1px
+                  top: 24, // Align with the "Edit Ingredient" title text
                   right: 22 - 1, // Moved right by 1px
                   child: GestureDetector(
                     onTap: () {
@@ -5005,8 +5004,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     },
                     child: Image.asset(
                       'assets/images/closeicon.png',
-                      width: 16, // Changed from 22 to 16
-                      height: 16, // Changed from 22 to 16
+                      width: 19, // Update to 19x19
+                      height: 19, // Update to 19x19
                     ),
                   ),
                 ),
@@ -5691,16 +5690,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                     // Close button
                     Positioned(
-                      top: 19 + 1, // Moved down by 1px
-                      right: 22 - 1, // Moved right by 1px
+                      top: 21, // Move up by 2px more (from 23 to 21)
+                      right: 21, // Keep adjusted position
                       child: GestureDetector(
                         onTap: () {
                           Navigator.pop(context);
                         },
                         child: Image.asset(
                           'assets/images/closeicon.png',
-                          width: 16, // Changed from 22 to 16
-                          height: 16, // Changed from 22 to 16
+                          width: 19, // Update to 19x19
+                          height: 19, // Update to 19x19
                         ),
                       ),
                     ),
@@ -5930,116 +5929,128 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 ),
                 elevation: 0,
                 backgroundColor: Colors.white,
-                child: Container(
-                  width: 326,
-                  padding: EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Close button
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Icon(Icons.close, size: 24),
-                        ),
-                      ),
-                      SizedBox(height: 8),
-
-                      // Health Score title with heart icon
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 326,
+                      padding: EdgeInsets.fromLTRB(24, 24, 24, 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset(
-                            'assets/images/heart.png',
-                            width: 55,
-                            height: 55,
-                          ),
-                          SizedBox(width: 12),
+                          // Title
                           Text(
-                            'Health Score',
+                            'Fix Health Score',
                             style: TextStyle(
                               fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'SF Pro Display',
+                            ),
+                          ),
+                          SizedBox(height: 24),
+
+                          // Heart icon (increased by 20%)
+                          Image.asset(
+                            'assets/images/heart.png',
+                            width: 57.6, // Increased from 48 by 20%
+                            height: 57.6, // Increased from 48 by 20%
+                          ),
+                          SizedBox(height: 24),
+
+                          // Slider
+                          SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              trackHeight: 8,
+                              activeTrackColor: Colors.black,
+                              inactiveTrackColor: Colors.grey[300],
+                              thumbColor: Colors.white,
+                              thumbShape: RoundSliderThumbShape(
+                                enabledThumbRadius: 11,
+                                elevation: 4,
+                              ),
+                              // Make highlight 50% more subtle (reduce opacity by 50%)
+                              overlayColor: Colors.black.withOpacity(
+                                  0.04), // Changed from 0.08 to 0.04
+                              overlayShape:
+                                  RoundSliderOverlayShape(overlayRadius: 18),
+                              tickMarkShape: SliderTickMarkShape.noTickMark,
+                              showValueIndicator: ShowValueIndicator.never,
+                            ),
+                            child: Slider(
+                              value: localHealthScoreValue,
+                              min: 0.0,
+                              max: 1.0,
+                              divisions: 10,
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  localHealthScoreValue = value;
+                                });
+                              },
+                            ),
+                          ),
+
+                          // Score display
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Text(
+                              '${(localHealthScoreValue * 10).round()} / 10',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                            ),
+                          ),
+
+                          // Update button
+                          Container(
+                            width: double.infinity,
+                            height: 50,
+                            margin: EdgeInsets.only(top: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            child: TextButton(
+                              onPressed: () {
+                                // Update the health score
+                                _updateHealthScore(localHealthScoreValue);
+                                Navigator.of(context).pop();
+                              },
+                              style: ButtonStyle(
+                                overlayColor: MaterialStateProperty.all(
+                                    Colors.transparent),
+                              ),
+                              child: Text(
+                                'Update',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: 24),
-
-                      // Slider
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 8,
-                          activeTrackColor: Color(0xFF1F73FF),
-                          inactiveTrackColor: Colors.grey[300],
-                          thumbColor: Colors.white,
-                          thumbShape: RoundSliderThumbShape(
-                            enabledThumbRadius: 11,
-                            elevation: 4,
-                          ),
-                          overlayColor: Color(0xFF1F73FF).withOpacity(0.3),
-                          overlayShape:
-                              RoundSliderOverlayShape(overlayRadius: 20),
-                        ),
-                        child: Slider(
-                          value: localHealthScoreValue,
-                          min: 0.0,
-                          max: 1.0,
-                          divisions: 10,
-                          onChanged: (value) {
-                            setDialogState(() {
-                              localHealthScoreValue = value;
-                            });
-                          },
+                    ),
+                    // Close button aligned with the title text vertically, moved up by 2px more
+                    Positioned(
+                      top: 32, // Move up by 2px more (from 34 to 32)
+                      right: 20,
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Image.asset(
+                          'assets/images/closeicon.png',
+                          width: 19,
+                          height: 19,
                         ),
                       ),
-
-                      // Score display
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          '${(localHealthScoreValue * 10).round()}',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-
-                      // Update button
-                      Container(
-                        width: double.infinity,
-                        height: 50,
-                        margin: EdgeInsets.only(top: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.black,
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        child: TextButton(
-                          onPressed: () {
-                            // Update the health score
-                            _updateHealthScore(localHealthScoreValue);
-                            Navigator.of(context).pop();
-                          },
-                          style: ButtonStyle(
-                            overlayColor:
-                                MaterialStateProperty.all(Colors.transparent),
-                          ),
-                          child: Text(
-                            'Update',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             );
