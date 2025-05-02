@@ -5,11 +5,16 @@ import '../Features/codia/codia_page.dart';
 import 'dart:convert'; // For base64 decoding
 import 'dart:typed_data'; // For Uint8List
 import 'package:http/http.dart' as http; // For API calls to OpenAI
-import 'package:cloud_functions/cloud_functions.dart'; // For Firebase Functions integration
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'dart:math';
+import 'dart:ui';
+import 'dart:io';
 
 // Custom scroll physics optimized for mouse wheel
 class SlowScrollPhysics extends ScrollPhysics {
-  const SlowScrollPhysics({super.parent});
+  const SlowScrollPhysics({ScrollPhysics? parent}) : super(parent: parent);
 
   @override
   SlowScrollPhysics applyTo(ScrollPhysics? ancestor) {
@@ -18,20 +23,8 @@ class SlowScrollPhysics extends ScrollPhysics {
 
   @override
   double applyPhysicsToUserOffset(ScrollMetrics position, double offset) {
-    // Only slow down mouse wheel scrolling, speed up touch scrolling
-    if (offset.abs() < 10) {
-      // Mouse wheel typically produces smaller offset values
-      return offset * 0.3; // Slow down mouse wheel by 70%
-    }
-    return offset * 1.5; // Speed up touch scrolling by 50%
+    return offset * 0.4; // Slow down by 60%
   }
-
-  @override
-  double get minFlingVelocity => super.minFlingVelocity;
-
-  @override
-  double get maxFlingVelocity =>
-      super.maxFlingVelocity * 1.2; // Increased fling velocity by 20%
 }
 
 class FoodCardOpen extends StatefulWidget {
@@ -82,6 +75,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   String?
       _storedImageBase64; // For storing retrieved image from SharedPreferences
   List<Map<String, dynamic>> _ingredients = []; // Store ingredients list
+  Map<String, bool> _isIngredientFlipped = {};
 
   @override
   void initState() {
@@ -96,7 +90,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     _processImage();
 
     // Load saved data from SharedPreferences
-    _loadSavedData();
+    _loadSavedData().then((_) {
+      // Calculate total nutrition after everything is loaded
+      if (mounted) {
+        _calculateTotalNutrition();
+      }
+    });
   }
 
   // Debug method to print ingredient details
@@ -110,7 +109,13 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       String name = ingredient['name'] ?? 'NO NAME';
       String amount = ingredient['amount'] ?? 'NO AMOUNT';
       var calories = ingredient['calories'] ?? 'NO CALORIES';
-      print('[$i] $name - $amount - $calories kcal (${calories.runtimeType})');
+      var protein = ingredient['protein'] ?? '0';
+      var fat = ingredient['fat'] ?? '0';
+      var carbs = ingredient['carbs'] ?? '0';
+
+      print(
+          '[$i] $name - $amount - $calories kcal (${calories.runtimeType}) - ' +
+              'P: $protein, F: $fat, C: $carbs');
     }
 
     print('===========================================\n');
@@ -311,19 +316,63 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   Future<void> _loadSavedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String foodId = _foodName.replaceAll(' ', '_').toLowerCase();
+      final foodId =
+          widget.foodName?.replaceAll(' ', '_').toLowerCase() ?? 'default';
 
-      // Before loading - check if we have any widget ingredients passed
-      if (widget.ingredients != null && widget.ingredients!.isNotEmpty) {
-        print(
-            'Ingredients received from widget: ${widget.ingredients!.length}');
-        for (var ingredient in widget.ingredients!) {
-          if (ingredient is Map<String, dynamic>) {
+      // Load ingredients array
+      if (_ingredients.isEmpty) {
+        final ingredientsJson = prefs.getString('food_ingredients_$foodId');
+        print('Loaded ingredients JSON: $ingredientsJson');
+
+        if (ingredientsJson != null) {
+          try {
+            final List<dynamic> decoded = jsonDecode(ingredientsJson);
+            _ingredients = [];
+
+            // Process each item in the decoded list
+            for (var item in decoded) {
+              // Handle both object and string formats
+              if (item is Map) {
+                // Make sure all required fields exist
+                if (!item.containsKey('name') ||
+                    !item.containsKey('amount') ||
+                    !item.containsKey('calories')) {
+                  // Add missing fields with defaults
+                  item['name'] = item['name'] ?? 'Ingredient';
+                  item['amount'] = item['amount'] ?? '1 serving';
+                  item['calories'] = item['calories'] ?? 0;
+                }
+
+                // Also include macro values with fallbacks
+                Map<String, dynamic> validIngredient = {
+                  'name': item['name'] ?? 'Ingredient',
+                  'amount': item['amount'] ?? '1 serving',
+                  'calories': item['calories'] ?? 0,
+                  'protein': item['protein'] ?? '0',
+                  'fat': item['fat'] ?? '0',
+                  'carbs': item['carbs'] ?? '0',
+                };
+
+                _ingredients.add(validIngredient);
+              } else if (item is String) {
+                // Handle old format - string-only ingredients
+                // Create default ingredient object
+                Map<String, dynamic> validIngredient = {
+                  'name': item,
+                  'amount': '1 serving',
+                  'calories': 100,
+                  'protein': '5.0',
+                  'fat': '2.0',
+                  'carbs': '15.0',
+                };
+                _ingredients.add(validIngredient);
+              }
+            }
             print(
-                'Ingredient: ${ingredient['name']} - ${ingredient['amount']} - ${ingredient['calories']} kcal');
-          } else {
-            print(
-                'Non-map ingredient: $ingredient (${ingredient.runtimeType})');
+                'Loaded and validated ${_ingredients.length} ingredients from SharedPreferences');
+          } catch (e) {
+            print('Error parsing saved ingredients: $e');
+            _ingredients = []; // Reset to empty on error
           }
         }
       }
@@ -361,62 +410,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           _healthScoreValue = _extractHealthScoreValue(_healthScore);
         }
 
-        // Load ingredients if not provided as parameters or if ingredients list is empty
-        if ((widget.ingredients == null || widget.ingredients!.isEmpty) &&
-            _ingredients.isEmpty) {
-          final String? ingredientsJson =
-              prefs.getString('food_ingredients_$foodId');
-          if (ingredientsJson != null && ingredientsJson.isNotEmpty) {
-            try {
-              final List<dynamic> decodedList = jsonDecode(ingredientsJson);
-              // Explicitly validate each ingredient when loading
-              _ingredients = [];
-              for (var item in decodedList) {
-                if (item is Map<String, dynamic>) {
-                  // Ensure all required fields exist
-                  Map<String, dynamic> validIngredient = {
-                    'name': item['name'] ?? 'Ingredient',
-                    'amount': item['amount'] ?? '1 serving',
-                    'calories': item['calories'] ?? 0
-                  };
-                  _ingredients.add(validIngredient);
-                }
-              }
-              print(
-                  'Loaded and validated ${_ingredients.length} ingredients from SharedPreferences');
-            } catch (e) {
-              print('Error decoding ingredients JSON: $e');
-              _ingredients = []; // Reset to empty on error
-            }
-          }
-
-          // If no ingredients were loaded from SharedPreferences, use default fallback
-          if (_ingredients.isEmpty) {
-            _ingredients = [
-              {'name': 'Cheesecake', 'amount': '100g', 'calories': 300},
-              {'name': 'Berries', 'amount': '20g', 'calories': 10},
-              {'name': 'Jam', 'amount': '10g', 'calories': 20}
-            ];
-
-            // Sort default ingredients by calories (highest to lowest)
-            _ingredients.sort((a, b) {
-              final caloriesA = a.containsKey('calories')
-                  ? double.tryParse(a['calories'].toString()) ?? 0
-                  : 0;
-              final caloriesB = b.containsKey('calories')
-                  ? double.tryParse(b['calories'].toString()) ?? 0
-                  : 0;
-              return caloriesB.compareTo(caloriesA);
-            });
-
-            print('Using default ingredients as fallback');
-          }
-        }
-
         // Load image from SharedPreferences if not already loaded from parameter
         if (_imageBytes == null) {
           _storedImageBase64 = prefs.getString('food_image_$foodId');
           if (_storedImageBase64 != null && _storedImageBase64!.isNotEmpty) {
+            print(
+                'Loading image from SharedPreferences: ${_storedImageBase64!.length} characters');
             try {
               _imageBytes = base64Decode(_storedImageBase64!);
               print(
@@ -428,6 +427,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               print('Error decoding stored image: $e');
             }
           }
+        }
+
+        // Calculate total nutrition from all ingredients after loading
+        if (_ingredients.isNotEmpty) {
+          _calculateTotalNutrition();
+          print('Calculated total nutrition values from loaded ingredients');
         }
       });
 
@@ -446,13 +451,102 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     }
   }
 
+  // Save all data to SharedPreferences
   Future<void> _saveData() async {
     // Debug output before saving
     _debugPrintIngredients('Before save');
 
     try {
+      print('Saving all data to SharedPreferences...');
       final prefs = await SharedPreferences.getInstance();
       final String foodId = _foodName.replaceAll(' ', '_').toLowerCase();
+
+      // Store ingredients list
+      if (_ingredients.isNotEmpty) {
+        print('Saving ${_ingredients.length} ingredients');
+        // Validate that _ingredients contains valid Map objects before saving
+        List<Map<String, dynamic>> validIngredients = [];
+        for (var ingredient in _ingredients) {
+          if (ingredient is Map<String, dynamic>) {
+            // Create a map with all required data to ensure format consistency
+            Map<String, dynamic> validIngredient = {
+              'name': ingredient['name'] ?? 'Ingredient',
+              'amount': ingredient['amount'] ?? '1 serving',
+              'calories': ingredient['calories'] ?? 0,
+              // Include macros with fallbacks
+              'protein': ingredient['protein'] ?? '0',
+              'fat': ingredient['fat'] ?? '0',
+              'carbs': ingredient['carbs'] ?? '0',
+            };
+            validIngredients.add(validIngredient);
+          }
+        }
+
+        final ingredientsJson = jsonEncode(validIngredients);
+        await prefs.setString('food_ingredients_$foodId', ingredientsJson);
+        print('Successfully saved ingredients to SharedPreferences');
+
+        // IMPORTANT: Also update the ingredients in the food_cards list
+        // This ensures that when returning to FoodCardOpen, we have correct ingredients
+        final List<String>? storedCards = prefs.getStringList('food_cards');
+        if (storedCards != null && storedCards.isNotEmpty) {
+          List<String> updatedCards = [];
+          bool foundCard = false;
+
+          // Find the correct card and update it
+          for (String cardJson in storedCards) {
+            try {
+              Map<String, dynamic> cardData = jsonDecode(cardJson);
+              String cardName = cardData['name'] ?? '';
+
+              // If this is our card, update the ingredients
+              if (cardName.toLowerCase() == _foodName.toLowerCase()) {
+                foundCard = true;
+
+                // Update with our valid ingredients
+                cardData['ingredients'] = validIngredients;
+
+                // Also create ingredient lookup maps for future use
+                Map<String, dynamic> ingredientAmounts = {};
+                Map<String, dynamic> ingredientCalories = {};
+
+                for (var ingredient in validIngredients) {
+                  String name = ingredient['name'];
+                  ingredientAmounts[name] = ingredient['amount'];
+                  ingredientCalories[name] = ingredient['calories'];
+                }
+
+                cardData['ingredient_amounts'] = ingredientAmounts;
+                cardData['ingredient_calories'] = ingredientCalories;
+
+                // Update with our high quality image - preserve original quality
+                if (_storedImageBase64 != null &&
+                    _storedImageBase64!.isNotEmpty) {
+                  cardData['image'] = _storedImageBase64;
+                  print(
+                      'Using high-quality stored image data for food_cards: ${_storedImageBase64!.length} characters');
+                }
+
+                // Add the updated card to our list
+                updatedCards.add(jsonEncode(cardData));
+              } else {
+                // Not our card, keep it as is
+                updatedCards.add(cardJson);
+              }
+            } catch (e) {
+              print('Error updating food card ingredient data: $e');
+              // If there was an error, keep the original card
+              updatedCards.add(cardJson);
+            }
+          }
+
+          // Save the updated cards list back to SharedPreferences
+          if (foundCard) {
+            await prefs.setStringList('food_cards', updatedCards);
+            print('Updated ingredients in food_cards list for: $_foodName');
+          }
+        }
+      }
 
       await prefs.setBool('food_liked_$foodId', _isLiked);
       await prefs.setBool('food_bookmarked_$foodId', _isBookmarked);
@@ -466,95 +560,6 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       await prefs.setString('food_fat_$foodId', _fat);
       await prefs.setString('food_carbs_$foodId', _carbs);
       await prefs.setString('food_health_score_$foodId', _healthScore);
-
-      // Save ingredients list
-      if (_ingredients.isNotEmpty) {
-        try {
-          // Validate that _ingredients contains valid Map objects before saving
-          List<Map<String, dynamic>> validIngredients = [];
-          for (var ingredient in _ingredients) {
-            if (ingredient is Map<String, dynamic>) {
-              // Make sure all required fields exist
-              if (!ingredient.containsKey('name') ||
-                  !ingredient.containsKey('amount') ||
-                  !ingredient.containsKey('calories')) {
-                // Add missing fields with defaults
-                ingredient['name'] = ingredient['name'] ?? 'Ingredient';
-                ingredient['amount'] = ingredient['amount'] ?? '1 serving';
-                ingredient['calories'] = ingredient['calories'] ?? 0;
-              }
-              validIngredients.add(ingredient);
-            }
-          }
-
-          final ingredientsJson = jsonEncode(validIngredients);
-          await prefs.setString('food_ingredients_$foodId', ingredientsJson);
-          print('Saved ${validIngredients.length} validated ingredients');
-
-          // IMPORTANT: Also update the ingredients in the food_cards list
-          // This ensures that when returning to FoodCardOpen, we have correct ingredients
-          final List<String>? storedCards = prefs.getStringList('food_cards');
-          if (storedCards != null && storedCards.isNotEmpty) {
-            List<String> updatedCards = [];
-            bool foundCard = false;
-
-            // Find the correct card and update it
-            for (String cardJson in storedCards) {
-              try {
-                Map<String, dynamic> cardData = jsonDecode(cardJson);
-                String cardName = cardData['name'] ?? '';
-
-                // If this is our card, update the ingredients
-                if (cardName.toLowerCase() == _foodName.toLowerCase()) {
-                  foundCard = true;
-
-                  // Update with our valid ingredients
-                  cardData['ingredients'] = validIngredients;
-
-                  // Also create ingredient lookup maps for future use
-                  Map<String, dynamic> ingredientAmounts = {};
-                  Map<String, dynamic> ingredientCalories = {};
-
-                  for (var ingredient in validIngredients) {
-                    String name = ingredient['name'];
-                    ingredientAmounts[name] = ingredient['amount'];
-                    ingredientCalories[name] = ingredient['calories'];
-                  }
-
-                  cardData['ingredient_amounts'] = ingredientAmounts;
-                  cardData['ingredient_calories'] = ingredientCalories;
-
-                  // Update with our high quality image - preserve original quality
-                  if (_storedImageBase64 != null &&
-                      _storedImageBase64!.isNotEmpty) {
-                    cardData['image'] = _storedImageBase64;
-                    print(
-                        'Using high-quality stored image data for food_cards: ${_storedImageBase64!.length} characters');
-                  }
-
-                  // Add the updated card to our list
-                  updatedCards.add(jsonEncode(cardData));
-                } else {
-                  // Not our card, keep it as is
-                  updatedCards.add(cardJson);
-                }
-              } catch (e) {
-                print('Error updating food card ingredient data: $e');
-                // If there was an error, keep the original card
-                updatedCards.add(cardJson);
-              }
-            }
-
-            // Save the updated cards list back to SharedPreferences
-            if (foundCard) {
-              await prefs.setStringList('food_cards', updatedCards);
-              print('Updated ingredients in food_cards list for: $_foodName');
-            }
-          }
-        } catch (e) {
-          print('Error encoding ingredients for saving: $e');
-        }
-      }
 
       // Save image if available - ensure high quality
       if (_imageBytes != null || _storedImageBase64 != null) {
@@ -632,12 +637,27 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     super.dispose();
   }
 
-  void _handleBack() {
-    // Save data before navigating back
-    _saveData().then((_) => Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => CodiaPage()),
-        ));
+  // Handle back button press
+  void _handleBack() async {
+    // First ensure any open dialogs are dismissed
+    try {
+      while (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      print('Error dismissing dialogs on back: $e');
+    }
+
+    // Save data before leaving
+    await _saveData();
+
+    // Navigate back to the CodiaPage
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => CodiaPage()),
+      );
+    }
   }
 
   // Method to increment counter with maximum limit
@@ -1198,6 +1218,227 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     return grams * caloriesPerGram;
   }
 
+  // Add the food analyzer service directly to FoodCardOpen to handle text analysis for ingredients
+  Future<Map<String, dynamic>> _analyzeIngredientWithAPI(
+      String foodName, String servingSize,
+      [BuildContext? dialogContext]) async {
+    try {
+      // Format the prompt for DeepSeek AI
+      final messages = [
+        {
+          'role': 'system',
+          'content':
+              'You are a nutrition expert analyzing food items. Return ONLY RAW JSON with nutritional values that are accurate for the food type. Calculate values based on typical nutritional composition - DO NOT inflate protein content. For example, donuts should have LOW protein (3-7g), not high protein. CALORIES MUST BE PRECISE NUMBERS - not rounded to multiples of 10 or 50. For example, if a food has 283 calories, return 283 (not 280 or 300). Use accurate macronutrient distribution based on food type (e.g. more carbs for sweets, more protein for meat).'
+        },
+        {
+          'role': 'user',
+          'content':
+              'Calculate accurate nutritional values for $foodName, serving size: $servingSize. Return only the JSON with calories, protein, fat, and carbs. Example format: {"calories": 283, "protein": 12.5, "fat": 8.3, "carbs": 36.7}'
+        }
+      ];
+
+      print(
+          'FOOD ANALYZER: Creating direct DeepSeek API request for "$foodName" ($servingSize)');
+
+      // DeepSeek API key specific to FoodCardOpen
+      const String deepseekApiKey = 'sk-39f27e0e4f2346ccb047ddc658f93469';
+
+      // Call DeepSeek API directly (bypass Firebase)
+      final response = await http
+          .post(
+            Uri.parse('https://api.deepseek.com/v1/chat/completions'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $deepseekApiKey',
+            },
+            body: jsonEncode({
+              'model': 'deepseek-chat',
+              'messages': messages,
+              'max_tokens': 500,
+              'temperature': 0.5,
+              'response_format': {'type': 'json_object'},
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      print(
+          'FOOD ANALYZER: Received DeepSeek API response with status: ${response.statusCode}');
+
+      if (response.statusCode != 200) {
+        throw Exception(
+            'DeepSeek API error: ${response.statusCode}, ${response.body}');
+      }
+
+      // Parse the response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+      print(
+          'FOOD ANALYZER: DeepSeek response: ${responseData.toString().substring(0, 200)}...');
+
+      // Extract the content from choices
+      if (!responseData.containsKey('choices') ||
+          responseData['choices'] is! List ||
+          (responseData['choices'] as List).isEmpty ||
+          !responseData['choices'][0].containsKey('message') ||
+          !responseData['choices'][0]['message'].containsKey('content')) {
+        throw Exception('Invalid response format from DeepSeek API');
+      }
+
+      final content = responseData['choices'][0]['message']['content'];
+      Map<String, dynamic> nutrition = {};
+
+      try {
+        // Parse the JSON content
+        nutrition = jsonDecode(content);
+        print('FOOD ANALYZER: Parsed nutrition data: $nutrition');
+      } catch (e) {
+        print('FOOD ANALYZER: Error parsing nutrition JSON: $e');
+
+        // Try to extract JSON using regex if parsing fails
+        final jsonRegex = RegExp(r'\{[\s\S]*?\}');
+        final jsonMatch = jsonRegex.firstMatch(content);
+        if (jsonMatch != null) {
+          try {
+            nutrition = jsonDecode(jsonMatch.group(0)!);
+            print('FOOD ANALYZER: Extracted nutrition data: $nutrition');
+          } catch (e) {
+            print('FOOD ANALYZER: Error parsing extracted JSON: $e');
+          }
+        }
+      }
+
+      // Return standardized nutrition values with fallbacks
+      return {
+        'calories':
+            _extractNumericValue(nutrition, ['calories', 'kcal', 'energy']),
+        'protein': _extractNumericValue(nutrition, ['protein', 'proteins']),
+        'carbs': _extractNumericValue(nutrition, ['carbs', 'carbohydrates']),
+        'fat': _extractNumericValue(nutrition, ['fat', 'fats', 'total_fat']),
+      };
+    } catch (e) {
+      print('FOOD ANALYZER error with DeepSeek: $e');
+
+      // Since DeepSeek API call failed, fall back to the render.com API
+      try {
+        print('Falling back to render.com API for nutrition data');
+
+        // Format the query for the text-based analysis
+        final query =
+            "Calculate nutrition for $foodName, serving size: $servingSize";
+
+        print(
+            'FOOD ANALYZER FALLBACK: Creating text analysis request for "$query"');
+
+        // Use the render.com API endpoint as a fallback
+        final String baseUrl = 'https://snap-food.onrender.com';
+        final String analyzeEndpoint = '/api/analyze-food';
+
+        final Map<String, dynamic> requestBody = {
+          'text_query': query,
+          'type': 'nutrition'
+        };
+
+        final response = await http
+            .post(
+              Uri.parse('$baseUrl$analyzeEndpoint'),
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: jsonEncode(requestBody),
+            )
+            .timeout(const Duration(seconds: 30));
+
+        print(
+            'FOOD ANALYZER FALLBACK: Received response status: ${response.statusCode}');
+
+        if (response.statusCode != 200) {
+          throw Exception('Fallback API error: ${response.statusCode}');
+        }
+
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+        if (responseData['success'] != true) {
+          throw Exception('Fallback API error: ${responseData['error']}');
+        }
+
+        final data = responseData['data'];
+        Map<String, dynamic> nutrition = {};
+
+        if (data is Map) {
+          if (data.containsKey('nutrition')) {
+            nutrition = data['nutrition'] is Map
+                ? Map<String, dynamic>.from(data['nutrition'])
+                : {};
+          } else if (data.containsKey('nutrients')) {
+            nutrition = data['nutrients'] is Map
+                ? Map<String, dynamic>.from(data['nutrients'])
+                : {};
+          } else {
+            nutrition = Map<String, dynamic>.from(data);
+          }
+        }
+
+        print(
+            'FOOD ANALYZER FALLBACK: Using render.com API nutrition data: $nutrition');
+
+        return {
+          'calories':
+              _extractNumericValue(nutrition, ['calories', 'kcal', 'energy']),
+          'protein': _extractNumericValue(nutrition, ['protein', 'proteins']),
+          'carbs': _extractNumericValue(nutrition, ['carbs', 'carbohydrates']),
+          'fat': _extractNumericValue(nutrition, ['fat', 'fats', 'total_fat']),
+        };
+      } catch (fallbackError) {
+        // Handle both API failures
+        print('FOOD ANALYZER FALLBACK also failed: $fallbackError');
+
+        // Last resort - estimate based on food type
+        print('Falling back to estimated nutrition values');
+        double estimatedCalories =
+            _estimateCaloriesForFood(foodName, servingSize);
+
+        // Estimate macros based on food type
+        double protein = 0.0, fat = 0.0, carbs = 0.0;
+        String lowercaseName = foodName.toLowerCase();
+
+        // Sweet/dessert foods
+        if (lowercaseName.contains('cake') ||
+            lowercaseName.contains('cookie') ||
+            lowercaseName.contains('sweet') ||
+            lowercaseName.contains('dessert') ||
+            lowercaseName.contains('donut')) {
+          // Low protein, high carbs, moderate fat
+          protein = estimatedCalories * 0.05 / 4; // 5% protein
+          fat = estimatedCalories * 0.3 / 9; // 30% fat
+          carbs = estimatedCalories * 0.65 / 4; // 65% carbs
+        }
+        // Meat-based foods
+        else if (lowercaseName.contains('chicken') ||
+            lowercaseName.contains('beef') ||
+            lowercaseName.contains('fish') ||
+            lowercaseName.contains('meat')) {
+          // High protein, moderate fat, low carbs
+          protein = estimatedCalories * 0.4 / 4; // 40% protein
+          fat = estimatedCalories * 0.4 / 9; // 40% fat
+          carbs = estimatedCalories * 0.2 / 4; // 20% carbs
+        }
+        // Balanced meals
+        else {
+          // Moderate protein, moderate fat, moderate carbs
+          protein = estimatedCalories * 0.25 / 4; // 25% protein
+          fat = estimatedCalories * 0.3 / 9; // 30% fat
+          carbs = estimatedCalories * 0.45 / 4; // 45% carbs
+        }
+
+        return {
+          'calories': estimatedCalories,
+          'protein': protein,
+          'carbs': carbs,
+          'fat': fat,
+        };
+      }
+    }
+  }
+
   // Helper method to extract numeric values from different possible field names
   double _extractNumericValue(
       Map<String, dynamic> data, List<String> possibleKeys) {
@@ -1218,187 +1459,118 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     return 0.0;
   }
 
-  // Calculate nutrition using Firebase Functions (similar to Coach.dart's DeepSeek AI integration)
-  Future<Map<String, dynamic>> _calculateNutritionWithFirebase(
+  // Calculate nutrition using the Food Analyzer API with proper context handling
+  Future<Map<String, dynamic>> _calculateNutritionWithAI(
       String foodName, String servingSize) async {
     // Store a local copy of the context to avoid BuildContext issues
-    final BuildContext localContext = context;
+    BuildContext? localContext = context;
+    BuildContext? dialogContext;
+    bool isDialogShowing = false;
 
     try {
-      print(
-          'STARTING Firebase nutrition calculation for: $foodName ($servingSize)');
+      print('STARTING OpenAI calculation for: $foodName ($servingSize)');
 
-      // Create the query to send to Firebase Functions
-      final query =
-          "Calculate nutrition information (calories, protein, carbs, and fat) for $foodName, serving size: $servingSize";
-
-      // Prepare data for Firebase Function call
-      final Map<String, dynamic> requestData = {
-        'query': query,
-        'food': foodName,
-        'serving_size': servingSize,
-        'type': 'nutrition_analysis'
-      };
-
-      // Set up Firebase Functions call
-      final HttpsCallable callable = FirebaseFunctions.instance.httpsCallable(
-        'getNutritionData',
-        options: HttpsCallableOptions(
-          timeout: const Duration(seconds: 30),
-        ),
-      );
-
-      // Call the Firebase Function
-      final result = await callable.call(requestData);
-      final data = result.data as Map<String, dynamic>;
-
-      print('FIREBASE: Got response: $data');
-
-      // Extract nutrition data from response
-      if (data['success'] == true && data.containsKey('nutrition')) {
-        final nutrition = data['nutrition'] as Map<String, dynamic>;
-
-        // Standard response format matching our app's needs
-        return {
-          'calories':
-              _extractNumericValue(nutrition, ['calories', 'kcal', 'energy']),
-          'protein': _extractNumericValue(nutrition, ['protein', 'proteins']),
-          'carbs': _extractNumericValue(nutrition, ['carbs', 'carbohydrates']),
-          'fat': _extractNumericValue(nutrition, ['fat', 'fats', 'total_fat']),
-        };
-      } else if (data.containsKey('error')) {
-        throw Exception('Firebase Function error: ${data['error']}');
-      } else {
-        throw Exception('Invalid response format from Firebase');
-      }
-    } catch (e) {
-      print('CRITICAL ERROR calculating nutrition with Firebase: $e');
-
-      // Ensure we're using a valid context for showing dialogs
-      if (localContext.mounted) {
-        // Show error dialog using the local context
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          showDialog(
-            context: localContext,
-            barrierDismissible: false,
-            builder: (BuildContext ctx) {
-              return Dialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                elevation: 0,
-                backgroundColor: Colors.white,
-                insetPadding: EdgeInsets.symmetric(horizontal: 32),
-                child: Container(
-                  width: 326,
-                  height: 182,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Title
-                        Text(
-                          "Scan Failed",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'SF Pro Display',
-                          ),
-                        ),
-                        SizedBox(height: 20),
-
-                        // OK button
-                        Container(
-                          width: 267,
-                          height: 40,
-                          margin: EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: () => Navigator.of(ctx).pop(),
-                              child: Center(
-                                child: Text(
-                                  "OK",
-                                  style: TextStyle(
-                                    color: Colors.black87,
-                                    fontSize: 16,
-                                    fontFamily: 'SF Pro Display',
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Try again button
-                        Container(
-                          width: 267,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: () => Navigator.of(ctx).pop(),
-                              child: Center(
-                                child: Text(
-                                  "Try Again Later",
-                                  style: TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 16,
-                                    fontFamily: 'SF Pro Display',
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+      // Show loading dialog if context is still valid
+      if (mounted && localContext != null) {
+        isDialogShowing = true;
+        // Show loading indicator as a simple dialog
+        showDialog(
+          context: localContext,
+          barrierDismissible: false,
+          builder: (BuildContext ctx) {
+            dialogContext = ctx;
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Container(
+                width: 110,
+                height: 110,
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 3,
+                      ),
                     ),
-                  ),
+                    SizedBox(height: 16),
+                    Text(
+                      "Calculating...",
+                      style: TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
-              );
-            },
-          );
-        });
+              ),
+            );
+          },
+        );
       }
 
-      // Use our fallback calorie estimation when Firebase call fails
-      final estimatedCalories = _estimateCaloriesForFood(foodName, servingSize);
+      // Use the Food Analyzer service directly
+      final nutritionData =
+          await _analyzeIngredientWithAPI(foodName, servingSize, context);
 
-      // Return estimated values with defaults for other macros
+      // Safely dismiss the loading dialog if it's showing
+      _safelyDismissDialog(dialogContext, isDialogShowing);
+
+      print('COMPLETED OpenAI calculation: $nutritionData');
+
+      return nutritionData;
+    } catch (e) {
+      print('CRITICAL ERROR calculating nutrition: $e');
+
+      // Safely dismiss the loading dialog if it's showing
+      _safelyDismissDialog(dialogContext, isDialogShowing);
+
+      // If we can't get nutrition data, return default values
       return {
-        'calories': estimatedCalories,
-        'protein': estimatedCalories * 0.2, // Estimate 20% protein
-        'carbs': estimatedCalories * 0.5, // Estimate 50% carbs
-        'fat': estimatedCalories * 0.3, // Estimate 30% fat
+        'calories': 0.0,
+        'protein': 0.0,
+        'carbs': 0.0,
+        'fat': 0.0,
       };
     }
+  }
+
+  // Helper method to safely dismiss dialog without context errors
+  void _safelyDismissDialog(BuildContext? dialogContext, bool isDialogShowing) {
+    // First approach: Try using the specific dialog context if available
+    if (isDialogShowing && dialogContext != null) {
+      try {
+        if (Navigator.canPop(dialogContext)) {
+          Navigator.of(dialogContext).pop();
+          print('Dialog dismissed using dialog context');
+          return;
+        }
+      } catch (e) {
+        print('Error dismissing dialog with dialog context: $e');
+      }
+    }
+
+    // Second approach: Try using the global context as fallback
+    if (mounted && context != null) {
+      try {
+        if (Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+          print('Dialog dismissed using global context');
+          return;
+        }
+      } catch (e) {
+        print('Error dismissing dialog with global context: $e');
+      }
+    }
+
+    print('Could not dismiss dialog - no valid context found');
   }
 
   @override
@@ -2198,56 +2370,170 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     );
   }
 
-  Widget _buildIngredient(String name, String amount, String calories) {
+  // Build a flippable ingredient card
+  Widget _buildIngredient(String name, String amount, String calories,
+      {String protein = "0", String fat = "0", String carbs = "0"}) {
     final boxWidth = (MediaQuery.of(context).size.width - 78) / 2;
-    return Container(
-      width: boxWidth,
-      height: 110,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 5),
+
+    // Check if it's an "Add" card - don't make these flippable
+    if (name == "Add") {
+      return Container(
+        width: boxWidth,
+        height: 110,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'SF Pro Display',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 10),
+                Text(
+                  amount,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontFamily: 'SF Pro Display',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 10),
+                Text(
+                  calories,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontFamily: 'SF Pro Display',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-      child: Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                name,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'SF Pro Display',
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 10),
-              Text(
-                amount,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontFamily: 'SF Pro Display',
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 10),
-              Text(
-                calories,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontFamily: 'SF Pro Display',
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+        ),
+      );
+    }
+
+    // For regular ingredient cards, create a flippable card
+    // Use a unique key based on ingredient name and amount to track flip state
+    final cardKey = "$name-$amount";
+
+    // Initialize flip state for this card if it doesn't exist
+    if (!_isIngredientFlipped.containsKey(cardKey)) {
+      _isIngredientFlipped[cardKey] = false;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          // Toggle flip state for this specific card
+          _isIngredientFlipped[cardKey] =
+              !(_isIngredientFlipped[cardKey] ?? false);
+        });
+      },
+      child: Container(
+        width: boxWidth,
+        height: 110,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: AnimatedSwitcher(
+              duration: Duration(milliseconds: 300),
+              child: _isIngredientFlipped[cardKey] == true
+                  ? Column(
+                      key: ValueKey('back-$cardKey'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "Protein: ${protein}g",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          "Fat: ${fat}g",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          "Carbs: ${carbs}g",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    )
+                  : Column(
+                      key: ValueKey('front-$cardKey'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          amount,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          calories,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),
@@ -2360,11 +2646,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   _ingredients[i]['name'],
                   _ingredients[i]['amount'],
                   _formatIngredientCalories(_ingredients[i]['calories']),
+                  protein: _ingredients[i]['protein']?.toString() ?? "0",
+                  fat: _ingredients[i]['fat']?.toString() ?? "0",
+                  carbs: _ingredients[i]['carbs']?.toString() ?? "0",
                 ),
                 _buildIngredient(
                   _ingredients[i + 1]['name'],
                   _ingredients[i + 1]['amount'],
                   _formatIngredientCalories(_ingredients[i + 1]['calories']),
+                  protein: _ingredients[i + 1]['protein']?.toString() ?? "0",
+                  fat: _ingredients[i + 1]['fat']?.toString() ?? "0",
+                  carbs: _ingredients[i + 1]['carbs']?.toString() ?? "0",
                 ),
               ],
             ),
@@ -2382,6 +2674,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   _ingredients[i]['name'],
                   _ingredients[i]['amount'],
                   _formatIngredientCalories(_ingredients[i]['calories']),
+                  protein: _ingredients[i]['protein']?.toString() ?? "0",
+                  fat: _ingredients[i]['fat']?.toString() ?? "0",
+                  carbs: _ingredients[i]['carbs']?.toString() ?? "0",
                 ),
                 // Add button with clickable box
                 GestureDetector(
@@ -2529,61 +2824,13 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 // Store a local reference to the context to avoid issues with async operations
                 final BuildContext localContext = context;
 
-                // Show loading indicator as a simple dialog
-                showDialog(
-                  context: localContext,
-                  barrierDismissible: false,
-                  builder: (BuildContext dialogContext) {
-                    return Dialog(
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Container(
-                        width: 110,
-                        height: 110,
-                        padding: EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: CircularProgressIndicator(
-                                color: Colors.black,
-                                strokeWidth: 3,
-                              ),
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              "Calculating...",
-                              style: TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-
-                print('INGREDIENT ADD: Loading dialog shown');
-
                 try {
-                  // Call the Firebase Functions service instead of OpenAI API
+                  // Call the OpenAI API to calculate nutrition
                   final nutritionData =
-                      await _calculateNutritionWithFirebase(foodName, size);
-
-                  // Close the loading dialog only if we're still mounted and dialog is showing
-                  if (mounted && Navigator.canPop(localContext)) {
-                    Navigator.of(localContext).pop();
-                  }
+                      await _calculateNutritionWithAI(foodName, size);
 
                   print(
-                      'INGREDIENT ADD: Got response from Firebase: $nutritionData');
+                      'INGREDIENT ADD: Got response from API: $nutritionData');
 
                   // Extract values with more careful parsing
                   calories = nutritionData['calories'] ?? 0.0;
@@ -2608,21 +2855,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   // Update main nutritional values
                   if (mounted) {
                     setState(() {
-                      _calories = calories.toString();
-                      _protein = protein;
-                      _fat = fat;
-                      _carbs = carbs;
-                    });
-                  }
-                  print('INGREDIENT ADD: Updated main nutrition values');
-
-                  // Create new ingredient and add to list
-                  if (mounted) {
-                    setState(() {
+                      // Create new ingredient with user-provided calories
                       Map<String, dynamic> newIngredient = {
                         'name': foodName,
                         'amount': size,
-                        'calories': calories
+                        'calories': calories,
+                        'protein': protein,
+                        'fat': fat,
+                        'carbs': carbs
                       };
 
                       _ingredients.add(newIngredient);
@@ -2638,7 +2878,19 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                         return caloriesB.compareTo(caloriesA);
                       });
                     });
+
+                    // Calculate total nutrition from all ingredients
+                    _calculateTotalNutrition();
+
+                    // Save to persist the new ingredient
+                    _saveData();
+                    print(
+                        'INGREDIENT ADD: Added ingredient with provided calories');
                   }
+                  print('INGREDIENT ADD: Updated main nutrition values');
+
+                  // Calculate total nutrition from all ingredients
+                  _calculateTotalNutrition();
 
                   // Save data to persist ingredients
                   _saveData();
@@ -2646,13 +2898,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 } catch (e) {
                   print('CRITICAL ERROR calculating nutrition: $e');
 
-                  // First make sure loading dialog is closed if still showing
-                  if (mounted && Navigator.canPop(localContext)) {
-                    Navigator.of(localContext).pop();
-                  }
-
-                  // No need to show error dialog here as our _calculateNutritionWithFirebase
-                  // already handles showing the error dialog
+                  // No need to show error dialog here as our _calculateNutritionWithAI
+                  // already handles showing the error dialog and dismissing the loading dialog
                 }
               } else {
                 // User provided calories directly
@@ -2660,13 +2907,30 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   // Parse provided calories
                   calories = double.tryParse(caloriesText) ?? 0;
 
+                  // Calculate reasonable default macros based on calories
+                  // For a balanced food item: ~25% protein, ~30% fat, ~45% carbs
+                  double defaultProtein =
+                      (calories * 0.25 / 4); // 4 calories per gram of protein
+                  double defaultFat =
+                      (calories * 0.30 / 9); // 9 calories per gram of fat
+                  double defaultCarbs =
+                      (calories * 0.45 / 4); // 4 calories per gram of carbs
+
+                  // Set default values for macros with 1 decimal place
+                  protein = defaultProtein.toStringAsFixed(1);
+                  fat = defaultFat.toStringAsFixed(1);
+                  carbs = defaultCarbs.toStringAsFixed(1);
+
                   if (mounted) {
                     setState(() {
                       // Create new ingredient with user-provided calories
                       Map<String, dynamic> newIngredient = {
                         'name': foodName,
                         'amount': size,
-                        'calories': calories
+                        'calories': calories,
+                        'protein': protein,
+                        'fat': fat,
+                        'carbs': carbs
                       };
 
                       _ingredients.add(newIngredient);
@@ -2682,6 +2946,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                         return caloriesB.compareTo(caloriesA);
                       });
                     });
+
+                    // Calculate total nutrition from all ingredients
+                    _calculateTotalNutrition();
 
                     // Save to persist the new ingredient
                     _saveData();
@@ -2987,5 +3254,78 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         );
       },
     );
+  }
+
+  // Calculate total nutrition values from all ingredients
+  void _calculateTotalNutrition() {
+    if (_ingredients.isEmpty) {
+      // If no ingredients, set default values
+      setState(() {
+        _calories = "0";
+        _protein = "0";
+        _fat = "0";
+        _carbs = "0";
+      });
+      return;
+    }
+
+    // Sum up all nutritional values from ingredients
+    double totalCalories = 0;
+    double totalProtein = 0;
+    double totalFat = 0;
+    double totalCarbs = 0;
+
+    for (var ingredient in _ingredients) {
+      // Add calories
+      if (ingredient.containsKey('calories')) {
+        var calories = ingredient['calories'];
+        if (calories is String) {
+          totalCalories += double.tryParse(calories) ?? 0;
+        } else if (calories is num) {
+          totalCalories += calories.toDouble();
+        }
+      }
+
+      // Add protein
+      if (ingredient.containsKey('protein')) {
+        var protein = ingredient['protein'];
+        if (protein is String) {
+          totalProtein += double.tryParse(protein) ?? 0;
+        } else if (protein is num) {
+          totalProtein += protein.toDouble();
+        }
+      }
+
+      // Add fat
+      if (ingredient.containsKey('fat')) {
+        var fat = ingredient['fat'];
+        if (fat is String) {
+          totalFat += double.tryParse(fat) ?? 0;
+        } else if (fat is num) {
+          totalFat += fat.toDouble();
+        }
+      }
+
+      // Add carbs
+      if (ingredient.containsKey('carbs')) {
+        var carbs = ingredient['carbs'];
+        if (carbs is String) {
+          totalCarbs += double.tryParse(carbs) ?? 0;
+        } else if (carbs is num) {
+          totalCarbs += carbs.toDouble();
+        }
+      }
+    }
+
+    // Update state with calculated totals
+    setState(() {
+      _calories = totalCalories.toStringAsFixed(0); // Format as whole number
+      _protein = totalProtein.toStringAsFixed(1); // Format with 1 decimal place
+      _fat = totalFat.toStringAsFixed(1); // Format with 1 decimal place
+      _carbs = totalCarbs.toStringAsFixed(1); // Format with 1 decimal place
+    });
+
+    print(
+        'NUTRITION TOTALS: Calories=$_calories, Protein=$_protein, Fat=$_fat, Carbs=$_carbs');
   }
 }

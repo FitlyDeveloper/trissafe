@@ -1096,7 +1096,8 @@ class _SnapFoodState extends State<SnapFood> {
         'carbs': carbs, // Use original carbs value
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'image': base64Image,
-        'ingredients': ingredientsList.map((ing) => ing['name']).toList(),
+        'ingredients':
+            ingredientsList, // Store full ingredient objects, not just names
         'health_score': healthScore, // Store health score in the food card
       };
 
