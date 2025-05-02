@@ -62,6 +62,19 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   bool _isEditMode = false; // Track if we're in edit mode for teal outlines
   int _counter = 1; // Counter for +/- buttons
   String _privacyStatus = 'Public'; // Default privacy status
+  bool _hasUnsavedChanges = false; // Track whether user has made changes
+  // Original values to compare for changes
+  String _originalFoodName = '';
+  String _originalHealthScore = '';
+  String _originalCalories = '';
+  String _originalProtein = '';
+  String _originalFat = '';
+  String _originalCarbs = '';
+  int _originalCounter = 1;
+
+  // Keep a backup of original ingredients for restoring if changes are discarded
+  List<Map<String, dynamic>> _originalIngredients = [];
+
   late AnimationController _bookmarkController;
   late Animation<double> _bookmarkScaleAnimation;
   late AnimationController _likeController;
@@ -87,34 +100,47 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   void initState() {
     super.initState();
     print('FoodCardOpen initState called');
+
+    // Initialize with no unsaved changes
+    _hasUnsavedChanges = false;
+
     // Initialize animation controllers
     _initAnimationControllers();
 
-    // Set initial values from parameters if available
+    // Set initial values from parameters if available - but don't set _originalXXX yet
     if (widget.foodName != null && widget.foodName!.isNotEmpty) {
       _foodName = widget.foodName!;
+      // We'll set _originalFoodName later after all data is loaded
     }
 
     if (widget.healthScore != null && widget.healthScore!.isNotEmpty) {
       _healthScore = widget.healthScore!;
       _healthScoreValue = _extractHealthScoreValue(_healthScore);
+      // We'll set _originalHealthScore later
     }
 
     if (widget.calories != null && widget.calories!.isNotEmpty) {
       _calories = _formatDecimalValue(widget.calories!);
+      // We'll set _originalCalories later
     }
 
     if (widget.protein != null && widget.protein!.isNotEmpty) {
       _protein = widget.protein!;
+      // We'll set _originalProtein later
     }
 
     if (widget.fat != null && widget.fat!.isNotEmpty) {
       _fat = widget.fat!;
+      // We'll set _originalFat later
     }
 
     if (widget.carbs != null && widget.carbs!.isNotEmpty) {
       _carbs = widget.carbs!;
+      // We'll set _originalCarbs later
     }
+
+    _counter = 1; // Always start at 1
+    // We'll set _originalCounter later
 
     // Process image if available
     _processImage();
@@ -126,11 +152,36 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         _initFoodData();
       }
 
+      // Create backup of original ingredients for potential restore on discard
+      _backupOriginalIngredients();
+
       // Calculate total nutrition after everything is loaded
       if (mounted) {
         _calculateTotalNutrition();
+
+        // Important: Now set the original values to match current values
+        // This will ensure _checkForUnsavedChanges() returns false initially
+        _resetUnsavedChangesState();
       }
     });
+  }
+
+  // Create a deep copy of ingredients to restore if changes are discarded
+  void _backupOriginalIngredients() {
+    _originalIngredients = [];
+    for (var ingredient in _ingredients) {
+      _originalIngredients.add(Map<String, dynamic>.from(ingredient));
+    }
+    print('Backed up ${_originalIngredients.length} original ingredients');
+  }
+
+  // Restore original ingredients when discarding changes
+  void _restoreOriginalIngredients() {
+    _ingredients = [];
+    for (var ingredient in _originalIngredients) {
+      _ingredients.add(Map<String, dynamic>.from(ingredient));
+    }
+    print('Restored ${_ingredients.length} original ingredients');
   }
 
   // Debug method to print ingredient details
@@ -430,6 +481,27 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     }
   }
 
+  // Add this method to reset the unsaved changes state after loading
+  void _resetUnsavedChangesState() {
+    // Update all original values to match current values
+    _originalFoodName = _foodName;
+    _originalHealthScore = _healthScore;
+    _originalCalories = _calories;
+    _originalProtein = _protein;
+    _originalFat = _fat;
+    _originalCarbs = _carbs;
+    _originalCounter = _counter;
+
+    // Create a fresh backup of ingredients
+    _backupOriginalIngredients();
+
+    // Reset the unsaved changes flag
+    _hasUnsavedChanges = false;
+
+    print('Reset unsaved changes state - screen is now in clean state');
+  }
+
+  // At the end of _loadSavedData method, add call to reset unsaved changes state
   Future<void> _loadSavedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -595,6 +667,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         _calculateTotalNutrition();
         print('Calculated total nutrition values from loaded ingredients');
       }
+
+      // Important: Reset unsaved changes state after everything is loaded
+      _resetUnsavedChangesState();
     } catch (e) {
       print('Error loading saved food data: $e');
     }
@@ -655,7 +730,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 // Update with our valid ingredients
                 cardData['ingredients'] = validIngredients;
 
-                // Update the total nutrition values for the meal card
+                // Also save the counter value in the food card data
+                // This will be used by codia_page.dart to multiply the nutrition values
+                cardData['counter'] = _counter;
+
+                // Update the total nutrition values for the meal card - base values (not multiplied)
                 cardData['calories'] = _calories.toString();
                 cardData['protein'] = _protein.toString();
                 cardData['fat'] = _fat.toString();
@@ -724,6 +803,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               'carbs': _carbs.toString(),
               'health_score': _healthScore,
               'ingredients': validIngredients,
+              'counter': _counter, // Add counter to food card
               'time': DateTime.now().millisecondsSinceEpoch.toString(),
             };
 
@@ -772,6 +852,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             'carbs': _carbs.toString(),
             'health_score': _healthScore,
             'ingredients': validIngredients,
+            'counter': _counter, // Add counter to food card
             'time': DateTime.now().millisecondsSinceEpoch.toString(),
           };
 
@@ -901,8 +982,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
   @override
   void dispose() {
-    // Save data when leaving the screen
-    _saveData();
+    // We're not automatically saving data when leaving the screen
+    // This prevents unwanted changes from being saved when discarding
 
     _bookmarkController.dispose();
     _likeController.dispose();
@@ -915,26 +996,303 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     super.dispose();
   }
 
-  // Handle back button press
-  void _handleBack() async {
-    // First ensure any open dialogs are dismissed
-    try {
-      while (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      print('Error dismissing dialogs on back: $e');
+  // Check if there are unsaved changes
+  bool _checkForUnsavedChanges() {
+    print('\nChecking for unsaved changes:');
+
+    // Check if _hasUnsavedChanges flag is set
+    if (_hasUnsavedChanges) {
+      print('_hasUnsavedChanges flag is set to true');
+      return true;
     }
 
-    // Save data before leaving
-    await _saveData();
+    // Compare current values with original values
+    if (_foodName != _originalFoodName) {
+      print('Food name changed: $_foodName != $_originalFoodName');
+      return true;
+    }
 
-    // Navigate back to the CodiaPage
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => CodiaPage()),
-      );
+    if (_healthScore != _originalHealthScore) {
+      print('Health score changed: $_healthScore != $_originalHealthScore');
+      return true;
+    }
+
+    // For numeric values, normalize to handle format differences
+    String normalizeNumber(String val) {
+      try {
+        // Convert to double and back to string to normalize format
+        return double.parse(val.replaceAll(',', '.')).toString();
+      } catch (e) {
+        return val;
+      }
+    }
+
+    if (normalizeNumber(_calories) != normalizeNumber(_originalCalories)) {
+      print('Calories changed: $_calories != $_originalCalories');
+      return true;
+    }
+
+    if (normalizeNumber(_protein) != normalizeNumber(_originalProtein)) {
+      print('Protein changed: $_protein != $_originalProtein');
+      return true;
+    }
+
+    if (normalizeNumber(_fat) != normalizeNumber(_originalFat)) {
+      print('Fat changed: $_fat != $_originalFat');
+      return true;
+    }
+
+    if (normalizeNumber(_carbs) != normalizeNumber(_originalCarbs)) {
+      print('Carbs changed: $_carbs != $_originalCarbs');
+      return true;
+    }
+
+    if (_counter != _originalCounter) {
+      print('Counter changed: $_counter != $_originalCounter');
+      return true;
+    }
+
+    // If ingredients list length is different, consider it a change
+    if (_ingredients.length != _originalIngredients.length) {
+      print(
+          'Different number of ingredients: ${_ingredients.length} vs ${_originalIngredients.length}');
+      return true;
+    }
+
+    // Compare each ingredient carefully
+    for (int i = 0; i < _ingredients.length; i++) {
+      var current = _ingredients[i];
+      var original = _originalIngredients[i];
+
+      // Normalize and compare essential fields
+      String currentName = current['name']?.toString() ?? '';
+      String originalName = original['name']?.toString() ?? '';
+
+      String currentAmount = current['amount']?.toString() ?? '';
+      String originalAmount = original['amount']?.toString() ?? '';
+
+      // Normalize calories for comparison
+      String currentCalories =
+          normalizeNumber(current['calories']?.toString() ?? '0');
+      String originalCalories =
+          normalizeNumber(original['calories']?.toString() ?? '0');
+
+      if (currentName != originalName) {
+        print('Ingredient $i name changed: $currentName != $originalName');
+        return true;
+      }
+
+      if (currentAmount != originalAmount) {
+        print(
+            'Ingredient $i amount changed: $currentAmount != $originalAmount');
+        return true;
+      }
+
+      if (currentCalories != originalCalories) {
+        print(
+            'Ingredient $i calories changed: $currentCalories != $originalCalories');
+        return true;
+      }
+    }
+
+    print('No changes detected');
+    return false;
+  }
+
+  // Show confirmation dialog for unsaved changes
+  Future<bool> _showUnsavedChangesDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierColor: Colors.black.withOpacity(0.5),
+          builder: (BuildContext context) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              elevation: 0,
+              backgroundColor: Colors.white,
+              insetPadding: EdgeInsets.symmetric(horizontal: 32),
+              child: Container(
+                width: 326,
+                height: 182,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Title
+                      Text(
+                        "Discard Changes?",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'SF Pro Display',
+                        ),
+                      ),
+                      SizedBox(height: 20),
+
+                      // Discard button
+                      Container(
+                        width: 267,
+                        height: 40,
+                        margin: EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              offset: Offset(0, 2),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Centered text
+                            Text(
+                              "Discard",
+                              style: TextStyle(
+                                color: Color(0xFFE97372),
+                                fontSize: 16,
+                                fontFamily: 'SF Pro Display',
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            // Icon positioned to the left with exact spacing
+                            Positioned(
+                              left: 70,
+                              child: Image.asset(
+                                'assets/images/trashcan.png',
+                                width: 20,
+                                height: 20,
+                                color: Color(0xFFE97372),
+                              ),
+                            ),
+                            // Full-width button for tap area
+                            Positioned.fill(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () {
+                                    Navigator.of(context)
+                                        .pop(true); // Discard changes
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Cancel button
+                      Container(
+                        width: 267,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              offset: Offset(0, 2),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Centered text
+                            Text(
+                              "Cancel",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontFamily: 'SF Pro Display',
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            // Icon positioned to the left with exact spacing
+                            Positioned(
+                              left: 70,
+                              child: Image.asset(
+                                'assets/images/closeicon.png',
+                                width: 18,
+                                height: 18,
+                              ),
+                            ),
+                            // Full-width button for tap area
+                            Positioned.fill(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () {
+                                    Navigator.of(context).pop(
+                                        false); // Cancel and return to editing
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ) ??
+        false;
+  }
+
+  // Handle back button press
+  void _handleBack() async {
+    // Check if there are unsaved changes
+    if (_checkForUnsavedChanges()) {
+      // Show confirmation dialog
+      bool shouldDiscard = await _showUnsavedChangesDialog();
+
+      if (shouldDiscard) {
+        // User clicked "Discard" - RESET ALL VALUES to original state
+        // This ensures any temporary changes are completely undone
+        if (mounted) {
+          setState(() {
+            // Reset all values to their original values
+            _foodName = _originalFoodName;
+            _healthScore = _originalHealthScore;
+            _healthScoreValue = _extractHealthScoreValue(_originalHealthScore);
+            _calories = _originalCalories;
+            _protein = _originalProtein;
+            _fat = _originalFat;
+            _carbs = _originalCarbs;
+            _counter = _originalCounter;
+            _hasUnsavedChanges = false;
+
+            // Restore original ingredients directly from our backup
+            _restoreOriginalIngredients();
+
+            // Navigate to CodiaPage after resetting everything
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => CodiaPage()),
+            );
+          });
+        }
+      }
+      // If shouldDiscard is false, user clicked "Cancel", stay on FoodCardOpen
+      // No action needed here - the dialog is dismissed and user stays on current screen
+    } else {
+      // No unsaved changes, simply navigate back without showing confirmation
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => CodiaPage()),
+        );
+      }
     }
   }
 
@@ -943,7 +1301,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     setState(() {
       if (_counter < 10) {
         _counter++;
-        _saveData(); // Save immediately on value change
+        _markAsUnsaved(); // Mark as having unsaved changes
+        // Don't save immediately, only mark as unsaved
       }
     });
   }
@@ -953,7 +1312,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     setState(() {
       if (_counter > 1) {
         _counter--;
-        _saveData(); // Save immediately on value change
+        _markAsUnsaved(); // Mark as having unsaved changes
+        // Don't save immediately, only mark as unsaved
       }
     });
   }
@@ -964,7 +1324,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       _isBookmarked = !_isBookmarked;
       _bookmarkController.reset();
       _bookmarkController.forward();
-      _saveData(); // Save immediately on value change
+      _markAsUnsaved(); // Mark as having unsaved changes
+      // Don't save immediately, only mark as unsaved
     });
   }
 
@@ -974,7 +1335,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       _isLiked = !_isLiked;
       _likeController.reset();
       _likeController.forward();
-      _saveData(); // Save immediately on value change
+      _markAsUnsaved(); // Mark as having unsaved changes
+      // Don't save immediately, only mark as unsaved
     });
   }
 
@@ -1005,7 +1367,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 setModalState(() => _selectedPrivacy = value);
                 setState(() {
                   _privacyStatus = value;
-                  _saveData(); // Save the change immediately
+                  _markAsUnsaved(); // Mark as having unsaved changes instead of saving
                 });
                 Navigator.pop(context);
               }),
@@ -1015,7 +1377,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 setModalState(() => _selectedPrivacy = value);
                 setState(() {
                   _privacyStatus = value;
-                  _saveData(); // Save the change immediately
+                  _markAsUnsaved(); // Mark as having unsaved changes instead of saving
                 });
                 Navigator.pop(context);
               }),
@@ -1026,7 +1388,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 setModalState(() => _selectedPrivacy = value);
                 setState(() {
                   _privacyStatus = value;
-                  _saveData(); // Save the change immediately
+                  _markAsUnsaved(); // Mark as having unsaved changes instead of saving
                 });
                 Navigator.pop(context);
               }),
@@ -1906,13 +2268,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       // Use a stack for better layout control
       body: WillPopScope(
         onWillPop: () async {
-          // Save data before allowing pop
-          await _saveData();
-          // Navigate to CodiaPage instead of regular pop
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => CodiaPage()),
-          );
+          // Use the same _handleBack logic for system back button
+          _handleBack();
           // Return false to prevent default pop behavior
           return false;
         },
@@ -2548,10 +2905,26 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                       });
                     }
                     // Save data and navigate to CodiaPage
-                    _saveData().then((_) => Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => CodiaPage()),
-                        ));
+                    _saveData().then((_) {
+                      setState(() {
+                        _hasUnsavedChanges =
+                            false; // Clear unsaved changes flag
+
+                        // Update original values to match current values
+                        // so subsequent changes are tracked properly
+                        _originalFoodName = _foodName;
+                        _originalHealthScore = _healthScore;
+                        _originalCalories = _calories;
+                        _originalProtein = _protein;
+                        _originalFat = _fat;
+                        _originalCarbs = _carbs;
+                        _originalCounter = _counter;
+                      });
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => CodiaPage()),
+                      );
+                    });
                   },
                   style: ButtonStyle(
                     overlayColor: MaterialStateProperty.all(Colors.transparent),
@@ -3495,6 +3868,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     };
 
                     _ingredients.add(newIngredient);
+                    _markAsUnsaved(); // Mark as having unsaved changes
 
                     // Sort ingredients by calories (highest to lowest)
                     _ingredients.sort((a, b) {
@@ -3511,19 +3885,18 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   // Calculate total nutrition from all ingredients
                   _calculateTotalNutrition();
 
-                  // Save to persist the new ingredient
-                  _saveData();
+                  // Don't auto-save - wait for user to click Save button
                   print(
-                      'INGREDIENT ADD: Added ingredient with provided calories');
+                      'INGREDIENT ADD: Added ingredient, changes marked as unsaved');
                 }
                 print('INGREDIENT ADD: Updated main nutrition values');
 
                 // Calculate total nutrition from all ingredients
                 _calculateTotalNutrition();
 
-                // Save data to persist ingredients
-                _saveData();
-                print('INGREDIENT ADD: Successfully added ingredient');
+                // Don't auto-save - wait for user to click Save button
+                print(
+                    'INGREDIENT ADD: Successfully added ingredient, waiting for save');
               } else {
                 // User provided calories directly
                 try {
@@ -3557,6 +3930,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                       };
 
                       _ingredients.add(newIngredient);
+                      _markAsUnsaved(); // Mark as having unsaved changes
 
                       // Sort ingredients by calories (highest to lowest)
                       _ingredients.sort((a, b) {
@@ -3573,10 +3947,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     // Calculate total nutrition from all ingredients
                     _calculateTotalNutrition();
 
-                    // Save to persist the new ingredient
-                    _saveData();
+                    // Don't auto-save - wait for user to click Save button
                     print(
-                        'INGREDIENT ADD: Added ingredient with provided calories');
+                        'INGREDIENT ADD: Added ingredient with provided calories, changes marked as unsaved');
                   }
                 } catch (e) {
                   print('Error adding ingredient with provided calories: $e');
@@ -3860,16 +4233,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                       // Close button
                       Positioned(
-                        top: 19,
-                        right: 22,
+                        top: 19 + 1, // Moved down by 1px
+                        right: 22 -
+                            1, // Moved right by 1px (by decreasing the value since it's positioned from right)
                         child: GestureDetector(
                           onTap: () {
                             Navigator.pop(context);
                           },
                           child: Image.asset(
                             'assets/images/closeicon.png',
-                            width: 22,
-                            height: 22,
+                            width: 16, // Changed from 22 to 16
+                            height: 16, // Changed from 22 to 16
                           ),
                         ),
                       ),
@@ -3888,11 +4262,25 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   void _calculateTotalNutrition() {
     if (_ingredients.isEmpty) {
       // If no ingredients, set default values
+      String oldCalories = _calories;
+      String oldProtein = _protein;
+      String oldFat = _fat;
+      String oldCarbs = _carbs;
+
       setState(() {
         _calories = "0";
         _protein = "0";
         _fat = "0";
         _carbs = "0";
+
+        // Only mark as unsaved if values actually changed
+        if (_calories != oldCalories ||
+            _protein != oldProtein ||
+            _fat != oldFat ||
+            _carbs != oldCarbs) {
+          print('Nutrition values changed, marking as unsaved');
+          _hasUnsavedChanges = true;
+        }
       });
       return;
     }
@@ -3902,6 +4290,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     double totalProtein = 0;
     double totalFat = 0;
     double totalCarbs = 0;
+
+    // Save old values for comparison
+    String oldCalories = _calories;
+    String oldProtein = _protein;
+    String oldFat = _fat;
+    String oldCarbs = _carbs;
 
     for (var ingredient in _ingredients) {
       // Debug output for each ingredient
@@ -3957,13 +4351,19 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       _protein = totalProtein.round().toString(); // Round to whole number
       _fat = totalFat.round().toString(); // Round to whole number
       _carbs = totalCarbs.round().toString(); // Round to whole number
+
+      // Only mark as unsaved if values actually changed
+      if (_calories != oldCalories ||
+          _protein != oldProtein ||
+          _fat != oldFat ||
+          _carbs != oldCarbs) {
+        print('Nutrition values changed, marking as unsaved');
+        _hasUnsavedChanges = true;
+      }
     });
 
     print(
         'NUTRITION TOTALS: Calories=$_calories, Protein=$_protein, Fat=$_fat, Carbs=$_carbs');
-
-    // Save data to persist the new calculated values
-    _saveData();
   }
 
   // Helper method to show API error dialog in premium style
@@ -4395,16 +4795,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                   // Close button
                   Positioned(
-                    top: 19,
-                    right: 22,
+                    top: 19 + 1, // Moved down by 1px
+                    right: 22 - 1, // Moved right by 1px
                     child: GestureDetector(
                       onTap: () {
                         Navigator.pop(context);
                       },
                       child: Image.asset(
                         'assets/images/closeicon.png',
-                        width: 22,
-                        height: 22,
+                        width: 16, // Changed from 22 to 16
+                        height: 16, // Changed from 22 to 16
                       ),
                     ),
                   ),
@@ -4597,16 +4997,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                 // Close button in top-right corner
                 Positioned(
-                  top: 19,
-                  right: 22,
+                  top: 19 + 1, // Moved down by 1px
+                  right: 22 - 1, // Moved right by 1px
                   child: GestureDetector(
                     onTap: () {
                       Navigator.pop(context);
                     },
                     child: Image.asset(
                       'assets/images/closeicon.png',
-                      width: 22,
-                      height: 22,
+                      width: 16, // Changed from 22 to 16
+                      height: 16, // Changed from 22 to 16
                     ),
                   ),
                 ),
@@ -5261,8 +5661,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                       // Recalculate total nutrition
                                       _calculateTotalNutrition();
 
-                                      // Save the updated data
-                                      _saveData();
+                                      // Don't save the data until the user clicks Save
+                                      _markAsUnsaved();
                                       break;
                                     }
                                   }
@@ -5291,16 +5691,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                     // Close button
                     Positioned(
-                      top: 19,
-                      right: 22,
+                      top: 19 + 1, // Moved down by 1px
+                      right: 22 - 1, // Moved right by 1px
                       child: GestureDetector(
                         onTap: () {
                           Navigator.pop(context);
                         },
                         child: Image.asset(
                           'assets/images/closeicon.png',
-                          width: 22,
-                          height: 22,
+                          width: 16, // Changed from 22 to 16
+                          height: 16, // Changed from 22 to 16
                         ),
                       ),
                     ),
@@ -5482,12 +5882,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       setState(() {
         // Remove the ingredient
         _ingredients.removeAt(indexToRemove);
+        _markAsUnsaved(); // Mark as having unsaved changes
 
         // Recalculate total nutrition values
         _calculateTotalNutrition();
 
-        // Save the updated data
-        _saveData();
+        // Don't save immediately - only when user clicks Save
       });
 
       print(
@@ -5497,7 +5897,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     }
   }
 
-  // Method to show the health score popup when in edit mode
+  // Method to update health score
+  void _updateHealthScore(double value) {
+    setState(() {
+      _healthScoreValue = value;
+      _healthScore = '${(value * 10).round()}/10';
+      _markAsUnsaved(); // Mark as having unsaved changes
+    });
+  }
+
+  // Method to show health score popup when in edit mode
   void _showHealthScorePopup() {
     // Local state for the slider value to allow immediate updates
     double localHealthScoreValue = _healthScoreValue;
@@ -5513,7 +5922,6 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 textSelectionTheme: TextSelectionThemeData(
                   selectionColor: Colors.grey.withOpacity(0.3),
                   cursorColor: Colors.black,
-                  selectionHandleColor: Colors.black,
                 ),
               ),
               child: Dialog(
@@ -5522,156 +5930,111 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 ),
                 elevation: 0,
                 backgroundColor: Colors.white,
-                insetPadding: EdgeInsets.symmetric(horizontal: 32),
                 child: Container(
                   width: 326,
-                  height: 360,
-                  child: Stack(
+                  padding: EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Title
-                            SizedBox(height: 14),
-                            Text(
-                              "Fix Health Score",
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'SF Pro Display',
-                              ),
+                      // Close button
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: Icon(Icons.close, size: 24),
+                        ),
+                      ),
+                      SizedBox(height: 8),
+
+                      // Health Score title with heart icon
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/images/heart.png',
+                            width: 55,
+                            height: 55,
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            'Health Score',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
                             ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 24),
 
-                            // Use Expanded to center the image and slider as one group
-                            Expanded(
-                              child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Heart icon - increased to 55x55
-                                    Image.asset(
-                                      'assets/images/heart.png',
-                                      width: 55.0,
-                                      height: 55.0,
-                                    ),
-
-                                    SizedBox(height: 28),
-
-                                    // Slider with style from onboarding screen but smaller width
-                                    Container(
-                                      width: 260, // Smaller horizontal width
-                                      child: SliderTheme(
-                                        data: SliderThemeData(
-                                          trackHeight:
-                                              2, // Thinner track like in onboarding
-                                          activeTrackColor: Colors.black,
-                                          inactiveTrackColor: Colors.grey[300],
-                                          thumbColor: Colors.white,
-                                          overlayColor:
-                                              Colors.black.withOpacity(0.05),
-                                          overlayShape:
-                                              const RoundSliderOverlayShape(
-                                            overlayRadius:
-                                                17, // Same aura size as in onboarding
-                                          ),
-                                          thumbShape:
-                                              const RoundSliderThumbShape(
-                                            enabledThumbRadius: 12,
-                                            elevation: 4,
-                                          ),
-                                        ),
-                                        child: Slider(
-                                          value: localHealthScoreValue,
-                                          min: 0.0,
-                                          max: 1.0,
-                                          onChanged: (value) {
-                                            // Update local state to move the slider and score in real-time
-                                            setDialogState(() {
-                                              localHealthScoreValue = value;
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ),
-
-                                    SizedBox(height: 20),
-
-                                    // Score display - increased font size to 20
-                                    Text(
-                                      "${((localHealthScoreValue * 10).round())} / 10",
-                                      style: TextStyle(
-                                        fontSize: 20, // Increased from 18 to 20
-                                        fontWeight: FontWeight.w500,
-                                        fontFamily: 'SF Pro Display',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Update button - match "Add" popup spacing
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 20),
-                              child: Container(
-                                width: 280,
-                                height: 48,
-                                margin: EdgeInsets.only(bottom: 24),
-                                decoration: BoxDecoration(
-                                  color: Colors.black,
-                                  borderRadius: BorderRadius.circular(28),
-                                ),
-                                child: TextButton(
-                                  onPressed: () {
-                                    // Update app state with local slider value
-                                    int score =
-                                        ((localHealthScoreValue * 10).round());
-                                    setState(() {
-                                      _healthScore = "$score/10";
-                                      _healthScoreValue = localHealthScoreValue;
-                                    });
-
-                                    // Save the data
-                                    _saveData();
-
-                                    // Close the dialog
-                                    Navigator.pop(context);
-                                  },
-                                  style: ButtonStyle(
-                                    overlayColor: MaterialStateProperty.all(
-                                        Colors.transparent),
-                                  ),
-                                  child: const Text(
-                                    'Update',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w500,
-                                      fontFamily: '.SF Pro Display',
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                      // Slider
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 8,
+                          activeTrackColor: Color(0xFF1F73FF),
+                          inactiveTrackColor: Colors.grey[300],
+                          thumbColor: Colors.white,
+                          thumbShape: RoundSliderThumbShape(
+                            enabledThumbRadius: 11,
+                            elevation: 4,
+                          ),
+                          overlayColor: Color(0xFF1F73FF).withOpacity(0.3),
+                          overlayShape:
+                              RoundSliderOverlayShape(overlayRadius: 20),
+                        ),
+                        child: Slider(
+                          value: localHealthScoreValue,
+                          min: 0.0,
+                          max: 1.0,
+                          divisions: 10,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              localHealthScoreValue = value;
+                            });
+                          },
                         ),
                       ),
 
-                      // Close button
-                      Positioned(
-                        top: 19,
-                        right: 22,
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.pop(context);
+                      // Score display
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          '${(localHealthScoreValue * 10).round()}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+
+                      // Update button
+                      Container(
+                        width: double.infinity,
+                        height: 50,
+                        margin: EdgeInsets.only(top: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: TextButton(
+                          onPressed: () {
+                            // Update the health score
+                            _updateHealthScore(localHealthScoreValue);
+                            Navigator.of(context).pop();
                           },
-                          child: Image.asset(
-                            'assets/images/closeicon.png',
-                            width: 22,
-                            height: 22,
+                          style: ButtonStyle(
+                            overlayColor:
+                                MaterialStateProperty.all(Colors.transparent),
+                          ),
+                          child: Text(
+                            'Update',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -5776,5 +6139,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         ),
       ),
     );
+  }
+
+  // When a field is edited, mark it as having unsaved changes
+  void _markAsUnsaved() {
+    print('_markAsUnsaved called from: ${StackTrace.current}');
+    setState(() {
+      _hasUnsavedChanges = true;
+      print('Changes marked as unsaved');
+    });
   }
 }
