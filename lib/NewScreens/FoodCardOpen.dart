@@ -4715,468 +4715,435 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     TextEditingController fatController = TextEditingController(text: fat);
     TextEditingController carbsController = TextEditingController(text: carbs);
 
-    // Track which field is currently active
-    String activeField = "food"; // Default active field
-
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.5),
       builder: (BuildContext context) {
-        return StatefulBuilder(builder: (context, setState) {
-          return Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            elevation: 0,
-            backgroundColor: Colors.white,
-            insetPadding: EdgeInsets.symmetric(horizontal: 32),
-            child: Container(
-              width: 326, // Same width as Add dialog
-              height: 530, // Same height as Add dialog
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Title
-                        SizedBox(height: 14),
-                        Text(
-                          "Edit Ingredient",
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'SF Pro Display',
-                          ),
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          insetPadding: EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            width: 326, // Same width as Add dialog
+            height: 530, // Same height as Add dialog
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Title
+                      SizedBox(height: 14),
+                      Text(
+                        "Edit Ingredient",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'SF Pro Display',
                         ),
-
-                        // Pencil icon
-                        SizedBox(height: 29),
-                        Image.asset(
-                          'assets/images/pencilicon.png',
-                          width: 45.0,
-                          height: 45.0,
-                        ),
-
-                        // Food field
-                        SizedBox(height: 25),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Left column - Food label and input
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        activeField = "food";
-                                      });
-                                    },
-                                    child: Text(
-                                      "Food",
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w500,
-                                        fontFamily: 'SF Pro Display',
-                                        color: activeField == "food"
-                                            ? Colors.black
-                                            : Colors.black.withOpacity(0.5),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(height: 7),
-                                  Container(
-                                    width: 280,
-                                    height: 50,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(25),
-                                      border:
-                                          Border.all(color: Colors.grey[300]!),
-                                    ),
-                                    padding:
-                                        EdgeInsets.symmetric(horizontal: 15),
-                                    child: activeField == "food"
-                                        ? TextField(
-                                            controller: foodController,
-                                            cursorColor: Colors.black,
-                                            cursorWidth: 1.2,
-                                            style: TextStyle(
-                                              fontSize: 13.6,
-                                              fontFamily: '.SF Pro Display',
-                                              color: Colors.black,
-                                            ),
-                                            decoration: InputDecoration(
-                                              hintText: "Pasta, Tomato, etc",
-                                              hintStyle: TextStyle(
-                                                color: Colors.grey[600]!
-                                                    .withOpacity(0.7),
-                                                fontSize: 13.6,
-                                                fontFamily: '.SF Pro Display',
-                                              ),
-                                              border: InputBorder.none,
-                                              enabledBorder: InputBorder.none,
-                                              focusedBorder: InputBorder.none,
-                                              contentPadding:
-                                                  EdgeInsets.symmetric(
-                                                      vertical: 15),
-                                            ),
-                                          )
-                                        : TextField(
-                                            controller: proteinController,
-                                            cursorColor: Colors.black,
-                                            cursorWidth: 1.2,
-                                            style: TextStyle(
-                                              fontSize: 13.6,
-                                              fontFamily: '.SF Pro Display',
-                                              color: Colors.black,
-                                            ),
-                                            decoration: InputDecoration(
-                                              hintText: "15g",
-                                              hintStyle: TextStyle(
-                                                color: Colors.grey[600]!
-                                                    .withOpacity(0.7),
-                                                fontSize: 13.6,
-                                                fontFamily: '.SF Pro Display',
-                                              ),
-                                              border: InputBorder.none,
-                                              enabledBorder: InputBorder.none,
-                                              focusedBorder: InputBorder.none,
-                                              contentPadding:
-                                                  EdgeInsets.symmetric(
-                                                      vertical: 15),
-                                            ),
-                                            keyboardType: TextInputType.number,
-                                          ),
-                                  ),
-                                ],
-                              ),
-
-                              // Right column - Protein label
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    activeField = "protein";
-                                  });
-                                },
-                                child: Text(
-                                  "Protein",
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w500,
-                                    fontFamily: 'SF Pro Display',
-                                    color: activeField == "protein"
-                                        ? Colors.black
-                                        : Colors.black.withOpacity(0.5),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Size field
-                        SizedBox(height: 10),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Left column - Size label and input
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        activeField = "size";
-                                      });
-                                    },
-                                    child: Text(
-                                      "Size",
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w500,
-                                        fontFamily: 'SF Pro Display',
-                                        color: activeField == "size"
-                                            ? Colors.black
-                                            : Colors.black.withOpacity(0.5),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(height: 7),
-                                  Container(
-                                    width: 280,
-                                    height: 50,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(25),
-                                      border:
-                                          Border.all(color: Colors.grey[300]!),
-                                    ),
-                                    padding:
-                                        EdgeInsets.symmetric(horizontal: 15),
-                                    child: activeField == "size"
-                                        ? TextField(
-                                            controller: sizeController,
-                                            cursorColor: Colors.black,
-                                            cursorWidth: 1.2,
-                                            style: TextStyle(
-                                              fontSize: 13.6,
-                                              fontFamily: '.SF Pro Display',
-                                              color: Colors.black,
-                                            ),
-                                            decoration: InputDecoration(
-                                              hintText: "150g, 3/4 cup, etc",
-                                              hintStyle: TextStyle(
-                                                color: Colors.grey[600]!
-                                                    .withOpacity(0.7),
-                                                fontSize: 13.6,
-                                                fontFamily: '.SF Pro Display',
-                                              ),
-                                              border: InputBorder.none,
-                                              enabledBorder: InputBorder.none,
-                                              focusedBorder: InputBorder.none,
-                                              contentPadding:
-                                                  EdgeInsets.symmetric(
-                                                      vertical: 15),
-                                            ),
-                                          )
-                                        : TextField(
-                                            controller: fatController,
-                                            cursorColor: Colors.black,
-                                            cursorWidth: 1.2,
-                                            style: TextStyle(
-                                              fontSize: 13.6,
-                                              fontFamily: '.SF Pro Display',
-                                              color: Colors.black,
-                                            ),
-                                            decoration: InputDecoration(
-                                              hintText: "5g",
-                                              hintStyle: TextStyle(
-                                                color: Colors.grey[600]!
-                                                    .withOpacity(0.7),
-                                                fontSize: 13.6,
-                                                fontFamily: '.SF Pro Display',
-                                              ),
-                                              border: InputBorder.none,
-                                              enabledBorder: InputBorder.none,
-                                              focusedBorder: InputBorder.none,
-                                              contentPadding:
-                                                  EdgeInsets.symmetric(
-                                                      vertical: 15),
-                                            ),
-                                            keyboardType: TextInputType.number,
-                                          ),
-                                  ),
-                                ],
-                              ),
-
-                              // Right column - Fat label
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    activeField = "fat";
-                                  });
-                                },
-                                child: Text(
-                                  "Fat",
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w500,
-                                    fontFamily: 'SF Pro Display',
-                                    color: activeField == "fat"
-                                        ? Colors.black
-                                        : Colors.black.withOpacity(0.5),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Calories field
-                        SizedBox(height: 10),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Left column - Calories label and input
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        activeField = "calories";
-                                      });
-                                    },
-                                    child: Text(
-                                      "Calories",
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w500,
-                                        fontFamily: 'SF Pro Display',
-                                        color: activeField == "calories"
-                                            ? Colors.black
-                                            : Colors.black.withOpacity(0.5),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(height: 7),
-                                  Container(
-                                    width: 280,
-                                    height: 50,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(25),
-                                      border:
-                                          Border.all(color: Colors.grey[300]!),
-                                    ),
-                                    padding:
-                                        EdgeInsets.symmetric(horizontal: 15),
-                                    child: activeField == "calories"
-                                        ? TextField(
-                                            controller: caloriesController,
-                                            cursorColor: Colors.black,
-                                            cursorWidth: 1.2,
-                                            style: TextStyle(
-                                              fontSize: 13.6,
-                                              fontFamily: '.SF Pro Display',
-                                              color: Colors.black,
-                                            ),
-                                            decoration: InputDecoration(
-                                              hintText: "450 kcal",
-                                              hintStyle: TextStyle(
-                                                color: Colors.grey[600]!
-                                                    .withOpacity(0.7),
-                                                fontSize: 13.6,
-                                                fontFamily: '.SF Pro Display',
-                                              ),
-                                              border: InputBorder.none,
-                                              enabledBorder: InputBorder.none,
-                                              focusedBorder: InputBorder.none,
-                                              contentPadding:
-                                                  EdgeInsets.symmetric(
-                                                      vertical: 15),
-                                            ),
-                                            keyboardType: TextInputType.number,
-                                          )
-                                        : TextField(
-                                            controller: carbsController,
-                                            cursorColor: Colors.black,
-                                            cursorWidth: 1.2,
-                                            style: TextStyle(
-                                              fontSize: 13.6,
-                                              fontFamily: '.SF Pro Display',
-                                              color: Colors.black,
-                                            ),
-                                            decoration: InputDecoration(
-                                              hintText: "30g",
-                                              hintStyle: TextStyle(
-                                                color: Colors.grey[600]!
-                                                    .withOpacity(0.7),
-                                                fontSize: 13.6,
-                                                fontFamily: '.SF Pro Display',
-                                              ),
-                                              border: InputBorder.none,
-                                              enabledBorder: InputBorder.none,
-                                              focusedBorder: InputBorder.none,
-                                              contentPadding:
-                                                  EdgeInsets.symmetric(
-                                                      vertical: 15),
-                                            ),
-                                            keyboardType: TextInputType.number,
-                                          ),
-                                  ),
-                                ],
-                              ),
-
-                              // Right column - Carbs label
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    activeField = "carbs";
-                                  });
-                                },
-                                child: Text(
-                                  "Carbs",
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w500,
-                                    fontFamily: 'SF Pro Display',
-                                    color: activeField == "carbs"
-                                        ? Colors.black
-                                        : Colors.black.withOpacity(0.5),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Update button
-                        SizedBox(height: 30),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Container(
-                            width: 280,
-                            height: 48,
-                            margin: EdgeInsets.only(bottom: 24),
-                            decoration: BoxDecoration(
-                              color: Colors.black,
-                              borderRadius: BorderRadius.circular(28),
-                            ),
-                            child: TextButton(
-                              onPressed: () {
-                                // This will be implemented later as per your instructions
-                                Navigator.pop(context);
-                              },
-                              style: ButtonStyle(
-                                overlayColor: MaterialStateProperty.all(
-                                    Colors.transparent),
-                              ),
-                              child: const Text(
-                                'Update',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: '.SF Pro Display',
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Close button
-                  Positioned(
-                    top: 19,
-                    right: 22,
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                      },
-                      child: Image.asset(
-                        'assets/images/closeicon.png',
-                        width: 22,
-                        height: 22,
                       ),
+
+                      // Pencil icon
+                      SizedBox(height: 29),
+                      Image.asset(
+                        'assets/images/pencilicon.png',
+                        width: 45.0,
+                        height: 45.0,
+                      ),
+
+                      // Food field
+                      SizedBox(height: 25),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Food label
+                            Text(
+                              "Food",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                            ),
+                            SizedBox(height: 7),
+                            Container(
+                              width: 280,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              padding: EdgeInsets.symmetric(horizontal: 15),
+                              child: TextField(
+                                controller: foodController,
+                                cursorColor: Colors.black,
+                                cursorWidth: 1.2,
+                                style: TextStyle(
+                                  fontSize: 13.6,
+                                  fontFamily: '.SF Pro Display',
+                                  color: Colors.black,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "Pasta, Tomato, etc",
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[600]!.withOpacity(0.7),
+                                    fontSize: 13.6,
+                                    fontFamily: '.SF Pro Display',
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  contentPadding:
+                                      EdgeInsets.symmetric(vertical: 15),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Size field
+                      SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Size label
+                            Text(
+                              "Size",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                            ),
+                            SizedBox(height: 7),
+                            Container(
+                              width: 280,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              padding: EdgeInsets.symmetric(horizontal: 15),
+                              child: TextField(
+                                controller: sizeController,
+                                cursorColor: Colors.black,
+                                cursorWidth: 1.2,
+                                style: TextStyle(
+                                  fontSize: 13.6,
+                                  fontFamily: '.SF Pro Display',
+                                  color: Colors.black,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "150g, 3/4 cup, etc",
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[600]!.withOpacity(0.7),
+                                    fontSize: 13.6,
+                                    fontFamily: '.SF Pro Display',
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  contentPadding:
+                                      EdgeInsets.symmetric(vertical: 15),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Protein field
+                      SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Protein label
+                            Text(
+                              "Protein",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                            ),
+                            SizedBox(height: 7),
+                            Container(
+                              width: 280,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              padding: EdgeInsets.symmetric(horizontal: 15),
+                              child: TextField(
+                                controller: proteinController,
+                                cursorColor: Colors.black,
+                                cursorWidth: 1.2,
+                                style: TextStyle(
+                                  fontSize: 13.6,
+                                  fontFamily: '.SF Pro Display',
+                                  color: Colors.black,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "15g",
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[600]!.withOpacity(0.7),
+                                    fontSize: 13.6,
+                                    fontFamily: '.SF Pro Display',
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  contentPadding:
+                                      EdgeInsets.symmetric(vertical: 15),
+                                ),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Fat field
+                      SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Fat label
+                            Text(
+                              "Fat",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                            ),
+                            SizedBox(height: 7),
+                            Container(
+                              width: 280,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              padding: EdgeInsets.symmetric(horizontal: 15),
+                              child: TextField(
+                                controller: fatController,
+                                cursorColor: Colors.black,
+                                cursorWidth: 1.2,
+                                style: TextStyle(
+                                  fontSize: 13.6,
+                                  fontFamily: '.SF Pro Display',
+                                  color: Colors.black,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "5g",
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[600]!.withOpacity(0.7),
+                                    fontSize: 13.6,
+                                    fontFamily: '.SF Pro Display',
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  contentPadding:
+                                      EdgeInsets.symmetric(vertical: 15),
+                                ),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Calories and Carbs fields in the same row
+                      SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          children: [
+                            // Calories column (left side)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Calories label
+                                  Text(
+                                    "Calories",
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: 'SF Pro Display',
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Container(
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(25),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 15),
+                                    child: TextField(
+                                      controller: caloriesController,
+                                      cursorColor: Colors.black,
+                                      cursorWidth: 1.2,
+                                      style: TextStyle(
+                                        fontSize: 13.6,
+                                        fontFamily: '.SF Pro Display',
+                                        color: Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: "450 kcal",
+                                        hintStyle: TextStyle(
+                                          color: Colors.grey[600]!
+                                              .withOpacity(0.7),
+                                          fontSize: 13.6,
+                                          fontFamily: '.SF Pro Display',
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        contentPadding:
+                                            EdgeInsets.symmetric(vertical: 15),
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            SizedBox(width: 10), // Space between columns
+
+                            // Carbs column (right side)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Carbs label
+                                  Text(
+                                    "Carbs",
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: 'SF Pro Display',
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Container(
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(25),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 15),
+                                    child: TextField(
+                                      controller: carbsController,
+                                      cursorColor: Colors.black,
+                                      cursorWidth: 1.2,
+                                      style: TextStyle(
+                                        fontSize: 13.6,
+                                        fontFamily: '.SF Pro Display',
+                                        color: Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: "30g",
+                                        hintStyle: TextStyle(
+                                          color: Colors.grey[600]!
+                                              .withOpacity(0.7),
+                                          fontSize: 13.6,
+                                          fontFamily: '.SF Pro Display',
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        contentPadding:
+                                            EdgeInsets.symmetric(vertical: 15),
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Update button
+                      SizedBox(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Container(
+                          width: 280,
+                          height: 48,
+                          margin: EdgeInsets.only(bottom: 24),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          child: TextButton(
+                            onPressed: () {
+                              // Update the ingredient
+                              Navigator.pop(context);
+                            },
+                            style: ButtonStyle(
+                              overlayColor:
+                                  MaterialStateProperty.all(Colors.transparent),
+                            ),
+                            child: const Text(
+                              'Update',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: '.SF Pro Display',
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Close button
+                Positioned(
+                  top: 19,
+                  right: 22,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
+                    child: Image.asset(
+                      'assets/images/closeicon.png',
+                      width: 22,
+                      height: 22,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          );
-        });
+          ),
+        );
       },
     );
   }
