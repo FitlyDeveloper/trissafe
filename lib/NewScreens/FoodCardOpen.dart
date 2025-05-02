@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http; // For API calls to OpenAI
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'dart:math';
+import 'dart:math'; // For pi in rotation animation
 import 'dart:ui';
 import 'dart:io';
 
@@ -77,6 +77,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   List<Map<String, dynamic>> _ingredients = []; // Store ingredients list
   Map<String, bool> _isIngredientFlipped = {};
   Set<String> _flippedCards = {}; // Track flipped cards
+  Map<String, AnimationController> _flipAnimationControllers = {};
+  Map<String, Animation<double>> _flipAnimations = {};
 
   @override
   void initState() {
@@ -744,6 +746,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     _bookmarkController.dispose();
     _likeController.dispose();
+
+    // Dispose of all flip animation controllers
+    for (var controller in _flipAnimationControllers.values) {
+      controller.dispose();
+    }
+
     super.dispose();
   }
 
@@ -2569,102 +2577,141 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       _isIngredientFlipped[cardKey] = false;
     }
 
+    // Create controller for this specific card if it doesn't exist
+    if (!_flipAnimationControllers.containsKey(cardKey)) {
+      _flipAnimationControllers[cardKey] = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: 600),
+      );
+
+      _flipAnimations[cardKey] = Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(
+          parent: _flipAnimationControllers[cardKey]!,
+          curve: Curves.easeOutBack,
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: () {
         setState(() {
           // Toggle flip state for this specific card
           _isIngredientFlipped[cardKey] =
               !(_isIngredientFlipped[cardKey] ?? false);
+
+          // Run the animation
+          if (_isIngredientFlipped[cardKey]!) {
+            _flipAnimationControllers[cardKey]!.forward();
+          } else {
+            _flipAnimationControllers[cardKey]!.reverse();
+          }
         });
       },
-      child: Container(
-        width: boxWidth,
-        height: 110,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: Offset(0, 5),
+      child: AnimatedBuilder(
+        animation: _flipAnimationControllers[cardKey]!,
+        builder: (context, child) {
+          final value = _flipAnimations[cardKey]!.value;
+
+          // First half of animation shows front, second half shows back
+          final showFront = value < 0.5;
+          final t = showFront ? value : 1 - value;
+
+          return Transform(
+            // Apply perspective
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.001) // perspective
+              ..rotateY(showFront ? pi * value : pi * (1 - value + 1)),
+            alignment: Alignment.center,
+            child: Container(
+              width: boxWidth,
+              height: 110,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black
+                        .withOpacity(0.05 + (0.05 * value)), // Dynamic shadow
+                    blurRadius: 10 + (5 * value), // Dynamic blur
+                    offset: Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Opacity(
+                    opacity: 1 - t * 2, // Fade out while flipping
+                    child: showFront
+                        ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                amount,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                calories,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "Protein: ${_formatMacroValue(protein)}",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                "Fat: ${_formatMacroValue(fat)}",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                "Carbs: ${_formatMacroValue(carbs)}",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
             ),
-          ],
-        ),
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: AnimatedSwitcher(
-              duration: Duration(milliseconds: 300),
-              child: _isIngredientFlipped[cardKey] == true
-                  ? Column(
-                      key: ValueKey('back-$cardKey'),
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "Protein: ${_formatMacroValue(protein)}",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'SF Pro Display',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          "Fat: ${_formatMacroValue(fat)}",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'SF Pro Display',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          "Carbs: ${_formatMacroValue(carbs)}",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'SF Pro Display',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    )
-                  : Column(
-                      key: ValueKey('front-$cardKey'),
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          name,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'SF Pro Display',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          amount,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'SF Pro Display',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          calories,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'SF Pro Display',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
