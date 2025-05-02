@@ -58,6 +58,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   bool _isLoading = false;
   bool _isLiked = false;
   bool _isBookmarked = false; // Track bookmark state
+  bool _isEditMode = false; // Track if we're in edit mode for teal outlines
   int _counter = 1; // Counter for +/- buttons
   String _privacyStatus = 'Public'; // Default privacy status
   late AnimationController _bookmarkController;
@@ -2326,14 +2327,10 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                       color: Color(0xFFBDBDBD),
                                     ),
                                   ),
-                                ] else
-                                  // Empty container with exact same height as the social interaction area
-                                  Container(
-                                    height:
-                                        33, // 0.5px divider + 16px vertical padding*2 + 0.5px divider
-                                    padding: EdgeInsets.zero,
-                                    margin: EdgeInsets.zero,
-                                  ),
+
+                                  // Add space after social interaction area
+                                  SizedBox(height: 20),
+                                ],
                               ],
                             ),
 
@@ -2341,9 +2338,6 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Exact 20px gap between divider and calories
-                                SizedBox(height: 20),
-
                                 // Calories and macros card
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -2353,6 +2347,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(20),
+                                      // Remove border on this card even in edit mode
+                                      border: null,
                                       boxShadow: [
                                         BoxShadow(
                                           color: Colors.black.withOpacity(0.05),
@@ -2448,6 +2444,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(20),
+                                      // Add light gray border when in edit mode (changed from teal)
+                                      border: _isEditMode
+                                          ? Border.all(
+                                              color: Color(0xFFD3D3D3),
+                                              width: 1.3)
+                                          : null,
                                       boxShadow: [
                                         BoxShadow(
                                           color: Colors.black.withOpacity(0.05),
@@ -2636,6 +2638,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 ),
                 child: TextButton(
                   onPressed: () {
+                    // Exit edit mode if active
+                    if (_isEditMode) {
+                      setState(() {
+                        _isEditMode = false;
+                      });
+                    }
                     // Save data and navigate to CodiaPage
                     _saveData().then((_) => Navigator.pushReplacement(
                           context,
@@ -2729,58 +2737,91 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     // Check if it's an "Add" card - don't make these flippable
     if (name == "Add") {
-      return Container(
-        width: boxWidth,
-        height: 110,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: Offset(0, 5),
+      return GestureDetector(
+        // Only enable the "Add" button when not in edit mode
+        onTap: _isEditMode
+            ? null
+            : () {
+                // Show the add ingredient dialog
+                print("Add ingredient tapped");
+                // Add your implementation here
+                _showAddIngredientDialog();
+              },
+        child: Opacity(
+          // Lower opacity in edit mode to indicate it's disabled
+          opacity: _isEditMode ? 0.5 : 1.0,
+          child: Container(
+            width: boxWidth,
+            height: 110,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              // No border for Add box, regardless of edit mode
+              border: null,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 5),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'SF Pro Display',
+                Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          amount,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          calories,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
-                SizedBox(height: 10),
-                Text(
-                  amount,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontFamily: 'SF Pro Display',
+                // Add icon overlay
+                Padding(
+                  padding: const EdgeInsets.only(top: 20.0),
+                  child: Image.asset(
+                    'assets/images/add.png',
+                    width: 29.0,
+                    height: 29.0,
+                    color:
+                        Colors.black, // Always black, regardless of edit mode
                   ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-                SizedBox(height: 10),
-                Text(
-                  calories,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontFamily: 'SF Pro Display',
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
               ],
             ),
@@ -2815,18 +2856,24 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          // Toggle flip state for this specific card
-          _isIngredientFlipped[cardKey] =
-              !(_isIngredientFlipped[cardKey] ?? false);
+        // If in edit mode, show edit popup instead of flipping
+        if (_isEditMode) {
+          _showIngredientEditOptions(
+              name, amount, calories, protein, fat, carbs);
+        } else {
+          setState(() {
+            // Toggle flip state for this specific card
+            _isIngredientFlipped[cardKey] =
+                !(_isIngredientFlipped[cardKey] ?? false);
 
-          // Run the animation
-          if (_isIngredientFlipped[cardKey]!) {
-            _flipAnimationControllers[cardKey]!.forward();
-          } else {
-            _flipAnimationControllers[cardKey]!.reverse();
-          }
-        });
+            // Run the animation
+            if (_isIngredientFlipped[cardKey]!) {
+              _flipAnimationControllers[cardKey]!.forward();
+            } else {
+              _flipAnimationControllers[cardKey]!.reverse();
+            }
+          });
+        }
       },
       child: AnimatedBuilder(
         animation: _flipAnimationControllers[cardKey]!,
@@ -2849,6 +2896,10 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
+              // Add light gray border when in edit mode (changed from teal)
+              border: _isEditMode
+                  ? Border.all(color: Color(0xFFD3D3D3), width: 1.3)
+                  : null,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -2963,64 +3014,91 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         ? largerIconSize
         : baseIconSize;
 
-    return Container(
-      margin: EdgeInsets.only(bottom: 15), // Set gap between boxes to 15px
-      padding: EdgeInsets.symmetric(vertical: 0, horizontal: 20),
-      width: double.infinity,
-      height: 45,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Add 40px padding before the icon alignment container (35 + 5)
-          SizedBox(width: 40),
-          // Container to ensure icons align vertically and have space
-          SizedBox(
-            width: 40, // Keep this width consistent for alignment
-            child: Align(
-              alignment:
-                  Alignment.centerLeft, // Align icon to the left of this box
-              child: SizedBox(
-                width: iconSize, // Use the calculated size
-                height: iconSize, // Use the calculated size
-                child: Image.asset(
-                  'assets/images/$iconAsset',
-                  width: iconSize, // Apply calculated width
-                  height: iconSize, // Apply calculated height
-                  fit: BoxFit.contain,
+    // Check if this is the "Fix Manually" button and we're in edit mode
+    bool isFixManuallyInEditMode = title == 'Fix Manually' && _isEditMode;
+
+    return GestureDetector(
+      onTap: () {
+        // Handle the click based on which option was selected
+        if (title == 'Fix Manually') {
+          if (_isEditMode) {
+            // If already in edit mode, exit it
+            setState(() {
+              _isEditMode = false;
+            });
+          } else {
+            // Show the fix manually dialog
+            _showFixManuallyDialog();
+          }
+        }
+        // Add other handlers for different options if needed
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: 15), // Set gap between boxes to 15px
+        padding: EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+        width: double.infinity,
+        height: 45,
+        decoration: BoxDecoration(
+          // Change background to black when "Fix Manually" is in edit mode
+          color: isFixManuallyInEditMode ? Colors.black : Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Add 40px padding before the icon alignment container (35 + 5)
+            SizedBox(width: 40),
+            // Container to ensure icons align vertically and have space
+            SizedBox(
+              width: 40, // Keep this width consistent for alignment
+              child: Align(
+                alignment:
+                    Alignment.centerLeft, // Align icon to the left of this box
+                child: SizedBox(
+                  width: iconSize, // Use the calculated size
+                  height: iconSize, // Use the calculated size
+                  child: Image.asset(
+                    'assets/images/$iconAsset',
+                    width: iconSize, // Apply calculated width
+                    height: iconSize, // Apply calculated height
+                    fit: BoxFit.contain,
+                    // Change icon color to white when "Fix Manually" is in edit mode
+                    color:
+                        isFixManuallyInEditMode ? Colors.white : Colors.black,
+                  ),
                 ),
               ),
             ),
-          ),
-          SizedBox(width: 8),
-          Expanded(
-            child: Center(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16, // Matches Health Score text size
-                  fontWeight: FontWeight.normal,
-                  color: Colors.black,
+            SizedBox(width: 8),
+            Expanded(
+              child: Center(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16, // Matches Health Score text size
+                    fontWeight: FontWeight.normal,
+                    // Change text color to white when "Fix Manually" is in edit mode
+                    color:
+                        isFixManuallyInEditMode ? Colors.white : Colors.black,
+                  ),
+                  textAlign: TextAlign.center,
+                  softWrap:
+                      false, // Prevent text from wrapping to the next line
+                  overflow: TextOverflow
+                      .visible, // Allow text to overflow container bounds
                 ),
-                textAlign: TextAlign.center,
-                softWrap: false, // Prevent text from wrapping to the next line
-                overflow: TextOverflow
-                    .visible, // Allow text to overflow container bounds
               ),
             ),
-          ),
-          // Adjust balance spacing for the added left padding
-          SizedBox(width: 88), // (40 padding + 40 icon area + 8 gap)
-        ],
+            // Adjust balance spacing for the added left padding
+            SizedBox(width: 88), // (40 padding + 40 icon area + 8 gap)
+          ],
+        ),
       ),
     );
   }
@@ -3092,12 +3170,73 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 ),
                 // Add button with clickable box
                 GestureDetector(
-                  onTap: _showAddIngredientDialog,
+                  onTap: _isEditMode
+                      ? null
+                      : _showAddIngredientDialog, // Disable in edit mode
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Add box
-                      _buildIngredient('Add', '', ''),
+                      // Add box - modified to not get a border in edit mode
+                      Container(
+                        width: (MediaQuery.of(context).size.width - 78) / 2,
+                        height: 110,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          // No border for Add box in edit mode
+                          border: null,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  "Add",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'SF Pro Display',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  "",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontFamily: 'SF Pro Display',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  "",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontFamily: 'SF Pro Display',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                       // Add icon overlay
                       Padding(
                         padding: const EdgeInsets.only(top: 20.0),
@@ -3105,6 +3244,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                           'assets/images/add.png',
                           width: 29.0,
                           height: 29.0,
+                          color:
+                              Colors.black, // Always black, even in edit mode
                         ),
                       ),
                     ],
@@ -3127,12 +3268,73 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             children: [
               // Add button with clickable box
               GestureDetector(
-                onTap: _showAddIngredientDialog,
+                onTap: _isEditMode
+                    ? null
+                    : _showAddIngredientDialog, // Disable in edit mode
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Add box
-                    _buildIngredient('Add', '', ''),
+                    // Add box - modified to not get a border in edit mode
+                    Container(
+                      width: (MediaQuery.of(context).size.width - 78) / 2,
+                      height: 110,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        // No border for Add box in edit mode
+                        border: null,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "Add",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                "",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                "",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'SF Pro Display',
+                                ),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                     // Add icon overlay
                     Padding(
                       padding: const EdgeInsets.only(top: 20.0),
@@ -3140,6 +3342,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                         'assets/images/add.png',
                         width: 29.0,
                         height: 29.0,
+                        color: Colors.black, // Always black, even in edit mode
                       ),
                     ),
                   ],
@@ -4153,5 +4356,1011 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         );
       },
     );
+  }
+
+  // Method to show the "Fix Manually" dialog
+  void _showFixManuallyDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            textSelectionTheme: TextSelectionThemeData(
+              selectionColor: Colors.grey.withOpacity(0.3),
+              cursorColor: Colors.black,
+              selectionHandleColor: Colors.black,
+            ),
+          ),
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 0,
+            backgroundColor: Colors.white,
+            insetPadding: EdgeInsets.symmetric(horizontal: 32),
+            child: Container(
+              width: 326, // Exactly 326px as specified
+              height: 360, // Adjusted height for proper spacing
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Title
+                        SizedBox(height: 14),
+                        Text(
+                          "Fix Manually",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
+
+                        // Use Expanded to center the image and text as one group
+                        Expanded(
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Pencil icon - exactly 43x43
+                                Image.asset(
+                                  'assets/images/pencilicon.png',
+                                  width: 43.0,
+                                  height: 43.0,
+                                  color: Colors.black,
+                                ),
+
+                                // 28px gap between image and text
+                                SizedBox(height: 28),
+
+                                // Instructions text - already size 18
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 25),
+                                  child: Text(
+                                    "Tap any item to change its name, calories, macros or serving sizes",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontFamily: 'SF Pro Display',
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Fix Now button - match "Add" popup spacing
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Container(
+                            width: 280,
+                            height: 48,
+                            margin: EdgeInsets.only(
+                                bottom: 24), // Same margin as Add popup
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                            child: TextButton(
+                              onPressed: () {
+                                // Handle the "Fix Now" action
+                                Navigator.pop(context);
+                                // Set edit mode to show teal outlines
+                                setState(() {
+                                  _isEditMode = true;
+                                });
+                              },
+                              style: ButtonStyle(
+                                overlayColor: MaterialStateProperty.all(
+                                    Colors.transparent),
+                              ),
+                              child: const Text(
+                                'Fix Now',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: '.SF Pro Display',
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Close button
+                  Positioned(
+                    top: 19,
+                    right: 22,
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                      child: Image.asset(
+                        'assets/images/closeicon.png',
+                        width: 22,
+                        height: 22,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Method to show edit and delete options for an ingredient
+  void _showIngredientEditOptions(String name, String amount, String calories,
+      String protein, String fat, String carbs) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          insetPadding: EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            width: 326,
+            height: 175, // Changed from 185px to 175px
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Main content
+                Container(
+                  width: double.infinity,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Title with padding
+                      Padding(
+                        padding: const EdgeInsets.only(top: 20, bottom: 15),
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
+                      // Buttons container
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 29.5),
+                        child: Column(
+                          children: [
+                            // Edit option
+                            Container(
+                              width: 267,
+                              height: 40,
+                              margin: EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                color: Colors.white,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // Centered text
+                                  Text(
+                                    "Edit",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 16,
+                                      fontFamily: 'SF Pro Display',
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  // Icon positioned to the left
+                                  Positioned(
+                                    left: 70,
+                                    child: Image.asset(
+                                      'assets/images/pencilicon.png',
+                                      width: 20,
+                                      height: 20,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  // Full-width button for tap area
+                                  Positioned.fill(
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(20),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          // Show the edit ingredient dialog
+                                          _showEditIngredientDialog(
+                                              name,
+                                              amount,
+                                              calories,
+                                              protein,
+                                              fat,
+                                              carbs);
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Delete option
+                            Container(
+                              width: 267,
+                              height: 40,
+                              margin: EdgeInsets.only(
+                                  bottom: 5), // Small margin added at bottom
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                color: Colors.white,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // Centered text
+                                  Text(
+                                    "Delete",
+                                    style: TextStyle(
+                                      color: Color(0xFFE97372),
+                                      fontSize: 16,
+                                      fontFamily: 'SF Pro Display',
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  // Icon positioned to the left
+                                  Positioned(
+                                    left: 70,
+                                    child: Image.asset(
+                                      'assets/images/trashcan.png',
+                                      width: 20,
+                                      height: 20,
+                                      color: Color(0xFFE97372),
+                                    ),
+                                  ),
+                                  // Full-width button for tap area
+                                  Positioned.fill(
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(20),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _showDeleteIngredientConfirmation(
+                                              name,
+                                              amount,
+                                              calories,
+                                              protein,
+                                              fat,
+                                              carbs);
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Close button in top-right corner
+                Positioned(
+                  top: 19,
+                  right: 22,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
+                    child: Image.asset(
+                      'assets/images/closeicon.png',
+                      width: 22,
+                      height: 22,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Method to show edit ingredient dialog
+  void _showEditIngredientDialog(String name, String amount, String calories,
+      String protein, String fat, String carbs) {
+    // Create controllers for text fields
+    TextEditingController foodController = TextEditingController(text: name);
+    TextEditingController sizeController = TextEditingController(text: amount);
+    TextEditingController caloriesController =
+        TextEditingController(text: calories.replaceAll(" kcal", ""));
+    TextEditingController proteinController =
+        TextEditingController(text: protein);
+    TextEditingController fatController = TextEditingController(text: fat);
+    TextEditingController carbsController = TextEditingController(text: carbs);
+
+    // Track which field is currently active
+    String activeField = "food"; // Default active field
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 0,
+            backgroundColor: Colors.white,
+            insetPadding: EdgeInsets.symmetric(horizontal: 32),
+            child: Container(
+              width: 326, // Same width as Add dialog
+              height: 530, // Same height as Add dialog
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Title
+                        SizedBox(height: 14),
+                        Text(
+                          "Edit Ingredient",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
+
+                        // Pencil icon
+                        SizedBox(height: 29),
+                        Image.asset(
+                          'assets/images/pencilicon.png',
+                          width: 45.0,
+                          height: 45.0,
+                        ),
+
+                        // Food field
+                        SizedBox(height: 25),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left column - Food label and input
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        activeField = "food";
+                                      });
+                                    },
+                                    child: Text(
+                                      "Food",
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w500,
+                                        fontFamily: 'SF Pro Display',
+                                        color: activeField == "food"
+                                            ? Colors.black
+                                            : Colors.black.withOpacity(0.5),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Container(
+                                    width: 280,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(25),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 15),
+                                    child: activeField == "food"
+                                        ? TextField(
+                                            controller: foodController,
+                                            cursorColor: Colors.black,
+                                            cursorWidth: 1.2,
+                                            style: TextStyle(
+                                              fontSize: 13.6,
+                                              fontFamily: '.SF Pro Display',
+                                              color: Colors.black,
+                                            ),
+                                            decoration: InputDecoration(
+                                              hintText: "Pasta, Tomato, etc",
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600]!
+                                                    .withOpacity(0.7),
+                                                fontSize: 13.6,
+                                                fontFamily: '.SF Pro Display',
+                                              ),
+                                              border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              contentPadding:
+                                                  EdgeInsets.symmetric(
+                                                      vertical: 15),
+                                            ),
+                                          )
+                                        : TextField(
+                                            controller: proteinController,
+                                            cursorColor: Colors.black,
+                                            cursorWidth: 1.2,
+                                            style: TextStyle(
+                                              fontSize: 13.6,
+                                              fontFamily: '.SF Pro Display',
+                                              color: Colors.black,
+                                            ),
+                                            decoration: InputDecoration(
+                                              hintText: "15g",
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600]!
+                                                    .withOpacity(0.7),
+                                                fontSize: 13.6,
+                                                fontFamily: '.SF Pro Display',
+                                              ),
+                                              border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              contentPadding:
+                                                  EdgeInsets.symmetric(
+                                                      vertical: 15),
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                          ),
+                                  ),
+                                ],
+                              ),
+
+                              // Right column - Protein label
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    activeField = "protein";
+                                  });
+                                },
+                                child: Text(
+                                  "Protein",
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: 'SF Pro Display',
+                                    color: activeField == "protein"
+                                        ? Colors.black
+                                        : Colors.black.withOpacity(0.5),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Size field
+                        SizedBox(height: 10),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left column - Size label and input
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        activeField = "size";
+                                      });
+                                    },
+                                    child: Text(
+                                      "Size",
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w500,
+                                        fontFamily: 'SF Pro Display',
+                                        color: activeField == "size"
+                                            ? Colors.black
+                                            : Colors.black.withOpacity(0.5),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Container(
+                                    width: 280,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(25),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 15),
+                                    child: activeField == "size"
+                                        ? TextField(
+                                            controller: sizeController,
+                                            cursorColor: Colors.black,
+                                            cursorWidth: 1.2,
+                                            style: TextStyle(
+                                              fontSize: 13.6,
+                                              fontFamily: '.SF Pro Display',
+                                              color: Colors.black,
+                                            ),
+                                            decoration: InputDecoration(
+                                              hintText: "150g, 3/4 cup, etc",
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600]!
+                                                    .withOpacity(0.7),
+                                                fontSize: 13.6,
+                                                fontFamily: '.SF Pro Display',
+                                              ),
+                                              border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              contentPadding:
+                                                  EdgeInsets.symmetric(
+                                                      vertical: 15),
+                                            ),
+                                          )
+                                        : TextField(
+                                            controller: fatController,
+                                            cursorColor: Colors.black,
+                                            cursorWidth: 1.2,
+                                            style: TextStyle(
+                                              fontSize: 13.6,
+                                              fontFamily: '.SF Pro Display',
+                                              color: Colors.black,
+                                            ),
+                                            decoration: InputDecoration(
+                                              hintText: "5g",
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600]!
+                                                    .withOpacity(0.7),
+                                                fontSize: 13.6,
+                                                fontFamily: '.SF Pro Display',
+                                              ),
+                                              border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              contentPadding:
+                                                  EdgeInsets.symmetric(
+                                                      vertical: 15),
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                          ),
+                                  ),
+                                ],
+                              ),
+
+                              // Right column - Fat label
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    activeField = "fat";
+                                  });
+                                },
+                                child: Text(
+                                  "Fat",
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: 'SF Pro Display',
+                                    color: activeField == "fat"
+                                        ? Colors.black
+                                        : Colors.black.withOpacity(0.5),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Calories field
+                        SizedBox(height: 10),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left column - Calories label and input
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        activeField = "calories";
+                                      });
+                                    },
+                                    child: Text(
+                                      "Calories",
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w500,
+                                        fontFamily: 'SF Pro Display',
+                                        color: activeField == "calories"
+                                            ? Colors.black
+                                            : Colors.black.withOpacity(0.5),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Container(
+                                    width: 280,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(25),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 15),
+                                    child: activeField == "calories"
+                                        ? TextField(
+                                            controller: caloriesController,
+                                            cursorColor: Colors.black,
+                                            cursorWidth: 1.2,
+                                            style: TextStyle(
+                                              fontSize: 13.6,
+                                              fontFamily: '.SF Pro Display',
+                                              color: Colors.black,
+                                            ),
+                                            decoration: InputDecoration(
+                                              hintText: "450 kcal",
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600]!
+                                                    .withOpacity(0.7),
+                                                fontSize: 13.6,
+                                                fontFamily: '.SF Pro Display',
+                                              ),
+                                              border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              contentPadding:
+                                                  EdgeInsets.symmetric(
+                                                      vertical: 15),
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                          )
+                                        : TextField(
+                                            controller: carbsController,
+                                            cursorColor: Colors.black,
+                                            cursorWidth: 1.2,
+                                            style: TextStyle(
+                                              fontSize: 13.6,
+                                              fontFamily: '.SF Pro Display',
+                                              color: Colors.black,
+                                            ),
+                                            decoration: InputDecoration(
+                                              hintText: "30g",
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600]!
+                                                    .withOpacity(0.7),
+                                                fontSize: 13.6,
+                                                fontFamily: '.SF Pro Display',
+                                              ),
+                                              border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              contentPadding:
+                                                  EdgeInsets.symmetric(
+                                                      vertical: 15),
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                          ),
+                                  ),
+                                ],
+                              ),
+
+                              // Right column - Carbs label
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    activeField = "carbs";
+                                  });
+                                },
+                                child: Text(
+                                  "Carbs",
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: 'SF Pro Display',
+                                    color: activeField == "carbs"
+                                        ? Colors.black
+                                        : Colors.black.withOpacity(0.5),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Update button
+                        SizedBox(height: 30),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Container(
+                            width: 280,
+                            height: 48,
+                            margin: EdgeInsets.only(bottom: 24),
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                            child: TextButton(
+                              onPressed: () {
+                                // This will be implemented later as per your instructions
+                                Navigator.pop(context);
+                              },
+                              style: ButtonStyle(
+                                overlayColor: MaterialStateProperty.all(
+                                    Colors.transparent),
+                              ),
+                              child: const Text(
+                                'Update',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: '.SF Pro Display',
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Close button
+                  Positioned(
+                    top: 19,
+                    right: 22,
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                      child: Image.asset(
+                        'assets/images/closeicon.png',
+                        width: 22,
+                        height: 22,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  // Method to show delete ingredient confirmation
+  void _showDeleteIngredientConfirmation(String name, String amount,
+      String calories, String protein, String fat, String carbs) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          insetPadding: EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            width: 326,
+            height: 182,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Title
+                  Text(
+                    "Delete Ingredient?",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'SF Pro Display',
+                    ),
+                  ),
+                  SizedBox(height: 20),
+
+                  // Delete button
+                  Container(
+                    width: 267,
+                    height: 40,
+                    margin: EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          offset: Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Centered text
+                        Text(
+                          "Delete",
+                          style: TextStyle(
+                            color: Color(0xFFE97372),
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        // Icon positioned to the left with exact spacing
+                        Positioned(
+                          left: 70, // Position for 28px from text
+                          child: Image.asset(
+                            'assets/images/trashcan.png',
+                            width: 20,
+                            height: 20,
+                            color: Color(0xFFE97372),
+                          ),
+                        ),
+                        // Full-width button for tap area
+                        Positioned.fill(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _deleteIngredient(name, amount, calories,
+                                    protein, fat, carbs);
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Cancel button
+                  Container(
+                    width: 267,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          offset: Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Centered text
+                        Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontSize: 16,
+                            fontFamily: 'SF Pro Display',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        // Icon positioned to match the delete icon's position
+                        Positioned(
+                          left: 70, // Same position as delete icon
+                          child: Image.asset(
+                            'assets/images/closeicon.png',
+                            width: 18, // 10% smaller than 20
+                            height: 18, // 10% smaller than 20
+                            color: Colors.black54,
+                          ),
+                        ),
+                        // Full-width button for tap area
+                        Positioned.fill(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Method to delete an ingredient and update nutrition values
+  void _deleteIngredient(String name, String amount, String calories,
+      String protein, String fat, String carbs) {
+    // Find the ingredient in the _ingredients list
+    int indexToRemove = -1;
+
+    for (int i = 0; i < _ingredients.length; i++) {
+      if (_ingredients[i]['name'] == name &&
+          _ingredients[i]['amount'] == amount) {
+        indexToRemove = i;
+        break;
+      }
+    }
+
+    if (indexToRemove >= 0) {
+      setState(() {
+        // Remove the ingredient
+        _ingredients.removeAt(indexToRemove);
+
+        // Recalculate total nutrition values
+        _calculateTotalNutrition();
+
+        // Save the updated data
+        _saveData();
+      });
+
+      print(
+          'Deleted ingredient: $name ($amount) - $calories kcal, P:$protein, F:$fat, C:$carbs');
+    } else {
+      print('Could not find ingredient to delete: $name ($amount)');
+    }
   }
 }
