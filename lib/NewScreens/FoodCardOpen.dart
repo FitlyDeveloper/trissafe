@@ -2439,105 +2439,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 29),
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                        vertical: 12, horizontal: 20),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                      // Add light gray border when in edit mode (changed from teal)
-                                      border: _isEditMode
-                                          ? Border.all(
-                                              color: Color(0xFFD3D3D3),
-                                              width: 1.3)
-                                          : null,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.05),
-                                          blurRadius: 10,
-                                          offset: Offset(0, 5),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      children: [
-                                        Padding(
-                                          padding: EdgeInsets.only(
-                                              left: 60, right: 12),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    'Health Score',
-                                                    style: TextStyle(
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.normal,
-                                                      color: Colors.black,
-                                                    ),
-                                                  ),
-                                                  Spacer(),
-                                                  Text(
-                                                    _healthScore,
-                                                    style: TextStyle(
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.normal,
-                                                      color: Colors.black,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              SizedBox(height: 8),
-                                              Container(
-                                                width: double.infinity,
-                                                height: 8,
-                                                decoration: BoxDecoration(
-                                                  color: Color(0xFFDADADA),
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                child: ClipRRect(
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                  child: Container(
-                                                    width: double.infinity,
-                                                    child: FractionallySizedBox(
-                                                      alignment:
-                                                          Alignment.centerLeft,
-                                                      widthFactor:
-                                                          _healthScoreValue,
-                                                      child: Container(
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color:
-                                                              Color(0xFF75D377),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Positioned(
-                                          left: -4,
-                                          top: -5,
-                                          bottom: -5,
-                                          child: Image.asset(
-                                            'assets/images/heartpink.png',
-                                            width: 45,
-                                            height: 45,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  child: _buildHealthScore(),
                                 ),
 
                                 // Gap between health score and ingredients label - set to 20px
@@ -3863,13 +3765,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                         ),
                                       ),
                                       SizedBox(width: 8),
-                                      Text(
-                                        "(optional)",
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400,
-                                          fontFamily: 'SF Pro Display',
-                                          color: Colors.grey[600],
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                            bottom: 1), // Moved up by 1px
+                                        child: Text(
+                                          "(optional)",
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w400,
+                                            fontFamily: 'SF Pro Display',
+                                            color: Colors.grey[600],
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -5589,5 +5495,286 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     } else {
       print('Could not find ingredient to delete: $name ($amount)');
     }
+  }
+
+  // Method to show the health score popup when in edit mode
+  void _showHealthScorePopup() {
+    // Local state for the slider value to allow immediate updates
+    double localHealthScoreValue = _healthScoreValue;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                textSelectionTheme: TextSelectionThemeData(
+                  selectionColor: Colors.grey.withOpacity(0.3),
+                  cursorColor: Colors.black,
+                  selectionHandleColor: Colors.black,
+                ),
+              ),
+              child: Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 0,
+                backgroundColor: Colors.white,
+                insetPadding: EdgeInsets.symmetric(horizontal: 32),
+                child: Container(
+                  width: 326,
+                  height: 360,
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Title
+                            SizedBox(height: 14),
+                            Text(
+                              "Fix Health Score",
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                            ),
+
+                            // Use Expanded to center the image and slider as one group
+                            Expanded(
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Heart icon - increased to 55x55
+                                    Image.asset(
+                                      'assets/images/heart.png',
+                                      width: 55.0,
+                                      height: 55.0,
+                                    ),
+
+                                    SizedBox(height: 28),
+
+                                    // Slider with style from onboarding screen but smaller width
+                                    Container(
+                                      width: 260, // Smaller horizontal width
+                                      child: SliderTheme(
+                                        data: SliderThemeData(
+                                          trackHeight:
+                                              2, // Thinner track like in onboarding
+                                          activeTrackColor: Colors.black,
+                                          inactiveTrackColor: Colors.grey[300],
+                                          thumbColor: Colors.white,
+                                          overlayColor:
+                                              Colors.black.withOpacity(0.05),
+                                          overlayShape:
+                                              const RoundSliderOverlayShape(
+                                            overlayRadius:
+                                                17, // Same aura size as in onboarding
+                                          ),
+                                          thumbShape:
+                                              const RoundSliderThumbShape(
+                                            enabledThumbRadius: 12,
+                                            elevation: 4,
+                                          ),
+                                        ),
+                                        child: Slider(
+                                          value: localHealthScoreValue,
+                                          min: 0.0,
+                                          max: 1.0,
+                                          onChanged: (value) {
+                                            // Update local state to move the slider and score in real-time
+                                            setDialogState(() {
+                                              localHealthScoreValue = value;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ),
+
+                                    SizedBox(height: 20),
+
+                                    // Score display - increased font size to 20
+                                    Text(
+                                      "${((localHealthScoreValue * 10).round())} / 10",
+                                      style: TextStyle(
+                                        fontSize: 20, // Increased from 18 to 20
+                                        fontWeight: FontWeight.w500,
+                                        fontFamily: 'SF Pro Display',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // Update button - match "Add" popup spacing
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Container(
+                                width: 280,
+                                height: 48,
+                                margin: EdgeInsets.only(bottom: 24),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                                child: TextButton(
+                                  onPressed: () {
+                                    // Update app state with local slider value
+                                    int score =
+                                        ((localHealthScoreValue * 10).round());
+                                    setState(() {
+                                      _healthScore = "$score/10";
+                                      _healthScoreValue = localHealthScoreValue;
+                                    });
+
+                                    // Save the data
+                                    _saveData();
+
+                                    // Close the dialog
+                                    Navigator.pop(context);
+                                  },
+                                  style: ButtonStyle(
+                                    overlayColor: MaterialStateProperty.all(
+                                        Colors.transparent),
+                                  ),
+                                  child: const Text(
+                                    'Update',
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: '.SF Pro Display',
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Close button
+                      Positioned(
+                        top: 19,
+                        right: 22,
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                          },
+                          child: Image.asset(
+                            'assets/images/closeicon.png',
+                            width: 22,
+                            height: 22,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildHealthScore() {
+    return GestureDetector(
+      onTap: _isEditMode ? _showHealthScorePopup : null,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          // Add light gray border when in edit mode
+          border: _isEditMode
+              ? Border.all(color: Color(0xFFD3D3D3), width: 1.3)
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Padding(
+              padding: EdgeInsets.only(left: 60, right: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Health Score',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.normal,
+                          color: Colors.black,
+                        ),
+                      ),
+                      Spacer(),
+                      Text(
+                        _healthScore,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.normal,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Color(0xFFDADADA),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        width: double.infinity,
+                        child: FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: _healthScoreValue,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Color(0xFF75D377),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              left: -4,
+              top: -5,
+              bottom: -5,
+              child: Image.asset(
+                'assets/images/heartpink.png',
+                width: 45,
+                height: 45,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
