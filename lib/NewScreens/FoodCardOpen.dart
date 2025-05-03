@@ -1274,11 +1274,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             // Restore original ingredients directly from our backup
             _restoreOriginalIngredients();
 
-            // Navigate to CodiaPage after resetting everything
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => CodiaPage()),
-            );
+            // Pop back to previous screen instead of navigating to CodiaPage
+            Navigator.of(context).pop();
           });
         }
       }
@@ -1287,10 +1284,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     } else {
       // No unsaved changes, simply navigate back without showing confirmation
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => CodiaPage()),
-        );
+        Navigator.of(context).pop();
       }
     }
   }
@@ -3057,10 +3051,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                         _originalCarbs = _carbs;
                         _originalCounter = _counter;
                       });
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => CodiaPage()),
-                      );
+                      // Navigate back to previous screen instead of CodiaPage
+                      Navigator.of(context).pop();
                     });
                   },
                   style: ButtonStyle(
@@ -7322,5 +7314,169 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       'carbs': (carbsNum - totalCarbsReduction).round(),
       'ingredients': newIngredients
     };
+  }
+
+  Future<void> _handleAIFix() async {
+    TextEditingController textController = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          contentPadding: EdgeInsets.all(20),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Fix with AI',
+                style: TextStyle(
+                  fontFamily: 'SF Pro Display',
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 20),
+              TextField(
+                controller: textController,
+                decoration: InputDecoration(
+                  hintText: 'E.g. less calories, add chicken, etc.',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                maxLines: 2,
+              ),
+              SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                    },
+                    child: Text('Cancel'),
+                  ),
+                  SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final instruction = textController.text.trim();
+                      if (instruction.isNotEmpty) {
+                        Navigator.of(ctx).pop(instruction);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text('Submit'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    ).then((instruction) async {
+      if (instruction != null && instruction.isNotEmpty) {
+        try {
+          // Store the current context for safer navigation
+          final currentContext = context;
+
+          // Process the food modification using the AI
+          final result = await _fixFoodWithAI(instruction);
+
+          // Check if context is still valid
+          if (!mounted) return;
+
+          // Stay on this page and update the food with the modification
+          if (result.containsKey('error') && result['error'] == true) {
+            // Show error message without navigating away
+            showDialog(
+              context: currentContext,
+              builder: (BuildContext ctx) {
+                return AlertDialog(
+                  title: Text('AI Fix Error'),
+                  content: Text(result['message'] ?? 'Unknown error occurred'),
+                  actions: [
+                    TextButton(
+                      child: Text('OK'),
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                      },
+                    ),
+                  ],
+                );
+              },
+            );
+          } else {
+            // Update the food with the AI-generated modifications
+            setState(() {
+              // Update food name if it was changed
+              if (result.containsKey('name')) {
+                _foodName = result['name'];
+              }
+
+              // Update nutritional values
+              if (result.containsKey('calories')) {
+                _calories = result['calories'];
+              }
+              if (result.containsKey('protein')) {
+                _protein = result['protein'];
+              }
+              if (result.containsKey('fat')) {
+                _fat = result['fat'];
+              }
+              if (result.containsKey('carbs')) {
+                _carbs = result['carbs'];
+              }
+
+              // Update ingredients if they were modified
+              if (result.containsKey('ingredients') &&
+                  result['ingredients'] is List) {
+                _ingredients =
+                    List<Map<String, dynamic>>.from(result['ingredients']);
+              }
+
+              // Mark as unsaved since we made changes
+              _hasUnsavedChanges = true;
+            });
+
+            // Show success message
+            ScaffoldMessenger.of(currentContext).showSnackBar(
+              SnackBar(
+                content: Text('Food updated successfully!'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } catch (e) {
+          // Handle any unexpected errors without navigating away
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (BuildContext ctx) {
+                return AlertDialog(
+                  title: Text('Error'),
+                  content: Text('Failed to process AI fix: $e'),
+                  actions: [
+                    TextButton(
+                      child: Text('OK'),
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                      },
+                    ),
+                  ],
+                );
+              },
+            );
+          }
+        }
+      }
+    });
   }
 }
