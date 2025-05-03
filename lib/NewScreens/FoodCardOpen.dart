@@ -6750,7 +6750,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 insetPadding: EdgeInsets.symmetric(horizontal: 32),
                 child: Container(
                   width: 326,
-                  height: 350, // Shorter than Add Ingredient dialog
+                  height: 350, // Adjusted height back to original value
                   child: Stack(
                     children: [
                       Padding(
@@ -6842,7 +6842,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                             ),
 
                             // Fix Now button
-                            SizedBox(height: 30),
+                            SizedBox(height: 30), // Restore original spacing
                             Padding(
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 20),
@@ -6926,7 +6926,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         'it had ',
         'it has ',
         'add ',
-        'with '
+        'with ',
+        'it didn\'t have ',
+        'it did not have ',
+        'remove ',
+        'take out ',
+        'no ',
       ];
 
       for (String phrase in phrasesToRemove) {
@@ -6942,7 +6947,37 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       preprocessedInstructions =
           preprocessedInstructions.replaceAll(' and ', ', ');
 
+      // Add special flags to help the model identify operation types
+      String operationType = 'UNKNOWN';
+      if (instructions.toLowerCase().contains('less calories') ||
+          instructions.toLowerCase().contains('fewer calories') ||
+          instructions.toLowerCase().contains('reduce calories')) {
+        operationType = 'REDUCE_CALORIES';
+      } else if (instructions.toLowerCase().contains('more calories') ||
+          instructions.toLowerCase().contains('increase calories')) {
+        operationType = 'INCREASE_CALORIES';
+      } else if (instructions.toLowerCase().contains('remove') ||
+          instructions.toLowerCase().contains('didn\'t have') ||
+          instructions.toLowerCase().contains('did not have') ||
+          instructions.toLowerCase().contains('no ')) {
+        operationType = 'REMOVE_INGREDIENT';
+      } else if (instructions.toLowerCase().contains('less ') ||
+          instructions.toLowerCase().contains('fewer ') ||
+          instructions.toLowerCase().contains('smaller amount')) {
+        operationType = 'REDUCE_AMOUNT';
+      } else if (instructions.toLowerCase().contains('more ') ||
+          instructions.toLowerCase().contains('larger amount') ||
+          instructions.toLowerCase().contains('bigger portion')) {
+        operationType = 'INCREASE_AMOUNT';
+      } else if (instructions.toLowerCase().contains('add ') ||
+          instructions.toLowerCase().contains('with ') ||
+          instructions.toLowerCase().contains('it had ') ||
+          instructions.toLowerCase().contains('it has ')) {
+        operationType = 'ADD_INGREDIENT';
+      }
+
       print('Preprocessed instructions: $preprocessedInstructions');
+      print('Detected operation type: $operationType');
 
       // Show loading dialog if context is still valid
       if (mounted && localContext != null) {
@@ -7005,7 +7040,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
       // Add the specific instruction about what to fix
       currentFoodDescription +=
-          "\nPlease analyze '$preprocessedInstructions' carefully - it may contain multiple ingredients that need to be added separately. Identify each individual ingredient, assign appropriate amounts (in grams), and update nutrition values accordingly. NEVER use phrases like 'it also had' or 'I added' in ingredient names.";
+          "\nPlease analyze and update the food according to the following instruction: '$preprocessedInstructions' (Operation type: $operationType)";
       print("Full content for AI: $currentFoodDescription");
 
       // DeepSeek API key
@@ -7016,12 +7051,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         {
           'role': 'system',
           'content':
-              'You are a nutrition expert that can modify foods based on user instructions. You will receive a description of a food with its ingredients and total nutritional values, along with instructions to add ingredients to the food. Your task is to intelligently parse the user instructions to identify individual ingredients, add them to the food, and recalculate the nutritional values. Important: If the user mentions multiple ingredients, you MUST add each one separately.\n\nFORMATTING REQUIREMENTS:\n1. Name each ingredient clearly and simply (e.g., "Olive Oil", "Chicken") - DO NOT include phrases like "it also had" or "I added" in the ingredient name\n2. Use the same measurement units as existing ingredients (typically grams, "g")\n3. Provide realistic portions and nutritional values for each identified ingredient\n4. Format all new ingredients exactly like the existing ones\n5. Return ONLY a JSON object with all the updated information'
+              'You are a nutrition expert that can modify foods based on user instructions. You will receive a description of a food with its ingredients and total nutritional values, along with instructions to modify the food. Your task is to intelligently parse the user instructions and make the requested changes, which may include:\n\n1. ADDING new ingredients\n2. REMOVING existing ingredients\n3. ADJUSTING overall calories (increasing or decreasing)\n4. MODIFYING serving sizes or amounts of existing ingredients\n\nRules to follow:\n1. CAREFULLY ANALYZE the user instructions to identify the requested change type (add, remove, adjust calories, modify amount)\n2. If instructions mention "less calories" or "fewer calories" - REDUCE the total calories by adjusting ingredient amounts or removing ingredients\n3. If instructions mention "more calories" - INCREASE the total calories by adjusting ingredient amounts or adding ingredients\n4. If instructions mention "remove X" or "didn\'t have X" - REMOVE that ingredient completely\n5. If instructions mention "less X" or "smaller amount of X" - REDUCE the amount of that ingredient\n6. If instructions mention "more X" - INCREASE the amount of that ingredient\n7. Format all NEW ingredients consistently with existing ones\n8. RECALCULATE all nutrition values after making changes\n9. Return ONLY a JSON object with all the updated information'
         },
         {
           'role': 'user',
           'content':
-              'Here is the current food information:\n\n$currentFoodDescription\n\nPlease fix this food by ADDING the following to the meal: $preprocessedInstructions\n\nImportant instructions:\n\n1. ANALYZE "$preprocessedInstructions" carefully - it may contain MULTIPLE ingredients\n2. If multiple ingredients are mentioned, add EACH ONE as a SEPARATE ingredient with its own nutritional values\n3. NEVER create a single ingredient with the full text "$preprocessedInstructions" - parse it to identify actual ingredients\n4. Use REALISTIC serving sizes for each identified ingredient (e.g., 10g olive oil, 50g chicken)\n5. Include individual macronutrients (protein, fat, carbs) for each ingredient\n6. Return a complete JSON with the food\'s name, updated calories, protein, fat, carbs, and the FULL ingredients list\n7. Name each ingredient simply (e.g., "Olive Oil" not "it also had olive oil")\n8. Make sure all values are numeric with no units in the values - only in amount fields\n9. Format the output consistently with existing ingredients'
+              'Here is the current food information:\n\n$currentFoodDescription\n\nPlease fix this food according to these instructions: "$preprocessedInstructions"\n\nImportant instructions:\n\n1. ANALYZE "$preprocessedInstructions" carefully to determine what type of change is needed:\n   - If adding ingredients: parse it to identify actual ingredients\n   - If removing ingredients: identify which ones to remove\n   - If adjusting calories: determine whether to increase or decrease and by how much\n   - If modifying amounts: identify which ingredients to adjust\n\n2. Make changes according to the specific instruction type:\n   - For ADDING: If multiple ingredients are mentioned, add EACH ONE SEPARATELY with its own nutritional values\n   - For REMOVING: Remove the specified ingredients completely\n   - For CALORIE ADJUSTMENT: Adjust ingredients proportionally to reach the target calories\n   - For AMOUNT MODIFICATION: Change specific ingredient amounts while updating nutritional values\n\n3. Follow these formatting requirements:\n   - Name each ingredient clearly and simply (e.g., "Olive Oil", "Chicken")\n   - Use the same measurement units as existing ingredients (typically grams, "g")\n   - Provide realistic portions and nutritional values for all ingredients\n   - Make sure all values are numeric with no units in the values - only in amount fields\n   - Return a complete JSON with updated name, calories, protein, fat, carbs, and the FULL ingredients list'
         }
       ];
 
