@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'ExerciseInfo.dart';
+import '../services/favorites_service.dart';
+import 'LogWeightLifting.dart';
 
 class CodiaPage extends StatefulWidget {
   CodiaPage({super.key});
@@ -12,8 +14,10 @@ class CodiaPage extends StatefulWidget {
 class _CodiaPage extends State<CodiaPage> {
   TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  int? _selectedIndex;
+  Set<int> _selectedIndices = {};
   String? _selectedMuscleGroup;
+  bool _showFavorites = false;
+  List<Map<String, String>> _favorites = [];
 
   @override
   void initState() {
@@ -23,6 +27,14 @@ class _CodiaPage extends State<CodiaPage> {
       setState(() {
         _searchQuery = _searchController.text.trim();
       });
+    });
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    final favorites = await FavoritesService.getFavorites();
+    setState(() {
+      _favorites = favorites;
     });
   }
 
@@ -42,6 +54,13 @@ class _CodiaPage extends State<CodiaPage> {
           ex.muscle.toLowerCase() == _selectedMuscleGroup!.toLowerCase();
       return matchesSearch && matchesMuscle;
     }).toList();
+
+    final displayedExercises = _showFavorites
+        ? exercises.where((ex) => _favorites.any((fav) =>
+            fav['name'] == ex.name && fav['muscle'] == ex.muscle)).toList()
+        : filteredExercises.where((ex) => !_favorites.any((fav) =>
+            fav['name'] == ex.name && fav['muscle'] == ex.muscle)).toList();
+
     return Material(
       color: Colors.white,
       child: SizedBox(
@@ -150,27 +169,37 @@ class _CodiaPage extends State<CodiaPage> {
                       ),
                       SizedBox(width: 8),
                       Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          style: TextStyle(
-                            decoration: TextDecoration.none,
-                            fontSize: 17,
-                            color: const Color(0xFF000000),
-                            fontFamily: 'SFProDisplay-Regular',
-                            fontWeight: FontWeight.normal,
+                        child: Theme(
+                          data: Theme.of(context).copyWith(
+                            textSelectionTheme: TextSelectionThemeData(
+                              selectionColor: Colors.grey[300],
+                              selectionHandleColor: Colors.grey[300],
+                            ),
                           ),
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            hintText: 'Search Exercise',
-                            hintStyle: TextStyle(
+                          child: TextField(
+                            controller: _searchController,
+                            style: TextStyle(
                               decoration: TextDecoration.none,
-                              fontSize: 17,
-                              color: const Color(0x7f000000),
+                              fontSize: 13.6,
+                              color: const Color(0xFF000000),
                               fontFamily: 'SFProDisplay-Regular',
                               fontWeight: FontWeight.normal,
                             ),
-                            isCollapsed: true,
-                            contentPadding: EdgeInsets.zero,
+                            cursorColor: Colors.black,
+                            cursorWidth: 1.2,
+                            decoration: InputDecoration(
+                              border: InputBorder.none,
+                              hintText: 'Search Exercise',
+                              hintStyle: TextStyle(
+                                decoration: TextDecoration.none,
+                                fontSize: 13.6,
+                                color: const Color(0x7f000000),
+                                fontFamily: 'SFProDisplay-Regular',
+                                fontWeight: FontWeight.normal,
+                              ),
+                              isCollapsed: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
                           ),
                         ),
                       ),
@@ -188,27 +217,34 @@ class _CodiaPage extends State<CodiaPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0xffffffff),
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: const [
-                          BoxShadow(
-                              color: Color(0x14000000),
-                              offset: Offset(0, 3),
-                              blurRadius: 8)
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Favorites',
-                          style: TextStyle(
-                            decoration: TextDecoration.none,
-                            fontSize: 17,
-                            color: const Color(0xff000000),
-                            fontFamily: 'SFProDisplay-Regular',
-                            fontWeight: FontWeight.normal,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _showFavorites = !_showFavorites;
+                        });
+                      },
+                      child: Container(
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: _showFavorites ? Colors.black : const Color(0xffffffff),
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: const [
+                            BoxShadow(
+                                color: Color(0x14000000),
+                                offset: Offset(0, 3),
+                                blurRadius: 8)
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Favorites',
+                            style: TextStyle(
+                              decoration: TextDecoration.none,
+                              fontSize: 17,
+                              color: _showFavorites ? Colors.white : const Color(0xff000000),
+                              fontFamily: 'SFProDisplay-Regular',
+                              fontWeight: FontWeight.normal,
+                            ),
                           ),
                         ),
                       ),
@@ -318,17 +354,20 @@ class _CodiaPage extends State<CodiaPage> {
               bottom: 0,
               child: ListView.builder(
                 padding: EdgeInsets.only(top: 10, bottom: 100),
-                itemCount: filteredExercises.length,
+                itemCount: displayedExercises.length,
                 itemBuilder: (context, index) {
-                  final ex = filteredExercises[index];
-                  final isSelected = _selectedIndex == index;
+                  final ex = displayedExercises[index];
+                  final isSelected = _selectedIndices.contains(index);
+                  final isFavorite = _favorites.any((fav) =>
+                      fav['name'] == ex.name && fav['muscle'] == ex.muscle);
+
                   return GestureDetector(
                     onTap: () {
                       setState(() {
-                        if (_selectedIndex == index) {
-                          _selectedIndex = null;
+                        if (_selectedIndices.contains(index)) {
+                          _selectedIndices.remove(index);
                         } else {
-                          _selectedIndex = index;
+                          _selectedIndices.add(index);
                         }
                       });
                     },
@@ -379,18 +418,31 @@ class _CodiaPage extends State<CodiaPage> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    ex.name,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.normal,
-                                      fontSize: 15,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.black,
-                                      fontFamily: 'SFProDisplay-Regular',
-                                      decoration: TextDecoration.none,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                                  Row(
+                                    children: [
+                                      Text(
+                                        ex.name,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.normal,
+                                          fontSize: 15,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Colors.black,
+                                          fontFamily: 'SFProDisplay-Regular',
+                                          decoration: TextDecoration.none,
+                                        ),
+                                      ),
+                                      if (isFavorite)
+                                        Padding(
+                                          padding: EdgeInsets.only(left: 4),
+                                          child: Image.asset(
+                                            'assets/images/bookmarkfilled.png',
+                                            width: 16,
+                                            height: 16,
+                                            color: isSelected ? Colors.white : Color(0xFFFFC300),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                   Text(
                                     ex.muscle,
@@ -403,15 +455,14 @@ class _CodiaPage extends State<CodiaPage> {
                                       fontWeight: FontWeight.normal,
                                       decoration: TextDecoration.none,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
                             SizedBox(width: 12),
                             GestureDetector(
-                              onTap: () {
-                                Navigator.push(
+                              onTap: () async {
+                                await Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => ExerciseInfo(
@@ -420,6 +471,7 @@ class _CodiaPage extends State<CodiaPage> {
                                     ),
                                   ),
                                 );
+                                _loadFavorites();
                               },
                               child: Image.asset(
                                 'assets/images/CircleMenu.png',
@@ -438,37 +490,39 @@ class _CodiaPage extends State<CodiaPage> {
                 },
               ),
             ),
-            if (_selectedIndex != null)
+            if (_selectedIndices.isNotEmpty)
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-                  color: Colors.transparent,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                  ),
                   child: Container(
                     width: double.infinity,
-                    height: 56,
+                    height: MediaQuery.of(context).size.height * 0.0689,
                     decoration: BoxDecoration(
                       color: Colors.black,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 16,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
+                      borderRadius: BorderRadius.circular(28),
                     ),
-                    child: Center(
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WeightLiftingActive(),
+                          ),
+                        );
+                      },
                       child: Text(
-                        'Add 1 exercise',
+                        'Add ${_selectedIndices.length} ${_selectedIndices.length == 1 ? 'exercise' : 'exercises'}',
                         style: TextStyle(
-                          color: Colors.white,
                           fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'SF Pro Display',
-                          letterSpacing: 0.2,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: '.SF Pro Display',
+                          color: Colors.white,
                         ),
                       ),
                     ),
