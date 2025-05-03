@@ -6,12 +6,11 @@ import 'dart:convert'; // For base64 decoding
 import 'dart:typed_data'; // For Uint8List
 import 'package:http/http.dart' as http; // For API calls to OpenAI
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'dart:math'; // For pi in rotation animation
+import 'dart:math'; // For pi in rotation animation and min function
 import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 // Custom scroll physics optimized for mouse wheel
 class SlowScrollPhysics extends ScrollPhysics {
@@ -1878,6 +1877,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       [BuildContext? dialogContext]) async {
     try {
       // Format the prompt for DeepSeek AI with improved validation instructions
+      // For single ingredients (Add Ingredient feature), use a simpler prompt focused on accurate nutrition
       final messages = [
         {
           'role': 'system',
@@ -1918,6 +1918,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       print(
           'FOOD ANALYZER: Received DeepSeek API response with status: ${response.statusCode}');
 
+      // Dismiss any loading dialog that might be showing (immediately after getting the response)
+      if (dialogContext != null) {
+        _safelyDismissDialog(dialogContext, true);
+      }
+
       if (response.statusCode != 200) {
         throw Exception(
             'DeepSeek API error: ${response.statusCode}, ${response.body}');
@@ -1926,7 +1931,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       // Parse the response
       final Map<String, dynamic> responseData = jsonDecode(response.body);
       print(
-          'FOOD ANALYZER: DeepSeek response: ${responseData.toString().substring(0, 200)}...');
+          'FOOD ANALYZER: DeepSeek response: ${responseData.toString().substring(0, min(200, responseData.toString().length))}...');
 
       // Extract the content from choices
       if (!responseData.containsKey('choices') ||
@@ -2019,6 +2024,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
         print(
             'FOOD ANALYZER FALLBACK: Received response status: ${response.statusCode}');
+
+        // Dismiss any loading dialog that might be showing (immediately after getting the response)
+        if (dialogContext != null) {
+          _safelyDismissDialog(dialogContext, true);
+        }
 
         if (response.statusCode != 200) {
           throw Exception('Fallback API error: ${response.statusCode}');
@@ -2138,92 +2148,238 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     bool isDialogShowing = false;
 
     try {
-      print('STARTING OpenAI calculation for: $foodName ($servingSize)');
+      print('STARTING NUTRITION CALCULATION for: $foodName ($servingSize)');
 
       // Show loading dialog if context is still valid
       if (mounted && localContext != null) {
         isDialogShowing = true;
-        // Show loading indicator as a simple dialog
-        showDialog(
-          context: localContext,
-          barrierDismissible: false,
-          builder: (BuildContext ctx) {
-            dialogContext = ctx;
-            return Dialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Container(
-                width: 110,
-                height: 110,
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: CircularProgressIndicator(
-                        color: Colors.black,
-                        strokeWidth: 3,
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      "Calculating...",
-                      style: TextStyle(
-                        fontFamily: 'SF Pro Display',
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+        try {
+          // Show loading indicator as a simple dialog
+          showDialog(
+            context: localContext,
+            barrierDismissible: false,
+            builder: (BuildContext ctx) {
+              dialogContext = ctx;
+              return Dialog(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ),
-            );
-          },
-        );
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: CircularProgressIndicator(
+                          color: Colors.black,
+                          strokeWidth: 3,
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        "Calculating...",
+                        style: TextStyle(
+                          fontFamily: 'SF Pro Display',
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        } catch (dialogError) {
+          print('Error showing dialog: $dialogError');
+          isDialogShowing = false;
+        }
       }
 
-      // Use the Food Analyzer service directly
-      final nutritionData =
-          await _analyzeIngredientWithAPI(foodName, servingSize, context);
+      // Format the prompt for DeepSeek AI with nutrition calculation instructions
+      final messages = [
+        {
+          'role': 'system',
+          'content':
+              'You are a nutrition expert analyzing food items. Calculate accurate nutritional values for the specified food and serving size. Return ONLY RAW JSON with nutritional values that are accurate for the food type. Calculate values based on typical nutritional composition - DO NOT inflate protein content. For example, donuts should have LOW protein (3-7g), not high protein. CALORIES MUST BE PRECISE NUMBERS - not rounded to multiples of 10 or 50. For example, if a food has 283 calories, return 283 (not 280 or 300). Use accurate macronutrient distribution based on food type (e.g. more carbs for sweets, more protein for meat).'
+        },
+        {
+          'role': 'user',
+          'content':
+              'Calculate accurate nutritional values for $foodName, serving size: $servingSize. Return only the JSON with calories, protein, fat, and carbs.'
+        }
+      ];
 
-      // Safely dismiss the loading dialog if it's showing
-      _safelyDismissDialog(dialogContext, isDialogShowing);
+      print(
+          'NUTRITION CALCULATOR: Creating direct DeepSeek API request for "$foodName" ($servingSize)');
 
-      // Check if the food name was invalid
-      if (nutritionData.containsKey('invalid_food') &&
-          nutritionData['invalid_food'] == true) {
-        print('Invalid food name detected by API: $foodName');
+      try {
+        // DeepSeek API key
+        const String deepseekApiKey = 'sk-39f27e0e4f2346ccb047ddc658f93469';
 
-        // Show the invalid ingredient dialog after a short delay to ensure the loading dialog is dismissed
-        if (mounted) {
-          Future.delayed(Duration(milliseconds: 300), () {
-            _showUnclearInputDialog();
-          });
+        // Call DeepSeek API directly for nutrition calculation
+        final response = await http
+            .post(
+              Uri.parse('https://api.deepseek.com/v1/chat/completions'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $deepseekApiKey',
+              },
+              body: jsonEncode({
+                'model': 'deepseek-chat',
+                'messages': messages,
+                'max_tokens': 500,
+                'temperature': 0.5,
+                'response_format': {'type': 'json_object'},
+              }),
+            )
+            .timeout(const Duration(seconds: 30));
+
+        print(
+            'NUTRITION CALCULATOR: Received DeepSeek API response with status: ${response.statusCode}');
+
+        // Safely dismiss the loading dialog if it's showing
+        _safelyDismissDialog(dialogContext, isDialogShowing);
+
+        if (response.statusCode != 200) {
+          throw Exception(
+              'DeepSeek API error: ${response.statusCode}, ${response.body}');
         }
 
-        // Return an empty map to indicate invalid food
-        return {'invalid_food': true};
+        // Parse the response
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        print(
+            'NUTRITION CALCULATOR: DeepSeek response: ${responseData.toString().substring(0, min(200, responseData.toString().length))}...');
+
+        // Extract the content from choices
+        if (!responseData.containsKey('choices') ||
+            responseData['choices'] is! List ||
+            (responseData['choices'] as List).isEmpty ||
+            !responseData['choices'][0].containsKey('message') ||
+            !responseData['choices'][0]['message'].containsKey('content')) {
+          throw Exception('Invalid response format from DeepSeek API');
+        }
+
+        final content = responseData['choices'][0]['message']['content'];
+        Map<String, dynamic> nutrition = {};
+
+        try {
+          // Parse the JSON content
+          nutrition = jsonDecode(content);
+          print('NUTRITION CALCULATOR: Parsed nutrition data: $nutrition');
+
+          // Check if the model identified this as an invalid food or serving size
+          if (nutrition.containsKey('invalid_food') &&
+              nutrition['invalid_food'] == true) {
+            print(
+                'NUTRITION CALCULATOR: Invalid food name or serving size detected: $foodName ($servingSize)');
+
+            // Show the invalid ingredient dialog after a short delay to ensure the loading dialog is dismissed
+            if (mounted) {
+              Future.delayed(Duration(milliseconds: 300), () {
+                _showUnclearInputDialog();
+              });
+            }
+
+            return {'invalid_food': true};
+          }
+        } catch (e) {
+          print('NUTRITION CALCULATOR: Error parsing nutrition JSON: $e');
+
+          // Try to extract JSON using regex if parsing fails
+          final jsonRegex = RegExp(r'\{[\s\S]*?\}');
+          final jsonMatch = jsonRegex.firstMatch(content);
+          if (jsonMatch != null) {
+            try {
+              nutrition = jsonDecode(jsonMatch.group(0)!);
+              print(
+                  'NUTRITION CALCULATOR: Extracted nutrition data: $nutrition');
+            } catch (e) {
+              print('NUTRITION CALCULATOR: Error parsing extracted JSON: $e');
+            }
+          }
+        }
+
+        // Return standardized nutrition values with fallbacks
+        final result = {
+          'calories':
+              _extractNumericValue(nutrition, ['calories', 'kcal', 'energy']),
+          'protein': _extractNumericValue(nutrition, ['protein', 'proteins']),
+          'carbs': _extractNumericValue(nutrition, ['carbs', 'carbohydrates']),
+          'fat': _extractNumericValue(nutrition, ['fat', 'fats', 'total_fat']),
+        };
+
+        print('COMPLETED nutrition calculation: $result');
+        return result;
+      } catch (apiError) {
+        print('API ERROR: $apiError');
+        // Safely dismiss the loading dialog if it's showing
+        _safelyDismissDialog(dialogContext, isDialogShowing);
+
+        // Use fallback estimation for nutrition values
+        double estimatedCalories =
+            _estimateCaloriesForFood(foodName, servingSize);
+
+        // Estimate macros based on food type
+        double protein = 0.0, fat = 0.0, carbs = 0.0;
+        String lowercaseName = foodName.toLowerCase();
+
+        // Sweet/dessert foods
+        if (lowercaseName.contains('cake') ||
+            lowercaseName.contains('cookie') ||
+            lowercaseName.contains('sweet') ||
+            lowercaseName.contains('dessert') ||
+            lowercaseName.contains('donut')) {
+          // Low protein, high carbs, moderate fat
+          protein = estimatedCalories * 0.05 / 4; // 5% protein
+          fat = estimatedCalories * 0.3 / 9; // 30% fat
+          carbs = estimatedCalories * 0.65 / 4; // 65% carbs
+        }
+        // Meat-based foods
+        else if (lowercaseName.contains('chicken') ||
+            lowercaseName.contains('beef') ||
+            lowercaseName.contains('fish') ||
+            lowercaseName.contains('meat')) {
+          // High protein, moderate fat, low carbs
+          protein = estimatedCalories * 0.4 / 4; // 40% protein
+          fat = estimatedCalories * 0.4 / 9; // 40% fat
+          carbs = estimatedCalories * 0.2 / 4; // 20% carbs
+        }
+        // Balanced meals
+        else {
+          // Moderate protein, moderate fat, moderate carbs
+          protein = estimatedCalories * 0.25 / 4; // 25% protein
+          fat = estimatedCalories * 0.3 / 9; // 30% fat
+          carbs = estimatedCalories * 0.45 / 4; // 45% carbs
+        }
+
+        final result = {
+          'calories': estimatedCalories,
+          'protein': protein,
+          'carbs': carbs,
+          'fat': fat,
+        };
+
+        print('Using estimated nutrition values: $result');
+        return result;
       }
-
-      print('COMPLETED OpenAI calculation: $nutritionData');
-
-      return nutritionData;
     } catch (e) {
       print('CRITICAL ERROR calculating nutrition: $e');
 
       // Safely dismiss the loading dialog if it's showing
       _safelyDismissDialog(dialogContext, isDialogShowing);
 
-      // If we can't get nutrition data, return default values
+      // Return default values to avoid crashes
       return {
-        'calories': 0.0,
-        'protein': 0.0,
-        'carbs': 0.0,
-        'fat': 0.0,
+        'calories': 200.0,
+        'protein': 10.0,
+        'carbs': 20.0,
+        'fat': 5.0,
       };
     }
   }
@@ -3314,6 +3470,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             // Show the fix manually dialog
             _showFixManuallyDialog();
           }
+        } else if (title == 'Fix with AI') {
+          // Show the Fix with AI dialog
+          _showFixWithAIDialog();
         }
         // Add other handlers for different options if needed
       },
@@ -3654,12 +3813,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     // Track input validation
     bool isFormValid = false;
 
+    print('INGREDIENT DIALOG: Opening Add Ingredient dialog');
+
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.5),
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogContext, setDialogState) {
             // Check form validity
             void updateFormValidity() {
               // Get trimmed values for validation
@@ -3760,43 +3921,80 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               return true;
             }
 
-            // Function to handle form submission with nutrition calculation
-            void handleSubmit() async {
-              if (!isFormValid) return;
+            // Function to clean and format ingredient name
+            String cleanAndFormatFoodName(String name) {
+              // Trim whitespace
+              String cleaned = name.trim();
 
-              // Get values from text fields
-              String foodName = foodController.text.trim();
-              String size = sizeController.text.trim();
-              String caloriesText = caloriesController.text.trim();
+              // Remove common prefixes
+              final List<String> prefixesToRemove = [
+                'it also had ',
+                'it also contains ',
+                'also add ',
+                'and also ',
+                'it had ',
+                'it has ',
+                'add ',
+                'with '
+              ];
 
-              // Validate food name for being a reasonable food
-              if (!isValidFoodName(foodName)) {
-                // Close the original dialog first
-                Navigator.pop(context);
-
-                // Show unclear input dialog
-                _showUnclearInputDialog();
-                return;
+              for (String prefix in prefixesToRemove) {
+                if (cleaned.toLowerCase().startsWith(prefix)) {
+                  cleaned = cleaned.substring(prefix.length);
+                  break;
+                }
               }
 
-              // Apply proper case to food name
-              if (foodName.isNotEmpty) {
+              // Proper title case formatting
+              if (cleaned.isNotEmpty) {
                 // Check if text is all uppercase
-                bool isAllCaps = foodName == foodName.toUpperCase() &&
-                    foodName != foodName.toLowerCase();
+                bool isAllCaps = cleaned == cleaned.toUpperCase() &&
+                    cleaned != cleaned.toLowerCase();
 
                 // Convert all caps to lowercase before formatting
-                if (isAllCaps) foodName = foodName.toLowerCase();
+                if (isAllCaps) cleaned = cleaned.toLowerCase();
 
                 // Apply title case formatting with improved handling
-                List<String> words = foodName.split(' ');
+                List<String> words = cleaned.split(' ');
                 for (int i = 0; i < words.length; i++) {
                   if (words[i].isNotEmpty) {
                     words[i] = words[i][0].toUpperCase() +
                         (words[i].length > 1 ? words[i].substring(1) : '');
                   }
                 }
-                foodName = words.join(' ');
+                cleaned = words.join(' ');
+              }
+
+              return cleaned;
+            }
+
+            // Function to handle form submission with nutrition calculation
+            void handleSubmit() async {
+              if (!isFormValid) return;
+
+              print('INGREDIENT ADD: Starting handleSubmit function');
+
+              // Get values from text fields
+              String foodName = foodController.text.trim();
+              String size = sizeController.text.trim();
+              String caloriesText = caloriesController.text.trim();
+
+              print(
+                  'INGREDIENT ADD: Got form values - foodName: $foodName, size: $size, caloriesText: $caloriesText');
+
+              // Clean and format the food name
+              foodName = cleanAndFormatFoodName(foodName);
+              print('INGREDIENT ADD: Cleaned food name: $foodName');
+
+              // Validate food name for being a reasonable food
+              if (!isValidFoodName(foodName)) {
+                print('INGREDIENT ADD: Invalid food name detected: $foodName');
+                // Close the original dialog first
+                Navigator.pop(dialogContext);
+
+                // Show unclear input dialog
+                _showUnclearInputDialog();
+                return;
               }
 
               // Format size by removing spaces before 'g' and 'kg'
@@ -3805,6 +4003,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 size = size.replaceAll(' g', 'g');
                 // Handle '1.5 kg' format
                 size = size.replaceAll(' kg', 'kg');
+                print('INGREDIENT ADD: Formatted size: $size');
               }
 
               // Initialize nutritional values
@@ -3813,95 +4012,120 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               String fat = "0";
               String carbs = "0";
 
-              // Close the ingredient dialog first
-              Navigator.pop(context);
-
               // Handle empty calories field - calculate with AI
               if (caloriesText.isEmpty) {
                 print(
-                    'INGREDIENT ADD: Started calculation for $foodName ($size)');
+                    'INGREDIENT ADD: Empty calories field, calculating with AI for $foodName ($size)');
 
-                // Call the OpenAI API to calculate nutrition
-                final nutritionData =
-                    await _calculateNutritionWithAI(foodName, size);
+                // Close the ingredient dialog first
+                print('INGREDIENT ADD: Closing add ingredient dialog');
+                Navigator.pop(dialogContext);
 
-                // Check if this was flagged as an invalid food by the API
-                if (nutritionData.containsKey('invalid_food') &&
-                    nutritionData['invalid_food'] == true) {
-                  print('INGREDIENT ADD: Invalid food name detected by API');
-                  // The _calculateNutritionWithAI function already shows the invalid input dialog
-                  return;
-                }
+                try {
+                  // Call the nutrition calculation API
+                  print('INGREDIENT ADD: Calling _calculateNutritionWithAI');
+                  final nutritionData =
+                      await _calculateNutritionWithAI(foodName, size);
 
-                print('INGREDIENT ADD: Got response from API: $nutritionData');
-
-                // Extract values with more careful parsing
-                calories = nutritionData['calories'] ?? 0.0;
-                protein = (nutritionData['protein'] ?? 0.0).toString();
-                fat = (nutritionData['fat'] ?? 0.0).toString();
-                carbs = (nutritionData['carbs'] ?? 0.0).toString();
-
-                print(
-                    'INGREDIENT ADD: Processed values - calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
-
-                // Check if we got valid calorie data
-                if (calories <= 0) {
                   print(
-                      'INGREDIENT ADD: Invalid calories value received: $calories');
+                      'INGREDIENT ADD: Received nutritionData: $nutritionData');
 
-                  // Use default calorie estimate based on food type
-                  calories = _estimateCaloriesForFood(foodName, size);
-                  print('INGREDIENT ADD: Using estimated calories: $calories');
-                }
+                  // Check if this was flagged as an invalid food by the API
+                  if (nutritionData.containsKey('invalid_food') &&
+                      nutritionData['invalid_food'] == true) {
+                    print('INGREDIENT ADD: Invalid food name detected by API');
+                    // The _calculateNutritionWithAI function already shows the invalid input dialog
+                    return;
+                  }
 
-                // Update main nutritional values
-                if (mounted) {
-                  setState(() {
-                    // Create new ingredient with user-provided calories
-                    Map<String, dynamic> newIngredient = {
-                      'name': foodName,
-                      'amount': size,
-                      'calories': calories,
-                      'protein': protein,
-                      'fat': fat,
-                      'carbs': carbs
-                    };
+                  // Extract values with more careful parsing
+                  calories = nutritionData['calories'] ?? 0.0;
+                  protein = (nutritionData['protein'] ?? 0.0).toString();
+                  fat = (nutritionData['fat'] ?? 0.0).toString();
+                  carbs = (nutritionData['carbs'] ?? 0.0).toString();
 
-                    _ingredients.add(newIngredient);
-                    _markAsUnsaved(); // Mark as having unsaved changes
+                  print(
+                      'INGREDIENT ADD: Processed values - calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
 
-                    // Sort ingredients by calories (highest to lowest)
-                    _ingredients.sort((a, b) {
-                      final caloriesA = a.containsKey('calories')
-                          ? double.tryParse(a['calories'].toString()) ?? 0
-                          : 0;
-                      final caloriesB = b.containsKey('calories')
-                          ? double.tryParse(b['calories'].toString()) ?? 0
-                          : 0;
-                      return caloriesB.compareTo(caloriesA);
+                  // Check if we got valid calorie data
+                  if (calories <= 0) {
+                    print(
+                        'INGREDIENT ADD: Invalid calories value received: $calories');
+                    // Use default calorie estimate based on food type
+                    calories = _estimateCaloriesForFood(foodName, size);
+                    print(
+                        'INGREDIENT ADD: Using estimated calories: $calories');
+                  }
+
+                  // Update main nutritional values
+                  if (mounted) {
+                    print(
+                        'INGREDIENT ADD: Widget is still mounted, updating state');
+                    setState(() {
+                      // Create new ingredient with calculated calories
+                      Map<String, dynamic> newIngredient = {
+                        'name': foodName,
+                        'amount': size,
+                        'calories': calories,
+                        'protein': protein,
+                        'fat': fat,
+                        'carbs': carbs
+                      };
+
+                      print(
+                          'INGREDIENT ADD: Adding new ingredient: $newIngredient');
+                      _ingredients.add(newIngredient);
+                      _markAsUnsaved(); // Mark as having unsaved changes
+
+                      // Sort ingredients by calories (highest to lowest)
+                      _ingredients.sort((a, b) {
+                        final caloriesA = a.containsKey('calories')
+                            ? double.tryParse(a['calories'].toString()) ?? 0
+                            : 0;
+                        final caloriesB = b.containsKey('calories')
+                            ? double.tryParse(b['calories'].toString()) ?? 0
+                            : 0;
+                        return caloriesB.compareTo(caloriesA);
+                      });
+                      print('INGREDIENT ADD: Sorted ingredients by calories');
                     });
-                  });
 
-                  // Calculate total nutrition from all ingredients
-                  _calculateTotalNutrition();
-
-                  // Don't auto-save - wait for user to click Save button
-                  print(
-                      'INGREDIENT ADD: Added ingredient, changes marked as unsaved');
+                    // Calculate total nutrition from all ingredients
+                    _calculateTotalNutrition();
+                    print(
+                        'INGREDIENT ADD: Successfully added ingredient, waiting for save');
+                  } else {
+                    print('INGREDIENT ADD: Widget is no longer mounted');
+                  }
+                } catch (e) {
+                  print('CRITICAL ERROR in handleSubmit: $e');
+                  if (mounted) {
+                    print('INGREDIENT ADD: Showing error alert');
+                    // Show error dialog
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Error'),
+                        content: Text('Failed to calculate nutrition: $e'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('OK'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
                 }
-                print('INGREDIENT ADD: Updated main nutrition values');
-
-                // Calculate total nutrition from all ingredients
-                _calculateTotalNutrition();
-
-                // Don't auto-save - wait for user to click Save button
-                print(
-                    'INGREDIENT ADD: Successfully added ingredient, waiting for save');
               } else {
                 // User provided calories directly
                 try {
+                  print(
+                      'INGREDIENT ADD: Using user-provided calories: $caloriesText');
+
                   // Parse provided calories
                   calories = double.tryParse(caloriesText) ?? 0;
+                  print('INGREDIENT ADD: Parsed calories: $calories');
 
                   // Calculate reasonable default macros based on calories
                   // For a balanced food item: ~25% protein, ~30% fat, ~45% carbs
@@ -3916,8 +4140,17 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   protein = defaultProtein.toStringAsFixed(1);
                   fat = defaultFat.toStringAsFixed(1);
                   carbs = defaultCarbs.toStringAsFixed(1);
+                  print(
+                      'INGREDIENT ADD: Calculated macros - protein=$protein, fat=$fat, carbs=$carbs');
+
+                  // Close the ingredient dialog first
+                  print(
+                      'INGREDIENT ADD: Closing add ingredient dialog (manual calories)');
+                  Navigator.pop(dialogContext);
 
                   if (mounted) {
+                    print(
+                        'INGREDIENT ADD: Widget is still mounted, updating state with manual calories');
                     setState(() {
                       // Create new ingredient with user-provided calories
                       Map<String, dynamic> newIngredient = {
@@ -3929,6 +4162,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                         'carbs': carbs
                       };
 
+                      print(
+                          'INGREDIENT ADD: Adding new ingredient with manual calories: $newIngredient');
                       _ingredients.add(newIngredient);
                       _markAsUnsaved(); // Mark as having unsaved changes
 
@@ -3947,9 +4182,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     // Calculate total nutrition from all ingredients
                     _calculateTotalNutrition();
 
-                    // Don't auto-save - wait for user to click Save button
                     print(
                         'INGREDIENT ADD: Added ingredient with provided calories, changes marked as unsaved');
+                  } else {
+                    print(
+                        'INGREDIENT ADD: Widget is no longer mounted for manual calories');
                   }
                 } catch (e) {
                   print('Error adding ingredient with provided calories: $e');
@@ -3973,8 +4210,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 backgroundColor: Colors.white,
                 insetPadding: EdgeInsets.symmetric(horizontal: 32),
                 child: Container(
-                  width: 326,
-                  height: 530,
+                  width: 326, // Same width as Add dialog
+                  height: 530, // Same height as Add dialog
                   child: Stack(
                     children: [
                       Padding(
@@ -4241,8 +4478,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                           },
                           child: Image.asset(
                             'assets/images/closeicon.png',
-                            width: 19,
-                            height: 19,
+                            width: 19, // Update to 19x19
+                            height: 19, // Update to 19x19
                           ),
                         ),
                       ),
@@ -6159,5 +6396,765 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       _hasUnsavedChanges = true;
       print('Changes marked as unsaved');
     });
+  }
+
+  // Method to show Fix with AI dialog
+  void _showFixWithAIDialog() {
+    // Create controller for text field
+    TextEditingController descriptionController = TextEditingController();
+
+    // Track input validation
+    bool isFormValid = false;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Check form validity
+            void updateFormValidity() {
+              // Description must have at least one character
+              bool descriptionValid =
+                  descriptionController.text.trim().isNotEmpty;
+
+              setDialogState(() {
+                isFormValid = descriptionValid;
+              });
+            }
+
+            // Function to handle form submission
+            void handleSubmit() async {
+              if (!isFormValid) return;
+
+              // Get description from text field
+              String description = descriptionController.text.trim();
+
+              // Close the dialog first
+              Navigator.pop(context);
+
+              // Call the AI to fix the food
+              final modifiedFoodData = await _fixFoodWithAI(description);
+
+              // Debug print entire response
+              print('AI RESPONSE DATA: ${modifiedFoodData.toString()}');
+
+              // Handle any potentially capitalized keys that weren't normalized in _fixFoodWithAI
+              Map<String, dynamic> normalizedData = Map.from(modifiedFoodData);
+
+              // Check for capitalized field names and normalize them
+              if (normalizedData.containsKey('Ingredients') &&
+                  !normalizedData.containsKey('ingredients')) {
+                print(
+                    'HANDLER: Found capitalized "Ingredients" key, normalizing');
+                normalizedData['ingredients'] =
+                    normalizedData.remove('Ingredients');
+              }
+
+              if (normalizedData.containsKey('Name') &&
+                  !normalizedData.containsKey('name')) {
+                normalizedData['name'] = normalizedData.remove('Name');
+              }
+
+              if (normalizedData.containsKey('Calories') &&
+                  !normalizedData.containsKey('calories')) {
+                normalizedData['calories'] = normalizedData.remove('Calories');
+              }
+
+              if (normalizedData.containsKey('Protein') &&
+                  !normalizedData.containsKey('protein')) {
+                normalizedData['protein'] = normalizedData.remove('Protein');
+              }
+
+              if (normalizedData.containsKey('Fat') &&
+                  !normalizedData.containsKey('fat')) {
+                normalizedData['fat'] = normalizedData.remove('Fat');
+              }
+
+              if (normalizedData.containsKey('Carbs') &&
+                  !normalizedData.containsKey('carbs')) {
+                normalizedData['carbs'] = normalizedData.remove('Carbs');
+              }
+
+              // Check if we got an error
+              if (normalizedData.containsKey('error') &&
+                  normalizedData['error'] == true) {
+                if (mounted) {
+                  // Show an error dialog
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: Text("Error"),
+                        content: Text(
+                            "Failed to modify food with AI. Please try again with different instructions."),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: Text("OK"),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                }
+                return;
+              }
+
+              // Update the food with the modified data
+              if (mounted) {
+                setState(() {
+                  // Update food name if provided
+                  if (normalizedData.containsKey('name')) {
+                    _foodName = normalizedData['name'];
+                    print('Updated food name to: $_foodName');
+                  }
+
+                  // Update total nutrition values if provided
+                  if (normalizedData.containsKey('calories')) {
+                    _calories = normalizedData['calories'].toString();
+                    print('Updated calories to: $_calories');
+                  }
+                  if (normalizedData.containsKey('protein')) {
+                    _protein = normalizedData['protein'].toString();
+                    print('Updated protein to: $_protein');
+                  }
+                  if (normalizedData.containsKey('fat')) {
+                    _fat = normalizedData['fat'].toString();
+                    print('Updated fat to: $_fat');
+                  }
+                  if (normalizedData.containsKey('carbs')) {
+                    _carbs = normalizedData['carbs'].toString();
+                    print('Updated carbs to: $_carbs');
+                  }
+
+                  // Update ingredients if provided
+                  if (normalizedData.containsKey('ingredients') &&
+                      normalizedData['ingredients'] is List &&
+                      (normalizedData['ingredients'] as List).isNotEmpty) {
+                    print(
+                        'Processing ${(normalizedData['ingredients'] as List).length} ingredients from AI response');
+
+                    _ingredients = []; // Clear existing ingredients
+
+                    // Helper function to clean up ingredient names
+                    String cleanIngredientName(String name) {
+                      // Remove common prefixes
+                      List<String> prefixesToRemove = [
+                        'it also had ',
+                        'also had ',
+                        'it had ',
+                        'had ',
+                        'it also has ',
+                        'also has ',
+                        'it has ',
+                        'has ',
+                        'with ',
+                        'add ',
+                        'added '
+                      ];
+
+                      String cleanedName = name.trim();
+                      for (String prefix in prefixesToRemove) {
+                        if (cleanedName.toLowerCase().startsWith(prefix)) {
+                          cleanedName =
+                              cleanedName.substring(prefix.length).trim();
+                          break;
+                        }
+                      }
+
+                      // Capitalize first letter of each word
+                      if (cleanedName.isNotEmpty) {
+                        List<String> words = cleanedName.split(' ');
+                        for (int i = 0; i < words.length; i++) {
+                          if (words[i].isNotEmpty) {
+                            words[i] = words[i][0].toUpperCase() +
+                                words[i].substring(1).toLowerCase();
+                          }
+                        }
+                        cleanedName = words.join(' ');
+                      }
+
+                      return cleanedName;
+                    }
+
+                    // Add each new ingredient
+                    for (var ingredient in normalizedData['ingredients']) {
+                      // Normalize keys inside ingredient
+                      Map<String, dynamic> normalizedIngredient = {};
+
+                      // Check for capitalized keys in the ingredient data
+                      if (ingredient is Map) {
+                        // Handle name
+                        String rawName;
+                        if (ingredient.containsKey('Name') &&
+                            !ingredient.containsKey('name')) {
+                          rawName = ingredient['Name'] ?? 'Unknown';
+                        } else {
+                          rawName = ingredient['name'] ?? 'Unknown';
+                        }
+
+                        // Clean and format the ingredient name
+                        normalizedIngredient['name'] =
+                            cleanIngredientName(rawName);
+
+                        // Handle amount
+                        String rawAmount;
+                        if (ingredient.containsKey('Amount') &&
+                            !ingredient.containsKey('amount')) {
+                          rawAmount = ingredient['Amount'] ?? '0g';
+                        } else {
+                          rawAmount = ingredient['amount'] ?? '0g';
+                        }
+
+                        // Ensure amount always has units (defaulting to 'g' if none)
+                        if (rawAmount.trim().isNotEmpty) {
+                          // If it's only a number without units, add 'g'
+                          if (RegExp(r'^\d+(\.\d+)?$').hasMatch(rawAmount)) {
+                            rawAmount = '$rawAmount' + 'g';
+                          }
+                        } else {
+                          rawAmount = '0g'; // Default amount
+                        }
+
+                        normalizedIngredient['amount'] = rawAmount;
+
+                        // Handle calories
+                        dynamic rawCalories;
+                        if (ingredient.containsKey('Calories') &&
+                            !ingredient.containsKey('calories')) {
+                          rawCalories = ingredient['Calories'];
+                        } else {
+                          rawCalories = ingredient['calories'];
+                        }
+
+                        // Ensure calories is a clean numeric value
+                        String caloriesStr = '0';
+                        if (rawCalories != null) {
+                          if (rawCalories is num) {
+                            caloriesStr = rawCalories.toString();
+                          } else if (rawCalories is String) {
+                            // Extract numeric part if string contains non-numeric characters
+                            final numericMatch = RegExp(r'(\d+(?:\.\d+)?)')
+                                .firstMatch(rawCalories);
+                            if (numericMatch != null) {
+                              caloriesStr = numericMatch.group(1) ?? '0';
+                            }
+                          }
+                        }
+
+                        normalizedIngredient['calories'] = caloriesStr;
+
+                        // Handle protein
+                        if (ingredient.containsKey('Protein') &&
+                            !ingredient.containsKey('protein')) {
+                          normalizedIngredient['protein'] =
+                              ingredient['Protein']?.toString() ?? '0';
+                        } else {
+                          normalizedIngredient['protein'] =
+                              ingredient['protein']?.toString() ?? '0';
+                        }
+
+                        // Handle fat
+                        if (ingredient.containsKey('Fat') &&
+                            !ingredient.containsKey('fat')) {
+                          normalizedIngredient['fat'] =
+                              ingredient['Fat']?.toString() ?? '0';
+                        } else {
+                          normalizedIngredient['fat'] =
+                              ingredient['fat']?.toString() ?? '0';
+                        }
+
+                        // Handle carbs
+                        if (ingredient.containsKey('Carbs') &&
+                            !ingredient.containsKey('carbs')) {
+                          normalizedIngredient['carbs'] =
+                              ingredient['Carbs']?.toString() ?? '0';
+                        } else {
+                          normalizedIngredient['carbs'] =
+                              ingredient['carbs']?.toString() ?? '0';
+                        }
+                      } else {
+                        // Fallback for non-Map ingredients
+                        normalizedIngredient = {
+                          'name': 'Unknown',
+                          'amount': '0g',
+                          'calories': '0',
+                          'protein': '0',
+                          'fat': '0',
+                          'carbs': '0',
+                        };
+                      }
+
+                      _ingredients.add(normalizedIngredient);
+                      print(
+                          'Added ingredient: ${normalizedIngredient['name']} (${normalizedIngredient['amount']}), calories: ${normalizedIngredient['calories']}');
+                    }
+
+                    // Sort ingredients by calories (highest to lowest)
+                    _ingredients.sort((a, b) {
+                      final caloriesA =
+                          double.tryParse(a['calories'].toString()) ?? 0;
+                      final caloriesB =
+                          double.tryParse(b['calories'].toString()) ?? 0;
+                      return caloriesB.compareTo(caloriesA);
+                    });
+                  } else {
+                    print('WARNING: No ingredients found in AI response!');
+                  }
+
+                  // Mark as having unsaved changes
+                  _markAsUnsaved();
+
+                  // Force recalculation of totals and refresh UI
+                  _calculateTotalNutrition();
+
+                  // Force a redraw of the entire screen
+                  _hasUnsavedChanges = true;
+                });
+
+                // Force a save to ensure changes are persisted
+                _saveData();
+
+                // Use Future.delayed to ensure UI is refreshed after the initial state update
+                Future.delayed(Duration(milliseconds: 300), () {
+                  if (mounted) {
+                    setState(() {
+                      // Just trigger another rebuild
+                      print(
+                          'Triggering second UI refresh to ensure ingredients are visible');
+                    });
+                  }
+                });
+              }
+
+              print('Food successfully modified with AI: $_foodName');
+            }
+
+            return Theme(
+              data: Theme.of(context).copyWith(
+                textSelectionTheme: TextSelectionThemeData(
+                  selectionColor: Colors.grey.withOpacity(0.3),
+                  cursorColor: Colors.black,
+                  selectionHandleColor: Colors.black,
+                ),
+              ),
+              child: Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 0,
+                backgroundColor: Colors.white,
+                insetPadding: EdgeInsets.symmetric(horizontal: 32),
+                child: Container(
+                  width: 326,
+                  height: 350, // Shorter than Add Ingredient dialog
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Title
+                            SizedBox(height: 14),
+                            Text(
+                              "Fix with AI",
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'SF Pro Display',
+                              ),
+                            ),
+
+                            // Adjusted spacing for proper vertical centering
+                            SizedBox(height: 30),
+
+                            // Bulb icon with increased size to 50x50
+                            Image.asset(
+                              'assets/images/bulb.png',
+                              width: 50.0,
+                              height: 50.0,
+                            ),
+
+                            // Adjusted spacing for proper vertical centering
+                            SizedBox(height: 30),
+
+                            // Description field
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Describe what you'd like to improve",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: 'SF Pro Display',
+                                    ),
+                                  ),
+                                  SizedBox(height: 15),
+                                  Container(
+                                    width: 280,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(25),
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 15),
+                                    child: TextField(
+                                      controller: descriptionController,
+                                      cursorColor: Colors.black,
+                                      cursorWidth: 1.2,
+                                      onChanged: (value) {
+                                        updateFormValidity();
+                                      },
+                                      style: TextStyle(
+                                        fontSize: 13.6,
+                                        fontFamily: '.SF Pro Display',
+                                        color: Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText:
+                                            "e.g. Remove sugar & reduce kcal",
+                                        hintStyle: TextStyle(
+                                          color: Colors.grey[600]!
+                                              .withOpacity(0.7),
+                                          fontSize: 13.6,
+                                          fontFamily: '.SF Pro Display',
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        contentPadding:
+                                            EdgeInsets.symmetric(vertical: 15),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Fix Now button
+                            SizedBox(height: 30),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Container(
+                                width: 280,
+                                height: 48,
+                                margin: EdgeInsets.only(bottom: 24),
+                                decoration: BoxDecoration(
+                                  color: isFormValid
+                                      ? Colors.black
+                                      : Colors.grey[400],
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                                child: TextButton(
+                                  onPressed: isFormValid ? handleSubmit : null,
+                                  style: ButtonStyle(
+                                    overlayColor: MaterialStateProperty.all(
+                                        Colors.transparent),
+                                  ),
+                                  child: const Text(
+                                    'Fix Now',
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: '.SF Pro Display',
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Close button
+                      Positioned(
+                        top: 21, // Match the position in Add Ingredient popup
+                        right: 21, // Match the position in Add Ingredient popup
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                          },
+                          child: Image.asset(
+                            'assets/images/closeicon.png',
+                            width: 19,
+                            height: 19,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Function to fix food with AI and recalculate nutrition
+  Future<Map<String, dynamic>> _fixFoodWithAI(String instructions) async {
+    // Store a local copy of the context to avoid BuildContext issues
+    BuildContext? localContext = context;
+    BuildContext? dialogContext;
+    bool isDialogShowing = false;
+
+    try {
+      print('STARTING AI fix for: $_foodName with instructions: $instructions');
+
+      // Preprocess the instructions to help identify multiple ingredients
+      String preprocessedInstructions = instructions;
+
+      // Check if the input starts with common phrases that should be removed
+      List<String> phrasesToRemove = [
+        'it also had ',
+        'it also contains ',
+        'also add ',
+        'and also ',
+        'it had ',
+        'it has ',
+        'add ',
+        'with '
+      ];
+
+      for (String phrase in phrasesToRemove) {
+        if (preprocessedInstructions.toLowerCase().startsWith(phrase)) {
+          preprocessedInstructions =
+              preprocessedInstructions.substring(phrase.length);
+          break;
+        }
+      }
+
+      // Clean up the input further to help DeepSeek recognize ingredients better
+      // Replace "and" with commas to help separate multiple ingredients
+      preprocessedInstructions =
+          preprocessedInstructions.replaceAll(' and ', ', ');
+
+      print('Preprocessed instructions: $preprocessedInstructions');
+
+      // Show loading dialog if context is still valid
+      if (mounted && localContext != null) {
+        isDialogShowing = true;
+        // Show loading indicator as a simple dialog
+        showDialog(
+          context: localContext,
+          barrierDismissible: false,
+          builder: (BuildContext ctx) {
+            dialogContext = ctx;
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Container(
+                width: 110,
+                height: 110,
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 3,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      "Calculating...",
+                      style: TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      }
+
+      // Create a description of the current food with all ingredients
+      String currentFoodDescription = "Food: $_foodName\n";
+      currentFoodDescription += "Total calories: $_calories\n";
+      currentFoodDescription += "Total protein: $_protein\n";
+      currentFoodDescription += "Total fat: $_fat\n";
+      currentFoodDescription += "Total carbs: $_carbs\n";
+      currentFoodDescription += "Ingredients:\n";
+
+      for (var ingredient in _ingredients) {
+        currentFoodDescription +=
+            "- ${ingredient['name']} (${ingredient['amount']}): ${ingredient['calories']} calories, ${ingredient['protein']}g protein, ${ingredient['fat']}g fat, ${ingredient['carbs']}g carbs\n";
+      }
+
+      // Add the specific instruction about what to fix
+      currentFoodDescription +=
+          "\nPlease analyze '$preprocessedInstructions' carefully - it may contain multiple ingredients that need to be added separately. Identify each individual ingredient, assign appropriate amounts (in grams), and update nutrition values accordingly. NEVER use phrases like 'it also had' or 'I added' in ingredient names.";
+      print("Full content for AI: $currentFoodDescription");
+
+      // DeepSeek API key
+      const String deepseekApiKey = 'sk-39f27e0e4f2346ccb047ddc658f93469';
+
+      // Format the prompt for DeepSeek AI
+      final messages = [
+        {
+          'role': 'system',
+          'content':
+              'You are a nutrition expert that can modify foods based on user instructions. You will receive a description of a food with its ingredients and total nutritional values, along with instructions to add ingredients to the food. Your task is to intelligently parse the user instructions to identify individual ingredients, add them to the food, and recalculate the nutritional values. Important: If the user mentions multiple ingredients, you MUST add each one separately.\n\nFORMATTING REQUIREMENTS:\n1. Name each ingredient clearly and simply (e.g., "Olive Oil", "Chicken") - DO NOT include phrases like "it also had" or "I added" in the ingredient name\n2. Use the same measurement units as existing ingredients (typically grams, "g")\n3. Provide realistic portions and nutritional values for each identified ingredient\n4. Format all new ingredients exactly like the existing ones\n5. Return ONLY a JSON object with all the updated information'
+        },
+        {
+          'role': 'user',
+          'content':
+              'Here is the current food information:\n\n$currentFoodDescription\n\nPlease fix this food by ADDING the following to the meal: $preprocessedInstructions\n\nImportant instructions:\n\n1. ANALYZE "$preprocessedInstructions" carefully - it may contain MULTIPLE ingredients\n2. If multiple ingredients are mentioned, add EACH ONE as a SEPARATE ingredient with its own nutritional values\n3. NEVER create a single ingredient with the full text "$preprocessedInstructions" - parse it to identify actual ingredients\n4. Use REALISTIC serving sizes for each identified ingredient (e.g., 10g olive oil, 50g chicken)\n5. Include individual macronutrients (protein, fat, carbs) for each ingredient\n6. Return a complete JSON with the food\'s name, updated calories, protein, fat, carbs, and the FULL ingredients list\n7. Name each ingredient simply (e.g., "Olive Oil" not "it also had olive oil")\n8. Make sure all values are numeric with no units in the values - only in amount fields\n9. Format the output consistently with existing ingredients'
+        }
+      ];
+
+      print('FOOD FIXER: Creating direct DeepSeek API request for fixing food');
+
+      // Call DeepSeek API directly
+      final response = await http
+          .post(
+            Uri.parse('https://api.deepseek.com/v1/chat/completions'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $deepseekApiKey',
+            },
+            body: jsonEncode({
+              'model': 'deepseek-chat',
+              'messages': messages,
+              'max_tokens': 1000,
+              'temperature': 0.5,
+              'response_format': {'type': 'json_object'},
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      print(
+          'FOOD FIXER: Received DeepSeek API response with status: ${response.statusCode}');
+
+      // Always dismiss the loading dialog once we have the API response
+      _safelyDismissDialog(dialogContext, isDialogShowing);
+
+      if (response.statusCode != 200) {
+        throw Exception(
+            'DeepSeek API error: ${response.statusCode}, ${response.body}');
+      }
+
+      // Parse the response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+      print('FOOD FIXER: DeepSeek response received, parsing content...');
+
+      // Extract the content from choices
+      if (!responseData.containsKey('choices') ||
+          responseData['choices'] is! List ||
+          (responseData['choices'] as List).isEmpty ||
+          !responseData['choices'][0].containsKey('message') ||
+          !responseData['choices'][0]['message'].containsKey('content')) {
+        throw Exception('Invalid response format from DeepSeek API');
+      }
+
+      final content = responseData['choices'][0]['message']['content'];
+      print('FOOD FIXER: Raw DeepSeek AI response content: $content');
+
+      Map<String, dynamic> modifiedFood = {};
+
+      try {
+        // Parse the JSON content
+        modifiedFood = jsonDecode(content);
+        print(
+            'FOOD FIXER: Parsed modified food data: ${modifiedFood.toString()}');
+
+        // Handle case sensitivity in keys - DeepSeek sometimes returns keys with capital letters
+        // Check for capitalized keys and normalize them to lowercase
+        if (modifiedFood.containsKey('Ingredients') &&
+            !modifiedFood.containsKey('ingredients')) {
+          print('FOOD FIXER: Found capitalized "Ingredients" key, normalizing');
+          modifiedFood['ingredients'] = modifiedFood.remove('Ingredients');
+        }
+
+        if (modifiedFood.containsKey('Name') &&
+            !modifiedFood.containsKey('name')) {
+          modifiedFood['name'] = modifiedFood.remove('Name');
+        }
+
+        if (modifiedFood.containsKey('Calories') &&
+            !modifiedFood.containsKey('calories')) {
+          modifiedFood['calories'] = modifiedFood.remove('Calories');
+        }
+
+        if (modifiedFood.containsKey('Protein') &&
+            !modifiedFood.containsKey('protein')) {
+          modifiedFood['protein'] = modifiedFood.remove('Protein');
+        }
+
+        if (modifiedFood.containsKey('Fat') &&
+            !modifiedFood.containsKey('fat')) {
+          modifiedFood['fat'] = modifiedFood.remove('Fat');
+        }
+
+        if (modifiedFood.containsKey('Carbs') &&
+            !modifiedFood.containsKey('carbs')) {
+          modifiedFood['carbs'] = modifiedFood.remove('Carbs');
+        }
+
+        // Verify that required fields exist
+        if (!modifiedFood.containsKey('ingredients') ||
+            modifiedFood['ingredients'] is! List) {
+          print(
+              'FOOD FIXER: WARNING - Missing ingredients list in AI response!');
+        } else {
+          print(
+              'FOOD FIXER: Found ${(modifiedFood['ingredients'] as List).length} ingredients in AI response');
+        }
+
+        return modifiedFood;
+      } catch (e) {
+        print('FOOD FIXER: Error parsing modified food JSON: $e');
+
+        // Try to extract JSON using regex if parsing fails
+        final jsonRegex = RegExp(r'\{[\s\S]*?\}');
+        final jsonMatch = jsonRegex.firstMatch(content);
+        if (jsonMatch != null) {
+          try {
+            modifiedFood = jsonDecode(jsonMatch.group(0)!);
+            print('FOOD FIXER: Extracted modified food data using regex');
+            return modifiedFood;
+          } catch (e) {
+            print('FOOD FIXER: Error parsing extracted JSON: $e');
+          }
+        }
+      }
+
+      // If we got here, something went wrong with parsing
+      throw Exception(
+          'Could not parse modified food data from DeepSeek response');
+    } catch (e) {
+      print('FOOD FIXER error: $e');
+
+      // Safely dismiss the loading dialog if it's showing
+      _safelyDismissDialog(dialogContext, isDialogShowing);
+
+      // Return an error result
+      return {
+        'error': true,
+        'message': 'Failed to modify food with AI: $e',
+      };
+    }
   }
 }
