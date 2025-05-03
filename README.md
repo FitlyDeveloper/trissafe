@@ -1,94 +1,100 @@
-# Fitness App with Food Analysis API
+# DeepSeek Nutrition Service
 
-A secure implementation of a food analysis API for use with the Fitness App. This repository contains the API server code that handles secure processing of food images using OpenAI's Vision API.
+A dedicated service for handling DeepSeek AI API calls for nutrition analysis, ingredient calculation, and food modification.
 
-## Overview
+## Features
 
-This is a clean implementation for deploying to Render.com, which avoids the limitations of Firebase Functions while maintaining security of API keys.
+- Specialized endpoints for different nutrition operations
+- Error handling and fallback mechanisms
+- Response normalization
+- Proper JSON validation and extraction
 
-## Getting Started
+## Setup
 
-### Prerequisites
+1. Install dependencies:
+```
+npm install
+```
 
-- Node.js v18 or higher
-- An OpenAI API key with access to GPT-4 Vision (gpt-4o model)
+2. Create a `.env` file with the following content:
+```
+DEEPSEEK_API_KEY=your_deepseek_api_key
+PORT=3000
+```
 
-### Local Development
+3. Run locally:
+```
+npm run dev
+```
 
-1. Clone this repository
-2. Navigate to the api-server directory
-3. Install dependencies:
-   ```
-   npm install
-   ```
-4. Create a `.env` file from the example:
-   ```
-   cp .env.example .env
-   ```
-5. Add your OpenAI API key to the `.env` file
-6. Start the development server:
-   ```
-   npm run dev
-   ```
+## API Endpoints
 
-The server will start on port 3000 by default.
+### Health Check
+```
+GET /
+```
+
+### General Analysis
+```
+POST /api/analyze
+```
+Body:
+```json
+{
+  "prompt": "Your instruction to DeepSeek AI",
+  "operation_type": "general"
+}
+```
+
+### Nutrition Calculation
+```
+POST /api/nutrition
+```
+Body:
+```json
+{
+  "food_name": "Apple",
+  "serving_size": "100g"
+}
+```
+
+### Food Modification
+```
+POST /api/fix-food
+```
+Body:
+```json
+{
+  "food_name": "Pasta dish",
+  "current_data": {
+    "calories": "450",
+    "protein": "15",
+    "fat": "12",
+    "carbs": "65",
+    "ingredients": [
+      {
+        "name": "Pasta",
+        "amount": "200g",
+        "calories": 300,
+        "protein": 10,
+        "fat": 2,
+        "carbs": 60
+      },
+      {
+        "name": "Olive Oil",
+        "amount": "15ml",
+        "calories": 120,
+        "protein": 0,
+        "fat": 14,
+        "carbs": 0
+      }
+    ]
+  },
+  "instructions": "Remove the olive oil",
+  "operation_type": "REMOVE_INGREDIENT"
+}
+```
 
 ## Deployment
 
-This server is designed to be deployed to Render.com:
-
-1. Push this repository to GitHub
-2. Create a new Web Service on Render.com
-3. Connect your GitHub repository
-4. Configure the build settings:
-   - Build Command: `cd api-server && npm install`
-   - Start Command: `cd api-server && npm start`
-5. Add the necessary environment variables:
-   - `OPENAI_API_KEY`: Your OpenAI API key
-   - `ALLOWED_ORIGINS`: Comma-separated list of allowed origins
-   - `RATE_LIMIT`: Request limits per minute (default: 30)
-   - `DEBUG_MODE`: Enable debug logging (true/false)
-
-## API Usage
-
-### Analyze Food Image
-
-**Endpoint:** `POST /api/analyze-food`
-
-**Request Body:**
-```json
-{
-  "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA..."
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "meal": [
-      {
-        "dish": "Chicken Salad",
-        "calories": 350,
-        "macronutrients": {
-          "protein": 25,
-          "carbohydrates": 15,
-          "fat": 20
-        },
-        "ingredients": ["chicken", "lettuce", "tomato", "avocado"]
-      }
-    ]
-  }
-}
-```
-
-## Security Considerations
-
-- The OpenAI API key is stored securely on the server and never exposed to clients
-- CORS protection ensures only authorized origins can access the API
-- Rate limiting prevents abuse of the API
-
-## License
-
-MIT
+This service is designed to be deployed to Render.com.
