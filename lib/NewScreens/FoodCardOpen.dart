@@ -6397,12 +6397,14 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               Navigator.pop(context);
 
               // Call the AI to fix the food using the callback approach
-              _fixFoodWithAI(description, (Map<String, dynamic> modifiedFoodData) {
+              _fixFoodWithAI(description,
+                  (Map<String, dynamic> modifiedFoodData) {
                 // Debug print entire response
                 print('AI RESPONSE DATA: ${modifiedFoodData.toString()}');
 
                 // Handle any potentially capitalized keys that weren't normalized in _fixFoodWithAI
-                Map<String, dynamic> normalizedData = Map.from(modifiedFoodData);
+                Map<String, dynamic> normalizedData =
+                    Map.from(modifiedFoodData);
 
                 // Check for capitalized field names and normalize them
                 if (normalizedData.containsKey('Ingredients') &&
@@ -6420,7 +6422,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                 if (normalizedData.containsKey('Calories') &&
                     !normalizedData.containsKey('calories')) {
-                  normalizedData['calories'] = normalizedData.remove('Calories');
+                  normalizedData['calories'] =
+                      normalizedData.remove('Calories');
                 }
 
                 if (normalizedData.containsKey('Protein') &&
@@ -6490,7 +6493,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     if (normalizedData.containsKey('carbs')) {
                       _carbs = normalizedData['carbs'].toString();
                     }
-                    
+
                     // Rest of the function remains unchanged
                     // ... existing code ...
                   });
@@ -6672,12 +6675,13 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   }
 
   // Function to fix food with AI and recalculate nutrition
-  Future<void> _fixFoodWithAI(String instructions, Function(Map<String, dynamic>) callback) async {
+  Future<void> _fixFoodWithAI(
+      String instructions, Function(Map<String, dynamic>) callback) async {
     // Store a local copy of the context to avoid BuildContext issues
     BuildContext? localContext = context;
     BuildContext? dialogContext;
     bool isDialogShowing = false;
-    
+
     try {
       print('STARTING AI fix for: $_foodName with instructions: $instructions');
 
@@ -6851,14 +6855,15 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               );
             }
           });
-          
-          // Use callback instead of throwing an exception
-          return {
+
+          // Call the callback with the error
+          callback({
             'error': true,
-            'message': 'The food modification service timed out. Please try again later.'
-          };
-          
-          // Then throw an exception to prevent further execution
+            'message':
+                'The food modification service timed out. Please try again later.'
+          });
+
+          // Then throw an exception to prevent further execution - no return needed
           throw Exception('Request timed out');
         });
 
@@ -6873,10 +6878,12 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           final Map<String, dynamic> responseData = jsonDecode(response.body);
 
           // Check if responseData has a data field (our new API format)
-          if (responseData.containsKey('data') && responseData['success'] == true) {
+          if (responseData.containsKey('data') &&
+              responseData['success'] == true) {
             // New API format - use callback instead of return
             callback(responseData['data']);
-          } else if (responseData.containsKey('success') && responseData['success'] == true) {
+          } else if (responseData.containsKey('success') &&
+              responseData['success'] == true) {
             // Legacy format - use callback instead of return
             callback(responseData);
           } else {
@@ -6891,8 +6898,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   builder: (BuildContext context) {
                     return AlertDialog(
                       title: const Text('Service Error'),
-                      content: Text(
-                          responseData['error'] ?? 'An unknown error occurred. Please try again.'),
+                      content: Text(responseData['error'] ??
+                          'An unknown error occurred. Please try again.'),
                       actions: [
                         TextButton(
                           child: const Text('OK'),
@@ -6910,11 +6917,13 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             // Use callback instead of return
             callback({
               'error': true,
-              'message': 'The food modification service returned an error. Please try again later.'
+              'message':
+                  'The food modification service returned an error. Please try again later.'
             });
           }
         } else {
-          print('FOOD FIXER: HTTP error: ${response.statusCode}, ${response.body}');
+          print(
+              'FOOD FIXER: HTTP error: ${response.statusCode}, ${response.body}');
 
           // Safely show error dialog without navigating away
           if (mounted) {
@@ -6943,7 +6952,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           // Use callback instead of return
           callback({
             'error': true,
-            'message': 'The food modification service returned an error. Please try again later.'
+            'message':
+                'The food modification service returned an error. Please try again later.'
           });
         }
       } catch (networkError) {
@@ -6956,7 +6966,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           // Use callback instead of return
           callback({
             'error': true,
-            'message': 'The food modification service is currently unavailable. Please try again later.',
+            'message':
+                'The food modification service is currently unavailable. Please try again later.',
           });
         }
       }
@@ -6973,3 +6984,4 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       });
     }
   }
+}
