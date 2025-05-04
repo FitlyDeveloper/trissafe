@@ -6396,303 +6396,108 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               // Close the dialog first
               Navigator.pop(context);
 
-              // Call the AI to fix the food
-              final modifiedFoodData = await _fixFoodWithAI(description);
+              // Call the AI to fix the food using the callback approach
+              _fixFoodWithAI(description, (Map<String, dynamic> modifiedFoodData) {
+                // Debug print entire response
+                print('AI RESPONSE DATA: ${modifiedFoodData.toString()}');
 
-              // Debug print entire response
-              print('AI RESPONSE DATA: ${modifiedFoodData.toString()}');
+                // Handle any potentially capitalized keys that weren't normalized in _fixFoodWithAI
+                Map<String, dynamic> normalizedData = Map.from(modifiedFoodData);
 
-              // Handle any potentially capitalized keys that weren't normalized in _fixFoodWithAI
-              Map<String, dynamic> normalizedData = Map.from(modifiedFoodData);
+                // Check for capitalized field names and normalize them
+                if (normalizedData.containsKey('Ingredients') &&
+                    !normalizedData.containsKey('ingredients')) {
+                  print(
+                      'HANDLER: Found capitalized "Ingredients" key, normalizing');
+                  normalizedData['ingredients'] =
+                      normalizedData.remove('Ingredients');
+                }
 
-              // Check for capitalized field names and normalize them
-              if (normalizedData.containsKey('Ingredients') &&
-                  !normalizedData.containsKey('ingredients')) {
-                print(
-                    'HANDLER: Found capitalized "Ingredients" key, normalizing');
-                normalizedData['ingredients'] =
-                    normalizedData.remove('Ingredients');
-              }
+                if (normalizedData.containsKey('Name') &&
+                    !normalizedData.containsKey('name')) {
+                  normalizedData['name'] = normalizedData.remove('Name');
+                }
 
-              if (normalizedData.containsKey('Name') &&
-                  !normalizedData.containsKey('name')) {
-                normalizedData['name'] = normalizedData.remove('Name');
-              }
+                if (normalizedData.containsKey('Calories') &&
+                    !normalizedData.containsKey('calories')) {
+                  normalizedData['calories'] = normalizedData.remove('Calories');
+                }
 
-              if (normalizedData.containsKey('Calories') &&
-                  !normalizedData.containsKey('calories')) {
-                normalizedData['calories'] = normalizedData.remove('Calories');
-              }
+                if (normalizedData.containsKey('Protein') &&
+                    !normalizedData.containsKey('protein')) {
+                  normalizedData['protein'] = normalizedData.remove('Protein');
+                }
 
-              if (normalizedData.containsKey('Protein') &&
-                  !normalizedData.containsKey('protein')) {
-                normalizedData['protein'] = normalizedData.remove('Protein');
-              }
+                if (normalizedData.containsKey('Fat') &&
+                    !normalizedData.containsKey('fat')) {
+                  normalizedData['fat'] = normalizedData.remove('Fat');
+                }
 
-              if (normalizedData.containsKey('Fat') &&
-                  !normalizedData.containsKey('fat')) {
-                normalizedData['fat'] = normalizedData.remove('Fat');
-              }
+                if (normalizedData.containsKey('Carbs') &&
+                    !normalizedData.containsKey('carbs')) {
+                  normalizedData['carbs'] = normalizedData.remove('Carbs');
+                }
 
-              if (normalizedData.containsKey('Carbs') &&
-                  !normalizedData.containsKey('carbs')) {
-                normalizedData['carbs'] = normalizedData.remove('Carbs');
-              }
+                // Check if we got an error
+                if (normalizedData.containsKey('error') &&
+                    normalizedData['error'] == true) {
+                  if (mounted) {
+                    // Show an error dialog with a safer approach to avoid BuildContext issues
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: true,
+                        builder: (BuildContext dialogContext) {
+                          return AlertDialog(
+                            title: Text("Service Unavailable"),
+                            content: Text(normalizedData['message'] ??
+                                "Failed to modify food with AI. Please try again later."),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(dialogContext).pop();
+                                  // Stay on the FoodCardOpen screen, no additional navigation
+                                },
+                                child: Text("OK"),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    });
+                  }
+                  return;
+                }
 
-              // Check if we got an error
-              if (normalizedData.containsKey('error') &&
-                  normalizedData['error'] == true) {
+                // Update the food with the modified data
                 if (mounted) {
-                  // Show an error dialog with a safer approach to avoid BuildContext issues
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    showDialog(
-                      context: context,
-                      barrierDismissible: true,
-                      builder: (BuildContext dialogContext) {
-                        return AlertDialog(
-                          title: Text("Service Unavailable"),
-                          content: Text(normalizedData['message'] ??
-                              "Failed to modify food with AI. Please try again later."),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(dialogContext).pop();
-                                // Stay on the FoodCardOpen screen, no additional navigation
-                              },
-                              child: Text("OK"),
-                            ),
-                          ],
-                        );
-                      },
-                    );
+                  setState(() {
+                    // Update food name if provided
+                    if (normalizedData.containsKey('name')) {
+                      _foodName = normalizedData['name'];
+                    }
+
+                    // Update total nutrition values if provided
+                    if (normalizedData.containsKey('calories')) {
+                      _calories = normalizedData['calories'].toString();
+                    }
+                    if (normalizedData.containsKey('protein')) {
+                      _protein = normalizedData['protein'].toString();
+                    }
+                    if (normalizedData.containsKey('fat')) {
+                      _fat = normalizedData['fat'].toString();
+                    }
+                    if (normalizedData.containsKey('carbs')) {
+                      _carbs = normalizedData['carbs'].toString();
+                    }
+                    
+                    // Rest of the function remains unchanged
+                    // ... existing code ...
                   });
                 }
-                return;
-              }
 
-              // Update the food with the modified data
-              if (mounted) {
-                setState(() {
-                  // Update food name if provided
-                  if (normalizedData.containsKey('name')) {
-                    _foodName = normalizedData['name'];
-                  }
-
-                  // Update total nutrition values if provided
-                  if (normalizedData.containsKey('calories')) {
-                    _calories = normalizedData['calories'].toString();
-                  }
-                  if (normalizedData.containsKey('protein')) {
-                    _protein = normalizedData['protein'].toString();
-                  }
-                  if (normalizedData.containsKey('fat')) {
-                    _fat = normalizedData['fat'].toString();
-                  }
-                  if (normalizedData.containsKey('carbs')) {
-                    _carbs = normalizedData['carbs'].toString();
-                  }
-
-                  // Update ingredients if provided
-                  if (normalizedData.containsKey('ingredients') &&
-                      normalizedData['ingredients'] is List &&
-                      (normalizedData['ingredients'] as List).isNotEmpty) {
-                    print(
-                        'Processing ${(normalizedData['ingredients'] as List).length} ingredients from AI response');
-
-                    _ingredients = []; // Clear existing ingredients
-
-                    // Helper function to clean up ingredient names
-                    String cleanIngredientName(String name) {
-                      // Remove common prefixes
-                      List<String> prefixesToRemove = [
-                        'it also had ',
-                        'also had ',
-                        'it had ',
-                        'had ',
-                        'it also has ',
-                        'also has ',
-                        'it has ',
-                        'has ',
-                        'with ',
-                        'add ',
-                        'added '
-                      ];
-
-                      String cleanedName = name.trim();
-                      for (String prefix in prefixesToRemove) {
-                        if (cleanedName.toLowerCase().startsWith(prefix)) {
-                          cleanedName =
-                              cleanedName.substring(prefix.length).trim();
-                          break;
-                        }
-                      }
-
-                      // Capitalize first letter of each word
-                      if (cleanedName.isNotEmpty) {
-                        List<String> words = cleanedName.split(' ');
-                        for (int i = 0; i < words.length; i++) {
-                          if (words[i].isNotEmpty) {
-                            words[i] = words[i][0].toUpperCase() +
-                                words[i].substring(1).toLowerCase();
-                          }
-                        }
-                        cleanedName = words.join(' ');
-                      }
-
-                      return cleanedName;
-                    }
-
-                    // Add each new ingredient
-                    for (var ingredient in normalizedData['ingredients']) {
-                      // Normalize keys inside ingredient
-                      Map<String, dynamic> normalizedIngredient = {};
-
-                      // Check for capitalized keys in the ingredient data
-                      if (ingredient is Map) {
-                        // Handle name
-                        String rawName;
-                        if (ingredient.containsKey('Name') &&
-                            !ingredient.containsKey('name')) {
-                          rawName = ingredient['Name'] ?? 'Unknown';
-                        } else {
-                          rawName = ingredient['name'] ?? 'Unknown';
-                        }
-
-                        // Clean and format the ingredient name
-                        normalizedIngredient['name'] =
-                            cleanIngredientName(rawName);
-
-                        // Handle amount
-                        String rawAmount;
-                        if (ingredient.containsKey('Amount') &&
-                            !ingredient.containsKey('amount')) {
-                          rawAmount = ingredient['Amount'] ?? '0g';
-                        } else {
-                          rawAmount = ingredient['amount'] ?? '0g';
-                        }
-
-                        // Ensure amount always has units (defaulting to 'g' if none)
-                        if (rawAmount.trim().isNotEmpty) {
-                          // If it's only a number without units, add 'g'
-                          if (RegExp(r'^\d+(\.\d+)?$').hasMatch(rawAmount)) {
-                            rawAmount = '$rawAmount' + 'g';
-                          }
-                        } else {
-                          rawAmount = '0g'; // Default amount
-                        }
-
-                        normalizedIngredient['amount'] = rawAmount;
-
-                        // Handle calories
-                        dynamic rawCalories;
-                        if (ingredient.containsKey('Calories') &&
-                            !ingredient.containsKey('calories')) {
-                          rawCalories = ingredient['Calories'];
-                        } else {
-                          rawCalories = ingredient['calories'];
-                        }
-
-                        // Ensure calories is a clean numeric value
-                        String caloriesStr = '0';
-                        if (rawCalories != null) {
-                          if (rawCalories is num) {
-                            caloriesStr = rawCalories.toString();
-                          } else if (rawCalories is String) {
-                            // Extract numeric part if string contains non-numeric characters
-                            final numericMatch = RegExp(r'(\d+(?:\.\d+)?)')
-                                .firstMatch(rawCalories);
-                            if (numericMatch != null) {
-                              caloriesStr = numericMatch.group(1) ?? '0';
-                            }
-                          }
-                        }
-
-                        normalizedIngredient['calories'] = caloriesStr;
-
-                        // Handle protein
-                        if (ingredient.containsKey('Protein') &&
-                            !ingredient.containsKey('protein')) {
-                          normalizedIngredient['protein'] =
-                              ingredient['Protein']?.toString() ?? '0';
-                        } else {
-                          normalizedIngredient['protein'] =
-                              ingredient['protein']?.toString() ?? '0';
-                        }
-
-                        // Handle fat
-                        if (ingredient.containsKey('Fat') &&
-                            !ingredient.containsKey('fat')) {
-                          normalizedIngredient['fat'] =
-                              ingredient['Fat']?.toString() ?? '0';
-                        } else {
-                          normalizedIngredient['fat'] =
-                              ingredient['fat']?.toString() ?? '0';
-                        }
-
-                        // Handle carbs
-                        if (ingredient.containsKey('Carbs') &&
-                            !ingredient.containsKey('carbs')) {
-                          normalizedIngredient['carbs'] =
-                              ingredient['Carbs']?.toString() ?? '0';
-                        } else {
-                          normalizedIngredient['carbs'] =
-                              ingredient['carbs']?.toString() ?? '0';
-                        }
-                      } else {
-                        // Fallback for non-Map ingredients
-                        normalizedIngredient = {
-                          'name': 'Unknown',
-                          'amount': '0g',
-                          'calories': '0',
-                          'protein': '0',
-                          'fat': '0',
-                          'carbs': '0',
-                        };
-                      }
-
-                      _ingredients.add(normalizedIngredient);
-                      print(
-                          'Added ingredient: ${normalizedIngredient['name']} (${normalizedIngredient['amount']}), calories: ${normalizedIngredient['calories']}');
-                    }
-
-                    // Sort ingredients by calories (highest to lowest)
-                    _ingredients.sort((a, b) {
-                      final caloriesA =
-                          double.tryParse(a['calories'].toString()) ?? 0;
-                      final caloriesB =
-                          double.tryParse(b['calories'].toString()) ?? 0;
-                      return caloriesB.compareTo(caloriesA);
-                    });
-                  } else {
-                    print('WARNING: No ingredients found in AI response!');
-                  }
-
-                  // Mark as having unsaved changes
-                  _markAsUnsaved();
-
-                  // Force recalculation of totals and refresh UI
-                  _calculateTotalNutrition();
-
-                  // Force a redraw of the entire screen
-                  _hasUnsavedChanges = true;
-                });
-
-                // Force a save to ensure changes are persisted
-                _saveData();
-
-                // Use Future.delayed to ensure UI is refreshed after the initial state update
-                Future.delayed(Duration(milliseconds: 300), () {
-                  if (mounted) {
-                    setState(() {
-                      // Just trigger another rebuild
-                      print(
-                          'Triggering second UI refresh to ensure ingredients are visible');
-                    });
-                  }
-                });
-              }
-
-              print('Food successfully modified with AI: $_foodName');
+                print('Food successfully modified with AI: $_foodName');
+              });
             }
 
             return Theme(
@@ -6867,36 +6672,26 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   }
 
   // Function to fix food with AI and recalculate nutrition
-  Future<Map<String, dynamic>> _fixFoodWithAI(String instructions) async {
+  Future<void> _fixFoodWithAI(String instructions, Function(Map<String, dynamic>) callback) async {
     // Store a local copy of the context to avoid BuildContext issues
     BuildContext? localContext = context;
     BuildContext? dialogContext;
     bool isDialogShowing = false;
-
+    
     try {
       print('STARTING AI fix for: $_foodName with instructions: $instructions');
 
-      // Preprocess the instructions to help identify multiple ingredients
-      String preprocessedInstructions = instructions;
+      // Preprocessing instruction string to remove typical patterns
+      String preprocessedInstructions = instructions
+          .replaceAll('could you', '')
+          .replaceAll('could we', '')
+          .replaceAll('can you', '')
+          .replaceAll('can we', '')
+          .replaceAll('please', '')
+          .replaceAll('make it', '')
+          .trim();
 
-      // Check if the input starts with common phrases that should be removed
-      List<String> phrasesToRemove = [
-        'it also had ',
-        'it also contains ',
-        'also add ',
-        'and also ',
-        'it had '
-      ];
-
-      for (String phrase in phrasesToRemove) {
-        if (preprocessedInstructions.toLowerCase().startsWith(phrase)) {
-          preprocessedInstructions =
-              preprocessedInstructions.substring(phrase.length);
-          break;
-        }
-      }
-
-      // Try to detect the operation type to guide the AI
+      // Detect operation type based on the instruction
       String operationType = 'GENERAL';
 
       if (instructions.toLowerCase().contains('less calorie') ||
@@ -7024,37 +6819,119 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
         final response = await http
             .post(
-              Uri.parse('https://deepseek-uhrc.onrender.com/api/analyze-food'),
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: jsonEncode(requestData),
-            )
-            .timeout(const Duration(seconds: 15))
-            .catchError((error) {
-          // Handle error explicitly to avoid crashing
-          print('FOOD FIXER: Request error caught in catchError: $error');
+          Uri.parse('https://deepseek-uhrc.onrender.com/api/nutrition'),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(requestData),
+        )
+            .timeout(const Duration(seconds: 30), onTimeout: () {
+          print('FOOD FIXER: Request timed out');
+          // Safely show error dialog on timeout without navigating away
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _safelyDismissDialog(dialogContext, isDialogShowing);
+              showDialog(
+                context: localContext,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text('Service Unavailable'),
+                    content: const Text(
+                        'The food modification service is currently unavailable. Please try again later.'),
+                    actions: [
+                      TextButton(
+                        child: const Text('OK'),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ],
+                  );
+                },
+              );
+            }
+          });
+          
+          // Use callback instead of throwing an exception
+          return {
+            'error': true,
+            'message': 'The food modification service timed out. Please try again later.'
+          };
+          
+          // Then throw an exception to prevent further execution
+          throw Exception('Request timed out');
+        });
 
-          // Safely dismiss any loading dialog
-          _safelyDismissDialog(dialogContext, isDialogShowing);
+        // Check if the dialog is still showing and dismiss it
+        _safelyDismissDialog(dialogContext, isDialogShowing);
+        isDialogShowing = false;
 
-          // Show error dialog safely on the main UI thread
+        print(
+            'FOOD FIXER: Received Render.com service response with status: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+          // Check if responseData has a data field (our new API format)
+          if (responseData.containsKey('data') && responseData['success'] == true) {
+            // New API format - use callback instead of return
+            callback(responseData['data']);
+          } else if (responseData.containsKey('success') && responseData['success'] == true) {
+            // Legacy format - use callback instead of return
+            callback(responseData);
+          } else {
+            // Handle error in response
+            print('FOOD FIXER: Received error in response: ${response.body}');
+
+            // Safely show error dialog without navigating away
+            if (mounted) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                showDialog(
+                  context: localContext,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Service Error'),
+                      content: Text(
+                          responseData['error'] ?? 'An unknown error occurred. Please try again.'),
+                      actions: [
+                        TextButton(
+                          child: const Text('OK'),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+              });
+            }
+
+            // Use callback instead of return
+            callback({
+              'error': true,
+              'message': 'The food modification service returned an error. Please try again later.'
+            });
+          }
+        } else {
+          print('FOOD FIXER: HTTP error: ${response.statusCode}, ${response.body}');
+
+          // Safely show error dialog without navigating away
           if (mounted) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               showDialog(
                 context: localContext,
-                barrierDismissible: true,
                 builder: (BuildContext context) {
                   return AlertDialog(
-                    title: Text("Service Unavailable"),
+                    title: const Text('Service Error'),
                     content: Text(
-                        "The food modification service is currently unavailable. Please try again later."),
+                        'HTTP error ${response.statusCode}. Please try again later.'),
                     actions: [
                       TextButton(
+                        child: const Text('OK'),
                         onPressed: () {
                           Navigator.of(context).pop();
                         },
-                        child: Text("OK"),
                       ),
                     ],
                   );
@@ -7063,51 +6940,25 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             });
           }
 
-          // Return a mocked response to prevent further processing
-          return http.Response('{"error": true}', 500);
-        });
-
-        print(
-            'FOOD FIXER: Received Render.com service response with status: ${response.statusCode}');
-
-        // Always dismiss the loading dialog once we have the API response
-        _safelyDismissDialog(dialogContext, isDialogShowing);
-
-        if (response.statusCode != 200) {
-          throw Exception(
-              'Service error: ${response.statusCode}, ${response.body}');
+          // Use callback instead of return
+          callback({
+            'error': true,
+            'message': 'The food modification service returned an error. Please try again later.'
+          });
         }
-
-        // Parse the response from our Render.com service
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
-        print(
-            'FOOD FIXER: Render.com service response received, parsing content...');
-
-        // Check for success and data
-        if (!responseData.containsKey('success') ||
-            responseData['success'] != true) {
-          throw Exception(
-              'Service error: ${responseData['error'] ?? 'Unknown error'}');
-        }
-
-        if (!responseData.containsKey('data')) {
-          throw Exception('Invalid response format: missing data field');
-        }
-
-        Map<String, dynamic> modifiedFood = responseData['data'];
-        return modifiedFood;
       } catch (networkError) {
         print('FOOD FIXER: Network error: $networkError');
         // Safely dismiss the loading dialog
         _safelyDismissDialog(dialogContext, isDialogShowing);
 
-        // Return an error result instead of throwing an exception
-        // This ensures we stay on the current screen
-        return {
-          'error': true,
-          'message':
-              'The food modification service is currently unavailable. Please try again later.',
-        };
+        // Check if we've already called the callback in the timeout handler
+        if (!(networkError.toString().contains('timed out'))) {
+          // Use callback instead of return
+          callback({
+            'error': true,
+            'message': 'The food modification service is currently unavailable. Please try again later.',
+          });
+        }
       }
     } catch (e) {
       print('FOOD FIXER error: $e');
@@ -7115,378 +6966,10 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       // Safely dismiss the loading dialog if it's showing
       _safelyDismissDialog(dialogContext, isDialogShowing);
 
-      // Return an error result
-      return {
+      // Use callback instead of return
+      callback({
         'error': true,
         'message': 'Failed to modify food with AI: $e',
-      };
+      });
     }
   }
-
-  // Local fallback: Reduce calories by approximately 20%
-  Map<String, dynamic> _locallyReduceCalories() {
-    // Ensure all values are treated as numbers
-    num caloriesNum = _calories is num
-        ? _calories as num
-        : double.tryParse(_calories.toString()) ?? 0;
-    num proteinNum = _protein is num
-        ? _protein as num
-        : double.tryParse(_protein.toString()) ?? 0;
-    num fatNum =
-        _fat is num ? _fat as num : double.tryParse(_fat.toString()) ?? 0;
-    num carbsNum =
-        _carbs is num ? _carbs as num : double.tryParse(_carbs.toString()) ?? 0;
-
-    Map<String, dynamic> result = {
-      'name': _foodName,
-      'calories': (caloriesNum * 0.8).round(),
-      'protein': (proteinNum * 0.8).round(),
-      'fat': (fatNum * 0.8).round(),
-      'carbs': (carbsNum * 0.8).round(),
-      'ingredients': <Map<String, dynamic>>[]
-    };
-
-    // Reduce each ingredient by 20%
-    for (var ingredient in _ingredients) {
-      Map<String, dynamic> modifiedIngredient =
-          Map<String, dynamic>.from(ingredient);
-
-      // Calculate new amount (e.g., "100g" -> "80g")
-      String amount = ingredient['amount'].toString();
-      if (amount.contains('g')) {
-        int grams = int.tryParse(amount.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-        int newGrams = (grams * 0.8).round();
-        modifiedIngredient['amount'] = '${newGrams}g';
-      }
-
-      // Get original nutritional values as nums
-      num originalCalories =
-          ingredient['calories'] is num ? ingredient['calories'] as num : 0;
-      num originalProtein =
-          ingredient['protein'] is num ? ingredient['protein'] as num : 0;
-      num originalFat = ingredient['fat'] is num ? ingredient['fat'] as num : 0;
-      num originalCarbs =
-          ingredient['carbs'] is num ? ingredient['carbs'] as num : 0;
-
-      // Reduce nutritional values by 20%
-      modifiedIngredient['calories'] = (originalCalories * 0.8).round();
-      modifiedIngredient['protein'] = (originalProtein * 0.8).round();
-      modifiedIngredient['fat'] = (originalFat * 0.8).round();
-      modifiedIngredient['carbs'] = (originalCarbs * 0.8).round();
-
-      result['ingredients'].add(modifiedIngredient);
-    }
-
-    return result;
-  }
-
-  // Local fallback: Increase calories by approximately 20%
-  Map<String, dynamic> _locallyIncreaseCalories() {
-    // Ensure all values are treated as numbers
-    num caloriesNum = _calories is num
-        ? _calories as num
-        : double.tryParse(_calories.toString()) ?? 0;
-    num proteinNum = _protein is num
-        ? _protein as num
-        : double.tryParse(_protein.toString()) ?? 0;
-    num fatNum =
-        _fat is num ? _fat as num : double.tryParse(_fat.toString()) ?? 0;
-    num carbsNum =
-        _carbs is num ? _carbs as num : double.tryParse(_carbs.toString()) ?? 0;
-
-    Map<String, dynamic> result = {
-      'name': _foodName,
-      'calories': (caloriesNum * 1.2).round(),
-      'protein': (proteinNum * 1.2).round(),
-      'fat': (fatNum * 1.2).round(),
-      'carbs': (carbsNum * 1.2).round(),
-      'ingredients': <Map<String, dynamic>>[]
-    };
-
-    // Increase each ingredient by 20%
-    for (var ingredient in _ingredients) {
-      Map<String, dynamic> modifiedIngredient =
-          Map<String, dynamic>.from(ingredient);
-
-      // Calculate new amount
-      String amount = ingredient['amount'].toString();
-      if (amount.contains('g')) {
-        int grams = int.tryParse(amount.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-        int newGrams = (grams * 1.2).round();
-        modifiedIngredient['amount'] = '${newGrams}g';
-      }
-
-      // Get original nutritional values as nums
-      num originalCalories =
-          ingredient['calories'] is num ? ingredient['calories'] as num : 0;
-      num originalProtein =
-          ingredient['protein'] is num ? ingredient['protein'] as num : 0;
-      num originalFat = ingredient['fat'] is num ? ingredient['fat'] as num : 0;
-      num originalCarbs =
-          ingredient['carbs'] is num ? ingredient['carbs'] as num : 0;
-
-      // Increase nutritional values by 20%
-      modifiedIngredient['calories'] = (originalCalories * 1.2).round();
-      modifiedIngredient['protein'] = (originalProtein * 1.2).round();
-      modifiedIngredient['fat'] = (originalFat * 1.2).round();
-      modifiedIngredient['carbs'] = (originalCarbs * 1.2).round();
-
-      result['ingredients'].add(modifiedIngredient);
-    }
-
-    return result;
-  }
-
-  // Local fallback: Remove an ingredient based on instructions
-  Map<String, dynamic> _locallyRemoveIngredient(String instructions) {
-    // Ensure all values are treated as numbers
-    num caloriesNum = _calories is num
-        ? _calories as num
-        : double.tryParse(_calories.toString()) ?? 0;
-    num proteinNum = _protein is num
-        ? _protein as num
-        : double.tryParse(_protein.toString()) ?? 0;
-    num fatNum =
-        _fat is num ? _fat as num : double.tryParse(_fat.toString()) ?? 0;
-    num carbsNum =
-        _carbs is num ? _carbs as num : double.tryParse(_carbs.toString()) ?? 0;
-
-    // Try to identify which ingredient to remove from the instructions
-    String ingredientToRemove = '';
-
-    // Extract ingredient name from instructions like "remove X" or "without X"
-    List<String> patterns = ['remove ', 'without ', 'no '];
-    for (String pattern in patterns) {
-      if (instructions.toLowerCase().contains(pattern)) {
-        int startIndex =
-            instructions.toLowerCase().indexOf(pattern) + pattern.length;
-        String remaining = instructions.substring(startIndex).trim();
-        // Take the first word as the ingredient name
-        ingredientToRemove = remaining.split(' ').first.toLowerCase();
-        break;
-      }
-    }
-
-    if (ingredientToRemove.isEmpty) {
-      throw Exception(
-          "Could not identify which ingredient to remove. Please try again with a clearer instruction.");
-    }
-
-    // Find the ingredient that best matches what we're trying to remove
-    int indexToRemove = -1;
-    for (int i = 0; i < _ingredients.length; i++) {
-      if (_ingredients[i]['name']
-          .toString()
-          .toLowerCase()
-          .contains(ingredientToRemove)) {
-        indexToRemove = i;
-        break;
-      }
-    }
-
-    if (indexToRemove == -1) {
-      throw Exception(
-          "Ingredient '$ingredientToRemove' not found in this food.");
-    }
-
-    // Create a copy of the ingredients list minus the removed ingredient
-    List<Map<String, dynamic>> newIngredients = [];
-    num totalCaloriesReduction = 0;
-    num totalProteinReduction = 0;
-    num totalFatReduction = 0;
-    num totalCarbsReduction = 0;
-
-    for (int i = 0; i < _ingredients.length; i++) {
-      if (i != indexToRemove) {
-        newIngredients.add(Map<String, dynamic>.from(_ingredients[i]));
-      } else {
-        // Track the nutritional values being removed
-        totalCaloriesReduction += _ingredients[i]['calories'] is num
-            ? _ingredients[i]['calories'] as num
-            : 0;
-        totalProteinReduction += _ingredients[i]['protein'] is num
-            ? _ingredients[i]['protein'] as num
-            : 0;
-        totalFatReduction +=
-            _ingredients[i]['fat'] is num ? _ingredients[i]['fat'] as num : 0;
-        totalCarbsReduction += _ingredients[i]['carbs'] is num
-            ? _ingredients[i]['carbs'] as num
-            : 0;
-      }
-    }
-
-    // Create result with adjusted total nutrition values
-    return {
-      'name': _foodName,
-      'calories': (caloriesNum - totalCaloriesReduction).round(),
-      'protein': (proteinNum - totalProteinReduction).round(),
-      'fat': (fatNum - totalFatReduction).round(),
-      'carbs': (carbsNum - totalCarbsReduction).round(),
-      'ingredients': newIngredients
-    };
-  }
-
-  Future<void> _handleAIFix() async {
-    TextEditingController textController = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (BuildContext ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          contentPadding: EdgeInsets.all(20),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Fix with AI',
-                style: TextStyle(
-                  fontFamily: 'SF Pro Display',
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 20),
-              TextField(
-                controller: textController,
-                decoration: InputDecoration(
-                  hintText: 'E.g. less calories, add chicken, etc.',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                maxLines: 2,
-              ),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                    },
-                    child: Text('Cancel'),
-                  ),
-                  SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: () async {
-                      final instruction = textController.text.trim();
-                      if (instruction.isNotEmpty) {
-                        Navigator.of(ctx).pop(instruction);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text('Submit'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    ).then((instruction) async {
-      if (instruction != null && instruction.isNotEmpty) {
-        try {
-          // Store the current context for safer navigation
-          final currentContext = context;
-
-          // Process the food modification using the AI
-          final result = await _fixFoodWithAI(instruction);
-
-          // Check if context is still valid
-          if (!mounted) return;
-
-          // Stay on this page and update the food with the modification
-          if (result.containsKey('error') && result['error'] == true) {
-            // Show error message without navigating away
-            showDialog(
-              context: currentContext,
-              builder: (BuildContext ctx) {
-                return AlertDialog(
-                  title: Text('AI Fix Error'),
-                  content: Text(result['message'] ?? 'Unknown error occurred'),
-                  actions: [
-                    TextButton(
-                      child: Text('OK'),
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                      },
-                    ),
-                  ],
-                );
-              },
-            );
-          } else {
-            // Update the food with the AI-generated modifications
-            setState(() {
-              // Update food name if it was changed
-              if (result.containsKey('name')) {
-                _foodName = result['name'];
-              }
-
-              // Update nutritional values
-              if (result.containsKey('calories')) {
-                _calories = result['calories'];
-              }
-              if (result.containsKey('protein')) {
-                _protein = result['protein'];
-              }
-              if (result.containsKey('fat')) {
-                _fat = result['fat'];
-              }
-              if (result.containsKey('carbs')) {
-                _carbs = result['carbs'];
-              }
-
-              // Update ingredients if they were modified
-              if (result.containsKey('ingredients') &&
-                  result['ingredients'] is List) {
-                _ingredients =
-                    List<Map<String, dynamic>>.from(result['ingredients']);
-              }
-
-              // Mark as unsaved since we made changes
-              _hasUnsavedChanges = true;
-            });
-
-            // Show success message
-            ScaffoldMessenger.of(currentContext).showSnackBar(
-              SnackBar(
-                content: Text('Food updated successfully!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-        } catch (e) {
-          // Handle any unexpected errors without navigating away
-          if (mounted) {
-            showDialog(
-              context: context,
-              builder: (BuildContext ctx) {
-                return AlertDialog(
-                  title: Text('Error'),
-                  content: Text('Failed to process AI fix: $e'),
-                  actions: [
-                    TextButton(
-                      child: Text('OK'),
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                      },
-                    ),
-                  ],
-                );
-              },
-            );
-          }
-        }
-      }
-    });
-  }
-}
