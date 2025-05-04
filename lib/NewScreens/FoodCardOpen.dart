@@ -1551,14 +1551,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                                                       'Updated food_cards list, removed deleted meal');
                                                 }
 
-                                                // Navigate back to main screen
+                                                // Navigate back to main screen with pop
+                                                // Correct the navigation: Just pop to the previous screen without redirecting to CodiaPage
                                                 Navigator.of(context).pop();
-                                                Navigator.pushReplacement(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          CodiaPage()),
-                                                );
                                               });
                                             },
                                           ),
@@ -1888,26 +1883,40 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       print(
           'FOOD ANALYZER: Creating direct DeepSeek API request for "$foodName" ($servingSize)');
 
-      // DeepSeek API key specific to FoodCardOpen
-      const String deepseekApiKey = 'sk-39f27e0e4f2346ccb047ddc658f93469';
+      // Use Render.com API endpoint instead of direct DeepSeek API
+      // Instead of using hardcoded API key, we'll use the Render.com API which has the API key
+      const String apiEndpoint = 'https://deepseek-uhrc.onrender.com';
 
-      // Call DeepSeek API directly (bypass Firebase)
+      // Store a local copy of the context to handle potential errors safely
+      final BuildContext? localDialogContext = dialogContext;
+      final BuildContext localContext = context;
+
+      // Call API endpoint that proxies to DeepSeek
       final response = await http
           .post(
-            Uri.parse('https://api.deepseek.com/v1/chat/completions'),
+            Uri.parse(apiEndpoint),
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer $deepseekApiKey',
             },
             body: jsonEncode({
-              'model': 'deepseek-chat',
               'messages': messages,
-              'max_tokens': 500,
-              'temperature': 0.5,
-              'response_format': {'type': 'json_object'},
+              'food_name': foodName,
+              'serving_size': servingSize,
+              'operation_type': 'NUTRITION_CALCULATION'
             }),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 30))
+          .catchError((error) {
+        print('FOOD ANALYZER: Request error caught in catchError: $error');
+
+        // Safely dismiss any loading dialog
+        if (localDialogContext != null) {
+          _safelyDismissDialog(localDialogContext, true);
+        }
+
+        // For caught errors, return a mock response to be handled gracefully
+        return http.Response('{"error": true}', 500);
+      });
 
       print(
           'FOOD ANALYZER: Received DeepSeek API response with status: ${response.statusCode}');
@@ -1918,64 +1927,44 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       }
 
       if (response.statusCode != 200) {
-        throw Exception(
-            'DeepSeek API error: ${response.statusCode}, ${response.body}');
+        throw Exception('API error: ${response.statusCode}, ${response.body}');
       }
 
       // Parse the response
       final Map<String, dynamic> responseData = jsonDecode(response.body);
       print(
-          'FOOD ANALYZER: DeepSeek response: ${responseData.toString().substring(0, min(200, responseData.toString().length))}...');
+          'FOOD ANALYZER: API response: ${responseData.toString().substring(0, min(200, responseData.toString().length))}...');
 
-      // Extract the content from choices
-      if (!responseData.containsKey('choices') ||
-          responseData['choices'] is! List ||
-          (responseData['choices'] as List).isEmpty ||
-          !responseData['choices'][0].containsKey('message') ||
-          !responseData['choices'][0]['message'].containsKey('content')) {
-        throw Exception('Invalid response format from DeepSeek API');
+      // Check if the response contains an error
+      if (responseData.containsKey('error') && responseData['error'] == true) {
+        throw Exception(
+            'API error: ${responseData['message'] ?? 'Unknown error'}');
       }
 
-      final content = responseData['choices'][0]['message']['content'];
+      // Extract the content from the response
       Map<String, dynamic> nutrition = {};
 
-      try {
-        // Parse the JSON content
-        nutrition = jsonDecode(content);
-        print('FOOD ANALYZER: Parsed nutrition data: $nutrition');
-
-        // Check if the model identified this as an invalid food or serving size
-        if (nutrition.containsKey('invalid_food') &&
-            nutrition['invalid_food'] == true) {
-          print(
-              'FOOD ANALYZER: Invalid food name or serving size detected: $foodName ($servingSize)');
-          return {'invalid_food': true};
-        }
-      } catch (e) {
-        print('FOOD ANALYZER: Error parsing nutrition JSON: $e');
-
-        // Try to extract JSON using regex if parsing fails
-        final jsonRegex = RegExp(r'\{[\s\S]*?\}');
-        final jsonMatch = jsonRegex.firstMatch(content);
-        if (jsonMatch != null) {
-          try {
-            nutrition = jsonDecode(jsonMatch.group(0)!);
-            print('FOOD ANALYZER: Extracted nutrition data: $nutrition');
-
-            // Check if the extracted JSON identifies this as an invalid food or serving size
-            if (nutrition.containsKey('invalid_food') &&
-                nutrition['invalid_food'] == true) {
-              print(
-                  'FOOD ANALYZER: Invalid food name or serving size detected: $foodName ($servingSize)');
-              return {'invalid_food': true};
-            }
-          } catch (e) {
-            print('FOOD ANALYZER: Error parsing extracted JSON: $e');
-          }
-        }
+      if (responseData.containsKey('data')) {
+        nutrition = responseData['data'] is Map
+            ? Map<String, dynamic>.from(responseData['data'])
+            : {};
+      } else if (responseData.containsKey('nutrition')) {
+        nutrition = responseData['nutrition'] is Map
+            ? Map<String, dynamic>.from(responseData['nutrition'])
+            : {};
+      } else {
+        // Try to find nutrition data in the response
+        nutrition = responseData;
       }
 
-      // Return standardized nutrition values with fallbacks
+      // Check if the model identified this as an invalid food or serving size
+      if (nutrition.containsKey('invalid_food') &&
+          nutrition['invalid_food'] == true) {
+        print(
+            'FOOD ANALYZER: Invalid food name or serving size detected: $foodName ($servingSize)');
+        return {'invalid_food': true};
+      }
+
       return {
         'calories':
             _extractNumericValue(nutrition, ['calories', 'kcal', 'energy']),
@@ -2203,7 +2192,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       // Call our Render.com DeepSeek service
       final response = await http
           .post(
-            Uri.parse('https://deepseek-uhrc.onrender.com/api/nutrition'),
+            Uri.parse('https://deepseek-uhrc.onrender.com'),
             headers: {
               'Content-Type': 'application/json',
             },
@@ -6453,25 +6442,29 @@ class _FoodCardOpenState extends State<FoodCardOpen>
               if (normalizedData.containsKey('error') &&
                   normalizedData['error'] == true) {
                 if (mounted) {
-                  // Show an error dialog
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: Text("Error"),
-                        content: Text(
-                            "Failed to modify food with AI. Please try again with different instructions."),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: Text("OK"),
-                          ),
-                        ],
-                      );
-                    },
-                  );
+                  // Show an error dialog with a safer approach to avoid BuildContext issues
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: true,
+                      builder: (BuildContext dialogContext) {
+                        return AlertDialog(
+                          title: Text("Service Unavailable"),
+                          content: Text(normalizedData['message'] ??
+                              "Failed to modify food with AI. Please try again later."),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                                // Stay on the FoodCardOpen screen, no additional navigation
+                              },
+                              child: Text("OK"),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  });
                 }
                 return;
               }
@@ -6482,25 +6475,20 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   // Update food name if provided
                   if (normalizedData.containsKey('name')) {
                     _foodName = normalizedData['name'];
-                    print('Updated food name to: $_foodName');
                   }
 
                   // Update total nutrition values if provided
                   if (normalizedData.containsKey('calories')) {
                     _calories = normalizedData['calories'].toString();
-                    print('Updated calories to: $_calories');
                   }
                   if (normalizedData.containsKey('protein')) {
                     _protein = normalizedData['protein'].toString();
-                    print('Updated protein to: $_protein');
                   }
                   if (normalizedData.containsKey('fat')) {
                     _fat = normalizedData['fat'].toString();
-                    print('Updated fat to: $_fat');
                   }
                   if (normalizedData.containsKey('carbs')) {
                     _carbs = normalizedData['carbs'].toString();
-                    print('Updated carbs to: $_carbs');
                   }
 
                   // Update ingredients if provided
@@ -7029,15 +7017,54 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         // Attempt to call the Render.com DeepSeek service
         print(
             'FOOD FIXER: Creating request to Render.com DeepSeek service for fixing food');
+
+        // Store a local copy of the context to avoid issues
+        final BuildContext localContext = context;
+
         final response = await http
             .post(
-              Uri.parse('https://deepseek-uhrc.onrender.com/api/fix-food'),
+              Uri.parse('https://deepseek-uhrc.onrender.com'),
               headers: {
                 'Content-Type': 'application/json',
               },
               body: jsonEncode(requestData),
             )
-            .timeout(const Duration(seconds: 15));
+            .timeout(const Duration(seconds: 15))
+            .catchError((error) {
+          // Handle error explicitly to avoid crashing
+          print('FOOD FIXER: Request error caught in catchError: $error');
+
+          // Safely dismiss any loading dialog
+          _safelyDismissDialog(dialogContext, isDialogShowing);
+
+          // Show error dialog safely on the main UI thread
+          if (mounted) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              showDialog(
+                context: localContext,
+                barrierDismissible: true,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: Text("Service Unavailable"),
+                    content: Text(
+                        "The food modification service is currently unavailable. Please try again later."),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Text("OK"),
+                      ),
+                    ],
+                  );
+                },
+              );
+            });
+          }
+
+          // Return a mocked response to prevent further processing
+          return http.Response('{"error": true}', 500);
+        });
 
         print(
             'FOOD FIXER: Received Render.com service response with status: ${response.statusCode}');
@@ -7073,31 +7100,13 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         // Safely dismiss the loading dialog
         _safelyDismissDialog(dialogContext, isDialogShowing);
 
-        // FALLBACK: Since the online service is not available, perform a local modification
-        // This provides some functionality even when the API is not working
-        Map<String, dynamic> localModification = {};
-
-        // Basic local modifications based on operation type
-        if (operationType == 'REDUCE_CALORIES') {
-          // Reduce calories by modifying ingredient amounts
-          localModification = _locallyReduceCalories();
-        } else if (operationType == 'INCREASE_CALORIES') {
-          // Increase calories
-          localModification = _locallyIncreaseCalories();
-        } else if (operationType == 'REMOVE_INGREDIENT') {
-          // Try to identify and remove an ingredient
-          localModification = _locallyRemoveIngredient(instructions);
-        } else if (operationType == 'ADD_INGREDIENT') {
-          // If user wants to add an ingredient, we can't do that locally
-          throw Exception(
-              "Adding ingredients requires the AI service. Please try again later.");
-        } else {
-          // For other operations, return a helpful error
-          throw Exception(
-              "The food modification service is currently unavailable. Please try again later.");
-        }
-
-        return localModification;
+        // Return an error result instead of throwing an exception
+        // This ensures we stay on the current screen
+        return {
+          'error': true,
+          'message':
+              'The food modification service is currently unavailable. Please try again later.',
+        };
       }
     } catch (e) {
       print('FOOD FIXER error: $e');
