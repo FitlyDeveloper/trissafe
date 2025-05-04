@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'ExerciseInfo.dart';
 import '../services/favorites_service.dart';
-import 'LogWeightLifting.dart';
+import '../Screens/WeightLiftingActive.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CodiaPage extends StatefulWidget {
   CodiaPage({super.key});
@@ -32,10 +33,29 @@ class _CodiaPage extends State<CodiaPage> {
   }
 
   Future<void> _loadFavorites() async {
-    final favorites = await FavoritesService.getFavorites();
+    final prefs = await SharedPreferences.getInstance();
+    final favoriteKeys = prefs.getKeys().where((key) => key.startsWith('favorite_'));
     setState(() {
-      _favorites = favorites;
+      _favorites = favoriteKeys.where((key) {
+        final isFavorite = prefs.getBool(key) ?? false;
+        return isFavorite;
+      }).map((key) {
+        final name = key.replaceFirst('favorite_', '');
+        final exercise = exercises.firstWhere((ex) => ex.name == name);
+        return {
+          'name': exercise.name,
+          'muscle': exercise.muscle,
+        };
+      }).toList();
     });
+  }
+
+  void _toggleFavorite(Exercise exercise) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'favorite_${exercise.name}';
+    final isFavorite = prefs.getBool(key) ?? false;
+    await prefs.setBool(key, !isFavorite);
+    _loadFavorites();
   }
 
   @override
@@ -512,7 +532,9 @@ class _CodiaPage extends State<CodiaPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => WeightLiftingActive(),
+                            builder: (context) => WeightLiftingActive(
+                              selectedExercises: _selectedIndices.map((i) => displayedExercises[i]).toList(),
+                            ),
                           ),
                         );
                       },

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ExerciseInfo extends StatefulWidget {
   final String exerciseName;
@@ -15,6 +16,29 @@ class ExerciseInfo extends StatefulWidget {
 }
 
 class _ExerciseInfoState extends State<ExerciseInfo> {
+  bool isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavoriteState();
+  }
+
+  Future<void> _loadFavoriteState() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      isFavorite = prefs.getBool('favorite_${widget.exerciseName}') ?? false;
+    });
+  }
+
+  Future<void> _toggleFavorite() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      isFavorite = !isFavorite;
+    });
+    await prefs.setBool('favorite_${widget.exerciseName}', isFavorite);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,33 +57,123 @@ class _ExerciseInfoState extends State<ExerciseInfo> {
               children: [
                 // Header with back button and title
                 Padding(
-                  padding: const EdgeInsets.only(left: 29, right: 29, top: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 29).copyWith(top: 16, bottom: 8.5),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.arrow_back, size: 24),
+                        icon: const Icon(Icons.arrow_back, color: Colors.black, size: 24),
                         onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: BoxConstraints(),
                       ),
-                      Expanded(
-                        child: Text(
-                          widget.exerciseName,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      Text(
+                        widget.exerciseName,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'SF Pro Display',
+                          color: Colors.black,
+                          decoration: TextDecoration.none,
                         ),
                       ),
-                      IconButton(
-                        icon: Icon(Icons.bookmark_border, size: 24),
-                        onPressed: () {},
-                      ),
+                      SizedBox(width: 24),
                     ],
                   ),
                 ),
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 29),
+                  height: 1,
+                  color: Color(0xFFBDBDBD),
+                ),
+                SizedBox(height: 10), // Updated from 24 to 10
+                // Exercise Info Box
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 31, vertical: 8),
+                  child: Container(
+                    width: 331,
+                    height: 62,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(25),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x14000000),
+                          offset: Offset(0, 3),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(width: 13),
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: Image.asset(
+                              'assets/images/dumbbell.png',
+                              width: 24,
+                              height: 24,
+                              color: Colors.grey[700],
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.exerciseName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.normal,
+                                  fontSize: 15,
+                                  color: Colors.black,
+                                  fontFamily: 'SFProDisplay-Regular',
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                              Text(
+                                widget.muscle,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0x7f000000),
+                                  fontFamily: 'SFProDisplay-Regular',
+                                  fontWeight: FontWeight.normal,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: _toggleFavorite,
+                          child: Image.asset(
+                            isFavorite ? 'assets/images/bookmarkfilled.png' : 'assets/images/bookmark.png',
+                            width: 20,
+                            height: 20,
+                            color: isFavorite ? Color(0xFFFFC300) : Colors.black,
+                          ),
+                        ),
+                        SizedBox(width: 13),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: 24), // Updated from 16 to 24
 
                 // Weight and date info
                 Padding(
-                  padding: const EdgeInsets.only(left: 29, right: 29, top: 24),
+                  padding: const EdgeInsets.only(left: 29, right: 29, top: 14),
                   child: Row(
                     children: [
                       Text(
@@ -177,30 +291,33 @@ class _ExerciseInfoState extends State<ExerciseInfo> {
                   ),
                 ),
 
-                // Personal Records
+                // Personal Records title
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 29, vertical: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  padding: const EdgeInsets.only(left: 29, right: 29, top: 24, bottom: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        children: [
-                          Image.asset(
-                            'assets/images/weekstreak.png',
-                            width: 24,
-                            height: 24,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Personal Records',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                      Image.asset(
+                        'assets/images/weekstreak.png',
+                        width: 24,
+                        height: 24,
                       ),
-                      SizedBox(height: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'Personal Records',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Personal Records entries
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 29),
+                  child: Column(
+                    children: [
                       _buildRecord('Heaviest Weight:', '90kg'),
                       Divider(height: 24, thickness: 0.5, color: Color(0xFFEEEEEE)),
                       _buildRecord('Best 1RM:', '92.5kg'),
@@ -209,50 +326,49 @@ class _ExerciseInfoState extends State<ExerciseInfo> {
                     ],
                   ),
                 ),
-
+                // Set Records title
+                Padding(
+                  padding: const EdgeInsets.only(left: 29, right: 29, top: 32, bottom: 12),
+                  child: Text(
+                    'Set Records',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                // Set Records table header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 29),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Reps',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Spacer(),
+                      Text(
+                        'Personal Best',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ],
+                  ),
+                ),
                 // Set Records
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 29),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Set Records',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 1,
-                              child: Text(
-                                'Reps',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Text(
-                                'Personal Best',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                       _buildSetRecordRow('1', '90kg'),
                       Divider(height: 24, thickness: 0.5, color: Color(0xFFEEEEEE)),
                       _buildSetRecordRow('2', '80kg'),
@@ -318,8 +434,8 @@ class _ExerciseInfoState extends State<ExerciseInfo> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Expanded(
-            flex: 1,
+          SizedBox(
+            width: 40,
             child: Text(
               reps,
               style: TextStyle(
@@ -328,10 +444,12 @@ class _ExerciseInfoState extends State<ExerciseInfo> {
               ),
             ),
           ),
-          Expanded(
-            flex: 2,
+          Spacer(),
+          SizedBox(
+            width: 80,
             child: Text(
               weight,
+              textAlign: TextAlign.right,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,

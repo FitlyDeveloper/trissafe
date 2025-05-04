@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'AddRoutine.dart';
-import 'StartWorkout.dart';
+import '../NewScreens/AddExercise.dart';
+import '../NewScreens/AddRoutine.dart';
+import '../NewScreens/StartWorkout.dart';
 
-class WeightLiftingActive extends StatefulWidget {
-  const WeightLiftingActive({Key? key}) : super(key: key);
+class WeightLifting extends StatefulWidget {
+  const WeightLifting({Key? key}) : super(key: key);
 
   @override
-  State<WeightLiftingActive> createState() => _WeightLiftingState();
+  State<WeightLifting> createState() => _WeightLiftingState();
 }
 
-class _WeightLiftingState extends State<WeightLiftingActive> {
+class _WeightLiftingState extends State<WeightLifting> {
   bool _isRoutineExpanded = false;
 
   @override

@@ -3,7 +3,7 @@ import 'package:grouped_list/grouped_list.dart';
 import '../Features/codia/codia_page.dart';
 import 'LogRunning.dart';
 import 'LogDescribeExercise.dart';
-import 'weightliftingactive.dart';
+import '../Screens/WeightLiftingActive.dart';
 
 class ChooseWorkout extends StatefulWidget {
   const ChooseWorkout({Key? key}) : super(key: key);
@@ -84,7 +84,7 @@ class _ChooseWorkoutState extends State<ChooseWorkout> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const WeightLiftingActive(),
+                                builder: (context) => WeightLiftingActive(selectedExercises: const []),
                               ),
                             );
                           },
