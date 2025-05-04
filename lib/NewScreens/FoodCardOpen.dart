@@ -1885,7 +1885,8 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
       // Use Render.com API endpoint instead of direct DeepSeek API
       // Instead of using hardcoded API key, we'll use the Render.com API which has the API key
-      const String apiEndpoint = 'https://deepseek-uhrc.onrender.com';
+      const String apiEndpoint =
+          'https://deepseek-uhrc.onrender.com/api/analyze-food';
 
       // Store a local copy of the context to handle potential errors safely
       final BuildContext? localDialogContext = dialogContext;
@@ -2192,7 +2193,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
       // Call our Render.com DeepSeek service
       final response = await http
           .post(
-            Uri.parse('https://deepseek-uhrc.onrender.com'),
+            Uri.parse('https://deepseek-uhrc.onrender.com/api/analyze-food'),
             headers: {
               'Content-Type': 'application/json',
             },
@@ -7023,7 +7024,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
         final response = await http
             .post(
-              Uri.parse('https://deepseek-uhrc.onrender.com'),
+              Uri.parse('https://deepseek-uhrc.onrender.com/api/analyze-food'),
               headers: {
                 'Content-Type': 'application/json',
               },
