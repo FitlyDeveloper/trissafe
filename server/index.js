@@ -108,7 +108,10 @@ app.post('/api/fix-food', async (req, res) => {
     try {
       const parsedContent = JSON.parse(resultContent);
       console.log('Successfully parsed JSON response');
-      res.json(parsedContent);
+      res.json({
+        success: true,
+        data: parsedContent
+      });
     } catch (parseError) {
       console.error('Error parsing JSON from DeepSeek:', parseError);
       // Try to extract JSON from the text if possible
@@ -117,18 +120,21 @@ app.post('/api/fix-food', async (req, res) => {
         try {
           const extractedJson = JSON.parse(jsonMatch[0]);
           console.log('Extracted JSON from response text');
-          res.json(extractedJson);
+          res.json({
+            success: true,
+            data: extractedJson
+          });
         } catch (e) {
           res.status(500).json({
-            error: true,
-            message: `Error parsing JSON from response: ${parseError.message}`,
+            success: false,
+            error: `Error parsing JSON from response: ${parseError.message}`,
             rawContent: resultContent
           });
         }
       } else {
         res.status(500).json({
-          error: true,
-          message: `Error parsing JSON from response: ${parseError.message}`,
+          success: false,
+          error: `Error parsing JSON from response: ${parseError.message}`,
           rawContent: resultContent
         });
       }
@@ -140,8 +146,8 @@ app.post('/api/fix-food', async (req, res) => {
       console.error('Response status:', error.response.status);
     }
     res.status(500).json({
-      error: true,
-      message: `Error processing request: ${error.message}`,
+      success: false,
+      error: `Error processing request: ${error.message}`,
       details: error.response ? error.response.data : null
     });
   }
@@ -150,7 +156,7 @@ app.post('/api/fix-food', async (req, res) => {
 // API endpoint for nutrition calculation
 app.post('/api/nutrition', async (req, res) => {
   try {
-    const { food_name, serving_size, query, request_type } = req.body;
+    const { food_name, serving_size, query, request_type, current_data, operation_type, instructions } = req.body;
     
     console.log('Received nutrition request:', JSON.stringify(req.body, null, 2));
     
@@ -162,18 +168,70 @@ app.post('/api/nutrition', async (req, res) => {
     if (serving_size) {
       prompt += `\nServing size: ${serving_size}`;
     }
-    if (query) {
-      prompt += `\nQuery: ${query}`;
-    }
     
-    prompt += "\n\nPlease provide a valid JSON response with the following structure:";
-    prompt += `
+    // Handle complex food modification requests (compatibility with Flutter app)
+    if (current_data) {
+      prompt = "Analyze and modify the following food based on instructions:\n\n";
+      
+      prompt += `Food: ${food_name || 'Unknown'}\n`;
+      
+      if (current_data.calories) prompt += `Total calories: ${current_data.calories}\n`;
+      if (current_data.protein) prompt += `Total protein: ${current_data.protein}\n`;
+      if (current_data.fat) prompt += `Total fat: ${current_data.fat}\n`;
+      if (current_data.carbs) prompt += `Total carbs: ${current_data.carbs}\n`;
+      
+      if (current_data.ingredients && Array.isArray(current_data.ingredients)) {
+        prompt += "Ingredients:\n";
+        current_data.ingredients.forEach(ingredient => {
+          prompt += `- ${ingredient.name} (${ingredient.amount}): ${ingredient.calories} calories, ${ingredient.protein}g protein, ${ingredient.fat}g fat, ${ingredient.carbs}g carbs\n`;
+        });
+      }
+      
+      prompt += `\nInstruction: ${instructions || 'Analyze and improve this food'}\n`;
+      if (operation_type) {
+        prompt += `Operation type: ${operation_type}\n`;
+      }
+      
+      prompt += "\nPlease respond with a valid JSON object using this structure:";
+      prompt += `
+{
+  "name": "Updated Food Name",
+  "calories": 123,
+  "protein": 30,
+  "fat": 5,
+  "carbs": 20,
+  "ingredients": [
+    {
+      "name": "Ingredient 1",
+      "amount": "100g",
+      "calories": 100,
+      "protein": 10,
+      "fat": 2,
+      "carbs": 5
+    },
+    {
+      "name": "Ingredient 2",
+      "amount": "50g",
+      "calories": 50,
+      "protein": 5,
+      "fat": 1,
+      "carbs": 3
+    }
+  ]
+}`;
+    }
+    else if (query) {
+      prompt += `\nQuery: ${query}`;
+      
+      prompt += "\n\nPlease provide a valid JSON response with the following structure:";
+      prompt += `
 {
   "calories": 250,
   "protein": 20,
   "fat": 10, 
   "carbs": 15
 }`;
+    }
     
     console.log('Sending prompt to DeepSeek API:', prompt);
     
@@ -210,7 +268,10 @@ app.post('/api/nutrition', async (req, res) => {
     try {
       const parsedContent = JSON.parse(resultContent);
       console.log('Successfully parsed JSON response');
-      res.json(parsedContent);
+      res.json({
+        success: true,
+        data: parsedContent
+      });
     } catch (parseError) {
       console.error('Error parsing JSON from DeepSeek:', parseError);
       // Try to extract JSON from the text if possible
@@ -219,18 +280,21 @@ app.post('/api/nutrition', async (req, res) => {
         try {
           const extractedJson = JSON.parse(jsonMatch[0]);
           console.log('Extracted JSON from response text');
-          res.json(extractedJson);
+          res.json({
+            success: true,
+            data: extractedJson
+          });
         } catch (e) {
           res.status(500).json({
-            error: true,
-            message: `Error parsing JSON from response: ${parseError.message}`,
+            success: false,
+            error: `Error parsing JSON from response: ${parseError.message}`,
             rawContent: resultContent
           });
         }
       } else {
         res.status(500).json({
-          error: true,
-          message: `Error parsing JSON from response: ${parseError.message}`,
+          success: false,
+          error: `Error parsing JSON from response: ${parseError.message}`,
           rawContent: resultContent
         });
       }
@@ -242,8 +306,8 @@ app.post('/api/nutrition', async (req, res) => {
       console.error('Response status:', error.response.status);
     }
     res.status(500).json({
-      error: true,
-      message: `Error processing request: ${error.message}`,
+      success: false,
+      error: `Error processing request: ${error.message}`,
       details: error.response ? error.response.data : null
     });
   }
