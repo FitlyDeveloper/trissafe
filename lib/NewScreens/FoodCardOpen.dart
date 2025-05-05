@@ -4374,16 +4374,16 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                       // Close button
                       Positioned(
-                        top: 21, // Move up by 2px more (from 23 to 21)
-                        right: 21, // Keep adjusted position
+                        top: 26, // Adjusted from 32 to 26 to align with the "Fix Manually" title
+                        right: 20,
                         child: GestureDetector(
                           onTap: () {
                             Navigator.pop(context);
                           },
                           child: Image.asset(
                             'assets/images/closeicon.png',
-                            width: 19, // Update to 19x19
-                            height: 19, // Update to 19x19
+                            width: 19,
+                            height: 19,
                           ),
                         ),
                       ),
@@ -4700,7 +4700,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                   // Close button
                   Positioned(
-                    top: 32, // Move up by 2px more (from 34 to 32)
+                    top: 26, // Adjusted from 32 to 26 to align with the "Fix Manually" title
                     right: 20,
                     child: GestureDetector(
                       onTap: () {
@@ -6158,7 +6158,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 setState(() {
                   // NEVER update the food name regardless of what the API returns
                   // This preserves the original name when using Fix with AI
-                  
+
                   // Update total nutrition values if provided
                   if (normalizedData.containsKey('calories')) {
                     _calories = normalizedData['calories'].toString();
