@@ -1200,6 +1200,22 @@ class _CodiaPageState extends State<CodiaPage> {
                               decoration: TextDecoration.none,
                             ),
                           ),
+                          SizedBox(width: 24.2),
+                          Image.asset(
+                            'assets/images/carbicon.png',
+                            width: 14,
+                            height: 14,
+                          ),
+                          SizedBox(width: 7.7),
+                          Text(
+                            '${carbs}g',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.normal,
+                              color: Colors.black,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -2109,7 +2125,7 @@ class _CodiaPageState extends State<CodiaPage> {
                     child: Row(
                       children: [
                         Container(
-                          width: (streakCount > 0) ? (280.0 / 7.0) * streakCount.toDouble() : 0.0, // Calculate exact width based on button width (280px)
+                          width: (280.0 / 7.0) * streakCount.toDouble(), // Calculate exact width based on button width (280px / 7 days)
                           height: 10.0,
                           decoration: BoxDecoration(
                             color: Color(0xFFFF9801),
