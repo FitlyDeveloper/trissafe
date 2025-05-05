@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'ExerciseInfo.dart';
 import '../services/favorites_service.dart';
-import '../Screens/WeightLiftingActive.dart';
+import '../WorkoutSession/WeightLiftingActive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CodiaPage extends StatefulWidget {
