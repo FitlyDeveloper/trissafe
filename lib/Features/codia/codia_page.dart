@@ -28,6 +28,7 @@ class _CodiaPageState extends State<CodiaPage> {
   int remainingCalories = 0; // Add this to track remaining calories
   bool isImperial = false; // Track metric/imperial setting
   double originalGoalSpeed = 0.0; // Track original goal speed for logs
+  int streakCount = 0; // Track user's streak count
 
   // User data variables - will be populated from saved answers
   String userGender = 'Female'; // Default values, will be overridden
@@ -850,9 +851,15 @@ class _CodiaPageState extends State<CodiaPage> {
       cards.sort(
           (a, b) => (b['timestamp'] as int).compareTo(a['timestamp'] as int));
 
+      // Update streak count if we have food cards
       setState(() {
         _foodCards = cards;
         _isLoadingFoodCards = false;
+        
+        // Update streak count if we have food cards
+        if (cards.isNotEmpty) {
+          streakCount = 1; // Set streak to 1 if any food images are uploaded
+        }
       });
 
       print("Loaded ${cards.length} food cards");
@@ -1193,22 +1200,6 @@ class _CodiaPageState extends State<CodiaPage> {
                               decoration: TextDecoration.none,
                             ),
                           ),
-                          SizedBox(width: 24.2),
-                          Image.asset(
-                            'assets/images/carbicon.png',
-                            width: 14,
-                            height: 14,
-                          ),
-                          SizedBox(width: 7.7),
-                          Text(
-                            '${carbs}g',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.normal,
-                              color: Colors.black,
-                              decoration: TextDecoration.none,
-                            ),
-                          ),
                         ],
                       ),
                     ],
@@ -1333,29 +1324,8 @@ class _CodiaPageState extends State<CodiaPage> {
                       // Streak icon with count
                       GestureDetector(
                         onTap: () async {
-                          // Debug helper - dump SharedPreferences data to console
-                          final prefs = await SharedPreferences.getInstance();
-                          print(
-                              '\n========== DEBUG: PREFERENCES DUMP ==========');
-                          print('Keys: ${prefs.getKeys()}');
-                          for (String key in prefs.getKeys()) {
-                            try {
-                              var value;
-                              if (prefs.getString(key) != null)
-                                value = prefs.getString(key);
-                              else if (prefs.getDouble(key) != null)
-                                value = prefs.getDouble(key);
-                              else if (prefs.getInt(key) != null)
-                                value = prefs.getInt(key);
-                              else if (prefs.getBool(key) != null)
-                                value = prefs.getBool(key);
-                              print('$key: $value');
-                            } catch (e) {
-                              print('Error reading $key: $e');
-                            }
-                          }
-                            print(
-                                '==========================================\n');
+                          // Show streak popup
+                          _showStreakPopup();
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1379,10 +1349,11 @@ class _CodiaPageState extends State<CodiaPage> {
                                 'assets/images/streak0.png',
                                 width: 19.4,
                                 height: 19.4,
+                                color: streakCount > 0 ? Color(0xFFFF9801) : null, // Orange for active streak
                               ),
                               const SizedBox(width: 4),
-                              const Text(
-                                '0',
+                              Text(
+                                streakCount > 0 ? '1' : '0',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
@@ -2069,6 +2040,144 @@ class _CodiaPageState extends State<CodiaPage> {
         'Test data set - Male, 66kg, 6\'1" (185cm), born 2009, lose weight at 0.5kg/week');
 
     print('====================================================\n');
+  }
+
+  void _showStreakPopup() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          insetPadding: EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            width: 326, // Exactly 326px as specified
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(height: 35), // Increased for more vertical space
+                
+                // Streak icon - 175x175 as specified
+                Image.asset(
+                  'assets/images/streak0.png',
+                  width: 175,
+                  height: 175,
+                  color: streakCount > 0 ? Color(0xFFFF9801) : null, // Orange color for active streak
+                ),
+                
+                SizedBox(height: 20),
+                
+                // Streak count text - changes based on streak
+                Text(
+                  streakCount > 0 ? "1 Day Streak" : "0 Day Streak",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: streakCount > 0 ? Color(0xFFFF9801) : Color(0xFFD9D9D9),
+                    fontFamily: 'SF Pro Display',
+                  ),
+                ),
+                
+                SizedBox(height: 20),
+                
+                // Level 1 text and progress bar for streaks > 0
+                if (streakCount > 0) ...[
+                  Text(
+                    "Level 1",
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.black.withOpacity(0.6),
+                      fontFamily: 'SF Pro Display',
+                    ),
+                  ),
+                  
+                  SizedBox(height: 10),
+                  
+                  // Progress bar
+                  Container(
+                    width: 280, // Same width as Continue button
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Color(0xFFE0E0E0), // Gray background color
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: (streakCount > 0) ? (280.0 / 7.0) * streakCount.toDouble() : 0.0, // Calculate exact width based on button width (280px)
+                          height: 10.0,
+                          decoration: BoxDecoration(
+                            color: Color(0xFFFF9801),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  SizedBox(height: 20),
+                ],
+                
+                // Motivational text - changes based on streak
+                Container(
+                  width: 280, // Match button width for alignment
+                  child: Text(
+                    streakCount > 0 
+                      ? "You're building a habit of success!" // 37 character limit
+                      : "Every journey starts at zero - \nStart Now!", 
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.black.withOpacity(0.6),
+                      fontFamily: 'SF Pro Display',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                
+                SizedBox(height: 35),
+                
+                // Continue button - match sizing of Fix with AI button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Container(
+                    width: 280,
+                    height: 48,
+                    margin: EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      style: ButtonStyle(
+                        overlayColor: MaterialStateProperty.all(
+                            Colors.transparent),
+                      ),
+                      child: const Text(
+                        'Continue',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'SF Pro Display',
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
