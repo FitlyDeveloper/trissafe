@@ -1,94 +1,118 @@
-# Fitness App with Food Analysis API
+# DeepSeek API Bridge for Fitness App
 
-A secure implementation of a food analysis API for use with the Fitness App. This repository contains the API server code that handles secure processing of food images using OpenAI's Vision API.
+This service acts as a bridge between the Flutter fitness app and the DeepSeek API, providing food analysis, nutrition calculation, and food modification features.
 
-## Overview
+## Features
 
-This is a clean implementation for deploying to Render.com, which avoids the limitations of Firebase Functions while maintaining security of API keys.
+- Food analysis based on descriptions or images
+- Nutrition calculation for food items
+- AI-powered food modification suggestions based on criteria like calorie reduction, ingredient substitution, etc.
 
-## Getting Started
+## Requirements
 
-### Prerequisites
+- Node.js (v14 or higher)
+- npm (v6 or higher)
+- DeepSeek API key
 
-- Node.js v18 or higher
-- An OpenAI API key with access to GPT-4 Vision (gpt-4o model)
+## Setup
 
-### Local Development
+1. Clone the repository
+2. Install dependencies:
+```
+npm install
+```
+3. Set up environment variables:
+   - Create a `.env` file in the root directory
+   - Add your DeepSeek API key: `DEEPSEEK_API_KEY=your_api_key_here`
 
-1. Clone this repository
-2. Navigate to the api-server directory
-3. Install dependencies:
-   ```
-   npm install
-   ```
-4. Create a `.env` file from the example:
-   ```
-   cp .env.example .env
-   ```
-5. Add your OpenAI API key to the `.env` file
-6. Start the development server:
-   ```
-   npm run dev
-   ```
+## Running Locally
 
-The server will start on port 3000 by default.
+```
+npm start
+```
+
+This will start the server on port 3000 (or the port specified in your environment variables).
+
+## API Endpoints
+
+### Health Check
+- `GET /` - Returns status of the API server
+
+### Food Analysis
+- `POST /api/fix-food` - Analyze and modify food based on given instructions
+
+### Nutrition Calculation
+- `POST /api/nutrition` - Calculate nutrition values for given food or modify a food item
+
+## API Usage 
+
+### Food Modification Example
+
+```json
+POST /api/nutrition
+
+{
+  "food_name": "Chicken Sandwich",
+  "current_data": {
+    "calories": "450",
+    "protein": "20",
+    "fat": "15",
+    "carbs": "60",
+    "ingredients": [
+      {
+        "name": "Chicken",
+        "amount": "100g",
+        "calories": "200",
+        "protein": "15",
+        "fat": "5",
+        "carbs": "0"
+      },
+      {
+        "name": "Bread",
+        "amount": "2 slices",
+        "calories": "150",
+        "protein": "4",
+        "fat": "3",
+        "carbs": "50"
+      },
+      {
+        "name": "Mayo",
+        "amount": "1 tbsp",
+        "calories": "100",
+        "protein": "1",
+        "fat": "7",
+        "carbs": "10"
+      }
+    ]
+  },
+  "instructions": "Make it low carb",
+  "operation_type": "REDUCE_CALORIES"
+}
+```
 
 ## Deployment
 
-This server is designed to be deployed to Render.com:
+### Deploying to Render.com
 
-1. Push this repository to GitHub
-2. Create a new Web Service on Render.com
-3. Connect your GitHub repository
-4. Configure the build settings:
-   - Build Command: `cd api-server && npm install`
-   - Start Command: `cd api-server && npm start`
-5. Add the necessary environment variables:
-   - `OPENAI_API_KEY`: Your OpenAI API key
-   - `ALLOWED_ORIGINS`: Comma-separated list of allowed origins
-   - `RATE_LIMIT`: Request limits per minute (default: 30)
-   - `DEBUG_MODE`: Enable debug logging (true/false)
+This project includes configuration files for easy deployment to Render.com:
 
-## API Usage
+1. Make sure you have the Render CLI installed
+2. Run the deployment script:
+   - Windows: `.\deploy-to-render.ps1`
+   - Unix/Mac: `./deploy-to-render.sh`
+3. The service will be available at:
+   - https://snap-food.onrender.com 
+   - https://deepseek-uhrc.onrender.com
 
-### Analyze Food Image
+### Important Notes
 
-**Endpoint:** `POST /api/analyze-food`
+- The API requires a valid DeepSeek API key configured in the environment variables.
+- The response format follows a standard pattern with `success` and `data` fields.
+- For food modification requests, the app expects a JSON object with nutrition values and ingredients list.
 
-**Request Body:**
-```json
-{
-  "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA..."
-}
-```
+## Recent Fixes
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "meal": [
-      {
-        "dish": "Chicken Salad",
-        "calories": 350,
-        "macronutrients": {
-          "protein": 25,
-          "carbohydrates": 15,
-          "fat": 20
-        },
-        "ingredients": ["chicken", "lettuce", "tomato", "avocado"]
-      }
-    ]
-  }
-}
-```
-
-## Security Considerations
-
-- The OpenAI API key is stored securely on the server and never exposed to clients
-- CORS protection ensures only authorized origins can access the API
-- Rate limiting prevents abuse of the API
-
-## License
-
-MIT
+- Fixed support for both snap-food.onrender.com and deepseek-uhrc.onrender.com domains
+- Added compatibility layer to support Flutter app's API calls
+- Improved JSON response formatting for consistent handling by the app
+- Added comprehensive error handling with detailed logs

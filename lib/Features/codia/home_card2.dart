@@ -68,7 +68,7 @@ class HomeCard2 extends StatelessWidget {
                       ),
                     ),
                   ),
-                  SizedBox(height: 10),
+                  SizedBox(height: 14),
 
                   // Steps count
                   Text(
@@ -116,7 +116,7 @@ class HomeCard2 extends StatelessWidget {
                       ),
                     ),
                   ),
-                  SizedBox(height: 20),
+                  SizedBox(height: 14),
 
                   // Calories burned
                   Row(
@@ -127,32 +127,35 @@ class HomeCard2 extends StatelessWidget {
                         height: 20,
                       ),
                       SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '0',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.normal,
-                              color: Colors.black,
-                              decoration: TextDecoration.none,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '0',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.black,
+                                decoration: TextDecoration.none,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Calories burned',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.normal,
-                              color: Colors.black,
-                              decoration: TextDecoration.none,
+                            Text(
+                              'Calories burned',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.black,
+                                decoration: TextDecoration.none,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 15),
+                  SizedBox(height: 10),
 
                   // From steps
                   Row(
@@ -163,32 +166,35 @@ class HomeCard2 extends StatelessWidget {
                         height: 20,
                       ),
                       SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '0',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.normal,
-                              color: Colors.black,
-                              decoration: TextDecoration.none,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '0',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.black,
+                                decoration: TextDecoration.none,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'From steps',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.normal,
-                              color: Colors.black,
-                              decoration: TextDecoration.none,
+                            Text(
+                              'From steps',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.black,
+                                decoration: TextDecoration.none,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 15),
+                  SizedBox(height: 10),
 
                   // From workout
                   Row(
@@ -199,28 +205,31 @@ class HomeCard2 extends StatelessWidget {
                         height: 20,
                       ),
                       SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '0',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.normal,
-                              color: Colors.black,
-                              decoration: TextDecoration.none,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '0',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.black,
+                                decoration: TextDecoration.none,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'From workout',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.normal,
-                              color: Colors.black,
-                              decoration: TextDecoration.none,
+                            Text(
+                              'From workout',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.black,
+                                decoration: TextDecoration.none,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),

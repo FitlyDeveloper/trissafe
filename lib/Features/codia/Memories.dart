@@ -70,7 +70,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
                 // January 2025 Calendar
                 Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 29, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 29).copyWith(top: 20, bottom: 8),
                         child: Container(
                     padding: EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -126,7 +126,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
                 // December 2024 Calendar
                 Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 29, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 29).copyWith(top: 8, bottom: 8),
                         child: Container(
                     padding: EdgeInsets.all(20),
                     decoration: BoxDecoration(

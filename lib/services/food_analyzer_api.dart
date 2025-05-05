@@ -17,6 +17,8 @@ class FoodAnalyzerApi {
       final String base64Image = base64Encode(imageBytes);
       final String dataUri = 'data:image/jpeg;base64,$base64Image';
 
+      print('Calling API endpoint: $baseUrl$analyzeEndpoint');
+
       // Call our secure API endpoint
       final response = await http
           .post(
@@ -24,7 +26,14 @@ class FoodAnalyzerApi {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: jsonEncode({'image': dataUri}),
+            body: jsonEncode({
+              'image': dataUri,
+              'detail_level': 'high',
+              'include_ingredient_macros': true,
+              'return_ingredient_nutrition': true,
+              'include_additional_nutrition': true,
+              'include_vitamins_minerals': true,
+            }),
           )
           .timeout(const Duration(seconds: 30));
 
@@ -40,6 +49,32 @@ class FoodAnalyzerApi {
       // Check for API-level errors
       if (responseData['success'] != true) {
         throw Exception('API error: ${responseData['error']}');
+      }
+
+      // If we got here, confirm that we received the expected format
+      print(
+          'API response format: ${responseData['data'] is Map ? 'Map' : 'Other type'}');
+      if (responseData['data'] is Map) {
+        print('Keys in data: ${(responseData['data'] as Map).keys.join(', ')}');
+
+        // Log additional nutritional information when available
+        final data = responseData['data'] as Map<String, dynamic>;
+
+        if (data.containsKey('vitamins')) {
+          print('Vitamins detected in API response');
+        }
+
+        if (data.containsKey('minerals')) {
+          print('Minerals detected in API response');
+        }
+
+        if (data.containsKey('amino_acids')) {
+          print('Amino acids detected in API response');
+        }
+
+        if (data.containsKey('nutrition_other')) {
+          print('Other nutrition values detected in API response');
+        }
       }
 
       // Return the data
