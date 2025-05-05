@@ -4374,7 +4374,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                       // Close button
                       Positioned(
-                        top: 26, // Adjusted from 32 to 26 to align with the "Fix Manually" title
+                        top: 23, // Adjusted from 26 to 23 to align with the "Fix Manually" title
                         right: 20,
                         child: GestureDetector(
                           onTap: () {
@@ -4700,7 +4700,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
 
                   // Close button
                   Positioned(
-                    top: 26, // Adjusted from 32 to 26 to align with the "Fix Manually" title
+                    top: 23, // Adjusted from 26 to 23 to align with the "Fix Manually" title
                     right: 20,
                     child: GestureDetector(
                       onTap: () {
