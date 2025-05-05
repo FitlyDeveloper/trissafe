@@ -1,0 +1,490 @@
+import 'package:flutter/material.dart';
+import 'package:grouped_list/grouped_list.dart';
+
+class CodiaPage extends StatefulWidget {
+  CodiaPage({super.key});
+
+  @override
+  State<StatefulWidget> createState() => _CodiaPage();
+}
+
+class _CodiaPage extends State<CodiaPage> {
+  TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  int? _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    exercises.sort((a, b) => a.name.compareTo(b.name));
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.trim();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredExercises = _searchQuery.isEmpty
+        ? exercises
+        : exercises
+            .where((ex) =>
+                ex.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+            .toList();
+    return Container(
+      color: Colors.white,
+      child: SizedBox(
+        width: 393,
+        height: 852,
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              width: 393,
+              top: 0,
+              height: 852,
+              child: Image.asset(
+                'assets/images/background4.jpg',
+                width: 393,
+                height: 852,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 29, vertical: 8.5),
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: Text(
+                              'Add Exercise',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'SF Pro Display',
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            child: IconButton(
+                              icon: Icon(Icons.arrow_back,
+                                  color: Colors.black, size: 24),
+                              onPressed: () => Navigator.pop(context),
+                              padding: EdgeInsets.zero,
+                              constraints: BoxConstraints(),
+                              focusColor: Colors.transparent,
+                              highlightColor: Colors.transparent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      margin: EdgeInsets.symmetric(horizontal: 29),
+                      height: 0.5,
+                      color: Color(0xFFBDBDBD),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 31,
+              width: 331,
+              top: 119,
+              height: 40,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: 331,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xffffffff),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: Color(0x14000000),
+                          offset: Offset(0, 3),
+                          blurRadius: 8)
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(width: 12),
+                      Image.asset(
+                        'assets/images/Search.png',
+                        width: 18,
+                        height: 18,
+                        fit: BoxFit.cover,
+                        color: Colors.black.withOpacity(0.5),
+                        colorBlendMode: BlendMode.srcIn,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                            Icons.search,
+                            color: Colors.grey.withOpacity(0.5),
+                            size: 18),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(
+                            decoration: TextDecoration.none,
+                            fontSize: 17,
+                            color: const Color(0xFF000000),
+                            fontFamily: 'SFProDisplay-Regular',
+                            fontWeight: FontWeight.normal,
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            hintText: 'Search Exercise',
+                            hintStyle: TextStyle(
+                              decoration: TextDecoration.none,
+                              fontSize: 17,
+                              color: const Color(0x7f000000),
+                              fontFamily: 'SFProDisplay-Regular',
+                              fontWeight: FontWeight.normal,
+                            ),
+                            isCollapsed: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 31,
+              right: 29,
+              top: 176,
+              height: 40,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xffffffff),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: const [
+                          BoxShadow(
+                              color: Color(0x14000000),
+                              offset: Offset(0, 3),
+                              blurRadius: 8)
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          'All Equipment',
+                          style: TextStyle(
+                            decoration: TextDecoration.none,
+                            fontSize: 17,
+                            color: const Color(0xff000000),
+                            fontFamily: 'SFProDisplay-Regular',
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xffffffff),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: const [
+                          BoxShadow(
+                              color: Color(0x14000000),
+                              offset: Offset(0, 3),
+                              blurRadius: 8)
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          'All Muscles',
+                          style: TextStyle(
+                            decoration: TextDecoration.none,
+                            fontSize: 17,
+                            color: const Color(0xff000000),
+                            fontFamily: 'SFProDisplay-Regular',
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              left: 31,
+              width: 73,
+              top: 243,
+              height: 20,
+              child: Text(
+                'Exercises',
+                textAlign: TextAlign.left,
+                style: TextStyle(
+                    decoration: TextDecoration.none,
+                    fontSize: 17,
+                    color: const Color(0x7f000000),
+                    fontFamily: 'SFProDisplay-Regular',
+                    fontWeight: FontWeight.normal),
+                maxLines: 9999,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 270,
+              bottom: 0,
+              child: ListView.builder(
+                padding: EdgeInsets.only(top: 10, bottom: 100),
+                itemCount: filteredExercises.length,
+                itemBuilder: (context, index) {
+                  final ex = filteredExercises[index];
+                  final isSelected = _selectedIndex == index;
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (_selectedIndex == index) {
+                          _selectedIndex = null;
+                        } else {
+                          _selectedIndex = index;
+                        }
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 31, vertical: 8),
+                      child: Container(
+                        width: 331,
+                        height: 62,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.black : Colors.white,
+                          borderRadius: BorderRadius.circular(25),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Color(0x14000000),
+                                offset: Offset(0, 3),
+                                blurRadius: 8),
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(width: 13),
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.white.withOpacity(0.15)
+                                    : Colors.grey[300],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Image.asset(
+                                  'assets/images/dumbbell.png',
+                                  width: 24,
+                                  height: 24,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.grey[700],
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    ex.name,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.normal,
+                                      fontSize: 15,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.black,
+                                      fontFamily: 'SFProDisplay-Regular',
+                                      decoration: TextDecoration.none,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    ex.muscle,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isSelected
+                                          ? Colors.white70
+                                          : Color(0x7f000000),
+                                      fontFamily: 'SFProDisplay-Regular',
+                                      fontWeight: FontWeight.normal,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Image.asset(
+                              'assets/images/CircleMenu.png',
+                              width: 18,
+                              height: 18,
+                              color: isSelected ? Colors.white : null,
+                              fit: BoxFit.cover,
+                            ),
+                            SizedBox(width: 13),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            if (_selectedIndex != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                  color: Colors.transparent,
+                  child: Container(
+                    width: double.infinity,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 16,
+                          offset: Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Add 1 exercise',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'SF Pro Display',
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Add Exercise data model
+class Exercise {
+  final String name;
+  final String muscle;
+  final String equipment;
+  Exercise({required this.name, required this.muscle, required this.equipment});
+}
+
+final List<Exercise> exercises = [
+  Exercise(
+      name: 'Bench Press (Barbell)', muscle: 'Chest', equipment: 'Barbell'),
+  Exercise(
+      name: 'Dumbbell Chest Press', muscle: 'Chest', equipment: 'Dumbbell'),
+  Exercise(
+      name: 'Incline Bench Press (Barbell)',
+      muscle: 'Chest',
+      equipment: 'Barbell'),
+  Exercise(
+      name: 'Incline Dumbbell Press', muscle: 'Chest', equipment: 'Dumbbell'),
+  Exercise(name: 'Chest Fly', muscle: 'Chest', equipment: 'Machine'),
+  Exercise(name: 'Cable Crossover', muscle: 'Chest', equipment: 'Cable'),
+  Exercise(name: 'Pec Deck', muscle: 'Chest', equipment: 'Machine'),
+  Exercise(name: 'Deadlift', muscle: 'Back', equipment: 'Barbell'),
+  Exercise(name: 'Pull-Up', muscle: 'Back', equipment: 'Bodyweight'),
+  Exercise(name: 'Lat Pulldown', muscle: 'Back', equipment: 'Cable'),
+  Exercise(name: 'Seated Cable Row', muscle: 'Back', equipment: 'Cable'),
+  Exercise(name: 'Dumbbell Row', muscle: 'Back', equipment: 'Dumbbell'),
+  Exercise(name: 'T-Bar Row', muscle: 'Back', equipment: 'Machine'),
+  Exercise(name: 'Straight-Arm Pulldown', muscle: 'Back', equipment: 'Cable'),
+  Exercise(name: 'Squat', muscle: 'Legs', equipment: 'Barbell'),
+  Exercise(name: 'Leg Press', muscle: 'Legs', equipment: 'Machine'),
+  Exercise(name: 'Hack Squat', muscle: 'Legs', equipment: 'Machine'),
+  Exercise(name: 'Romanian Deadlift', muscle: 'Legs', equipment: 'Barbell'),
+  Exercise(name: 'Leg Curl', muscle: 'Legs', equipment: 'Machine'),
+  Exercise(name: 'Leg Extension', muscle: 'Legs', equipment: 'Machine'),
+  Exercise(
+      name: 'Bulgarian Split Squat', muscle: 'Legs', equipment: 'Dumbbell'),
+  Exercise(name: 'Walking Lunges', muscle: 'Legs', equipment: 'Dumbbell'),
+  Exercise(name: 'Standing Calf Raise', muscle: 'Legs', equipment: 'Machine'),
+  Exercise(name: 'Seated Calf Raise', muscle: 'Legs', equipment: 'Machine'),
+  Exercise(name: 'Overhead Press', muscle: 'Shoulders', equipment: 'Barbell'),
+  Exercise(
+      name: 'Dumbbell Shoulder Press',
+      muscle: 'Shoulders',
+      equipment: 'Dumbbell'),
+  Exercise(name: 'Lateral Raise', muscle: 'Shoulders', equipment: 'Dumbbell'),
+  Exercise(name: 'Front Raise', muscle: 'Shoulders', equipment: 'Dumbbell'),
+  Exercise(name: 'Rear Delt Fly', muscle: 'Shoulders', equipment: 'Machine'),
+  Exercise(name: 'Arnold Press', muscle: 'Shoulders', equipment: 'Dumbbell'),
+  Exercise(name: 'Shrug', muscle: 'Shoulders', equipment: 'Dumbbell'),
+  Exercise(name: 'Barbell Curl', muscle: 'Arms', equipment: 'Barbell'),
+  Exercise(name: 'Dumbbell Curl', muscle: 'Arms', equipment: 'Dumbbell'),
+  Exercise(name: 'Preacher Curl', muscle: 'Arms', equipment: 'Machine'),
+  Exercise(name: 'Concentration Curl', muscle: 'Arms', equipment: 'Dumbbell'),
+  Exercise(name: 'Skullcrusher', muscle: 'Arms', equipment: 'Barbell'),
+  Exercise(name: 'Tricep Pushdown', muscle: 'Arms', equipment: 'Cable'),
+  Exercise(
+      name: 'Overhead Tricep Extension', muscle: 'Arms', equipment: 'Dumbbell'),
+  Exercise(
+      name: 'Close-Grip Bench Press', muscle: 'Arms', equipment: 'Barbell'),
+  Exercise(
+      name: 'Rope Overhead Tricep Extension',
+      muscle: 'Arms',
+      equipment: 'Cable'),
+  Exercise(name: 'Hanging Leg Raise', muscle: 'Core', equipment: 'Bodyweight'),
+  Exercise(name: 'Cable Crunch', muscle: 'Core', equipment: 'Cable'),
+  Exercise(name: 'Plank', muscle: 'Core', equipment: 'Bodyweight'),
+  Exercise(name: 'Decline Sit-Up', muscle: 'Core', equipment: 'Bodyweight'),
+  Exercise(name: 'Russian Twist', muscle: 'Core', equipment: 'Dumbbell'),
+  Exercise(name: 'Back Extension', muscle: 'Core', equipment: 'Machine'),
+];

@@ -1,0 +1,12 @@
+{
+  "name": "deepseek-api-bridge-root",
+  "version": "1.0.0",
+  "description": "Root package for DeepSeek API Bridge",
+  "scripts": {
+    "start": "cd server && npm start",
+    "build": "cd server && npm install"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
