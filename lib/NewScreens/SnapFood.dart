@@ -169,65 +169,175 @@ class _SnapFoodState extends State<SnapFood> {
 
       // Process image if needed (e.g., compress large images)
       Uint8List processedBytes = imageBytes;
-      if (imageBytes.length > 500 * 1024) {
-        // More than 500KB, try to compress
-        print(
-            "Image is large (${(imageBytes.length / 1024).toStringAsFixed(1)}KB), compressing...");
-        try {
-          if (kIsWeb) {
-            // Resize image using web-specific implementation
-            processedBytes = await resizeWebImage(imageBytes, 800);
-          } else {
-            // For mobile, we'll use a simpler approach to avoid path_provider
-            // Use FlutterImageCompress.compressWithList for direct byte processing
-            final compressedBytes =
-                await flutter_compress.FlutterImageCompress.compressWithList(
-              imageBytes,
-              minWidth: 800,
-              minHeight: 800,
-              quality: 85,
-            );
+      // Get image size in MB for logging
+      final double originalSizeMB = imageBytes.length / (1024 * 1024);
+      print("Original image size: ${originalSizeMB.toStringAsFixed(2)} MB");
 
-            if (compressedBytes.isNotEmpty) {
-              processedBytes = Uint8List.fromList(compressedBytes);
-            }
-          }
+      try {
+        // Use the exact 0.7MB target approach
+        processedBytes = await compressImage(
+          imageBytes,
+          targetWidth: 1200, // Initial width (will be adjusted)
+          quality: 90, // Initial quality (will be adjusted)
+        );
+
+        // Calculate compression stats
+        final double compressedSizeMB = processedBytes.length / (1024 * 1024);
+        final double compressionRatio = originalSizeMB / compressedSizeMB;
+
+        print("Image processing complete:");
+        print("  - Original: ${originalSizeMB.toStringAsFixed(2)} MB");
+        print("  - Final: ${compressedSizeMB.toStringAsFixed(2)} MB");
+
+        if (originalSizeMB <= 0.7) {
+          print("  - Original image preserved (≤0.7MB)");
+        } else {
+          print("  - Compressed to target size of 0.7MB");
           print(
-              "Compressed to ${(processedBytes.length / 1024).toStringAsFixed(1)}KB");
-        } catch (e) {
-          print("Error compressing image: $e");
-          // Fall back to original bytes if compression fails
-          processedBytes = imageBytes;
+              "  - Compression ratio: ${compressionRatio.toStringAsFixed(2)}x");
         }
+      } catch (e) {
+        print("Error during image compression: $e");
+        // Fall back to original bytes if compression fails
+        processedBytes = imageBytes;
       }
 
       print("Calling secure API service");
 
-      // Use our secure API service via Firebase
-      final response = await FoodAnalyzerApi.analyzeFoodImage(processedBytes);
+      try {
+        // Use our secure API service via Firebase
+        final response = await FoodAnalyzerApi.analyzeFoodImage(processedBytes);
 
-      print("API call successful!");
-      print('Response: $response');
+        print("API call successful!");
+        print('Response: $response');
 
-      if (mounted) {
-        // DO NOT set _isAnalyzing to false here to keep animation running
-        setState(() {
-          _analysisResult = response;
-        });
+        if (mounted) {
+          // DO NOT set _isAnalyzing to false here to keep animation running
+          setState(() {
+            _analysisResult = response;
+          });
 
-        // Display the formatted results in the terminal
-        _displayAnalysisResults(_analysisResult!);
+          // Display the formatted results in the terminal
+          _displayAnalysisResults(_analysisResult!);
 
-        // _isAnalyzing will be set to false after navigation to FoodCardOpen
+          // _isAnalyzing will be set to false after navigation to FoodCardOpen
+        }
+      } catch (e) {
+        print("API analysis error: $e");
+
+        // Even if API fails, navigate to FoodCardOpen with default values
+        if (mounted) {
+          // Create a default food card with the image
+          final String defaultName = "Unknown Food";
+          final String defaultCalories = "0";
+          final String defaultProtein = "0";
+          final String defaultFat = "0";
+          final String defaultCarbs = "0";
+          final String healthScore = "5/10";
+          final List<Map<String, dynamic>> defaultIngredients = [
+            {'name': 'Unknown ingredients', 'amount': '0g', 'calories': 0}
+          ];
+
+          // Convert image to base64 for FoodCardOpen
+          String? imageBase64;
+          try {
+            imageBase64 = base64Encode(processedBytes);
+          } catch (e) {
+            print("Error encoding image: $e");
+          }
+
+          print(
+              "API failed, but navigating to FoodCardOpen with default values");
+
+          // Navigate to FoodCardOpen with default values
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => FoodCardOpen(
+                foodName: defaultName,
+                healthScore: healthScore,
+                calories: defaultCalories,
+                protein: defaultProtein,
+                fat: defaultFat,
+                carbs: defaultCarbs,
+                imageBase64: imageBase64,
+                ingredients: defaultIngredients,
+              ),
+            ),
+          ).then((_) {
+            // Set _isAnalyzing to false only after returning from FoodCardOpen
+            if (mounted) {
+              setState(() {
+                _isAnalyzing = false;
+              });
+            }
+          });
+        }
       }
     } catch (e) {
       print("Error analyzing image: $e");
       if (mounted) {
-        setState(() {
-          _isAnalyzing = false;
-        });
-        _showCustomDialog("Analysis Failed",
-            "Failed to analyze the image. Please try again.");
+        // Try to use the image even if analysis completely fails
+        try {
+          Uint8List imageBytes;
+          if (kIsWeb && _webImageBytes != null) {
+            imageBytes = _webImageBytes!;
+          } else if (_imageFile != null && !kIsWeb) {
+            imageBytes = await _imageFile!.readAsBytes();
+          } else if (image != null) {
+            imageBytes = await image.readAsBytes();
+          } else {
+            throw Exception("No image available");
+          }
+
+          // Create a default food card with the image
+          final String defaultName = "Unknown Food";
+          final String defaultCalories = "0";
+          final String defaultProtein = "0";
+          final String defaultFat = "0";
+          final String defaultCarbs = "0";
+          final String healthScore = "5/10";
+          final List<Map<String, dynamic>> defaultIngredients = [
+            {'name': 'Unknown ingredients', 'amount': '0g', 'calories': 0}
+          ];
+
+          // Convert image to base64 for FoodCardOpen
+          String? imageBase64 = base64Encode(imageBytes);
+
+          print(
+              "Analysis completely failed, but navigating to FoodCardOpen with default values");
+
+          // Navigate to FoodCardOpen with default values
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => FoodCardOpen(
+                foodName: defaultName,
+                healthScore: healthScore,
+                calories: defaultCalories,
+                protein: defaultProtein,
+                fat: defaultFat,
+                carbs: defaultCarbs,
+                imageBase64: imageBase64,
+                ingredients: defaultIngredients,
+              ),
+            ),
+          ).then((_) {
+            if (mounted) {
+              setState(() {
+                _isAnalyzing = false;
+              });
+            }
+          });
+        } catch (imageError) {
+          // If we can't even get the image, show an error dialog
+          print("Failed to process image: $imageError");
+          setState(() {
+            _isAnalyzing = false;
+          });
+          _showCustomDialog("Analysis Failed",
+              "Failed to analyze the image. Please try again.");
+        }
       }
     }
   }
@@ -251,10 +361,10 @@ class _SnapFoodState extends State<SnapFood> {
             final bytes = await pickedFile.readAsBytes();
             print("Web image bytes read successfully: ${bytes.length} bytes");
 
-            // Check file size - 4MB maximum
-            if (bytes.length > 4 * 1024 * 1024) {
+            // Check file size - 15MB maximum
+            if (bytes.length > 15 * 1024 * 1024) {
               _showCustomDialog("File Too Large",
-                  "Image must be less than 4MB. Please select a smaller image.");
+                  "Image must be less than 15MB. Please select a smaller image.");
               return;
             }
 
@@ -273,10 +383,10 @@ class _SnapFoodState extends State<SnapFood> {
             // For mobile platforms
             final bytes = await pickedFile.readAsBytes();
 
-            // Check file size - 4MB maximum
-            if (bytes.length > 4 * 1024 * 1024) {
+            // Check file size - 15MB maximum
+            if (bytes.length > 15 * 1024 * 1024) {
               _showCustomDialog("File Too Large",
-                  "Image must be less than 4MB. Please select a smaller image.");
+                  "Image must be less than 15MB. Please select a smaller image.");
               return;
             }
 
@@ -347,10 +457,10 @@ class _SnapFoodState extends State<SnapFood> {
             print(
                 "Web camera image bytes read successfully: ${bytes.length} bytes");
 
-            // Check file size - 4MB maximum
-            if (bytes.length > 4 * 1024 * 1024) {
+            // Check file size - 15MB maximum
+            if (bytes.length > 15 * 1024 * 1024) {
               _showCustomDialog("File Too Large",
-                  "Image must be less than 4MB. Please take a smaller image or adjust your camera settings.");
+                  "Image must be less than 15MB. Please take a smaller image or adjust your camera settings.");
               setState(() {
                 _isAnalyzing = false;
               });
@@ -371,10 +481,10 @@ class _SnapFoodState extends State<SnapFood> {
             // For mobile platforms
             final bytes = await pickedFile.readAsBytes();
 
-            // Check file size - 4MB maximum
-            if (bytes.length > 4 * 1024 * 1024) {
+            // Check file size - 15MB maximum
+            if (bytes.length > 15 * 1024 * 1024) {
               _showCustomDialog("File Too Large",
-                  "Image must be less than 4MB. Please take a smaller image or adjust your camera settings.");
+                  "Image must be less than 15MB. Please take a smaller image or adjust your camera settings.");
               setState(() {
                 _isAnalyzing = false;
               });
@@ -490,36 +600,42 @@ class _SnapFoodState extends State<SnapFood> {
   }
 
   Future<Uint8List> _compressImage(Uint8List imageBytes) async {
-    // Target quality levels for successive compression attempts
-    final qualityLevels = [80, 60, 40, 30];
+    try {
+      print('Starting image compression process...');
+      final double imageSizeMB = imageBytes.length / (1024 * 1024);
+      print('Original image size: ${imageSizeMB.toStringAsFixed(2)} MB');
 
-    // Target size in KB
-    final targetSize = 300 * 1024; // 300 KB
+      // Target size of 0.7MB
+      final int targetSizeBytes = 716800; // 0.7MB in bytes
 
-    // Try each quality level until we get below target size
-    for (int quality in qualityLevels) {
-      try {
-        Uint8List result = await _compressBytesConsistently(
-          imageBytes,
-          quality: quality,
-          targetWidth: 800,
-        );
-
-        print(
-            'Compressed to quality $quality: ${(result.length / 1024).toStringAsFixed(2)} KB');
-
-        // If we're below target size or on last attempt, return this result
-        if (result.length < targetSize || quality == qualityLevels.last) {
-          return result;
-        }
-      } catch (e) {
-        print('Error compressing at quality $quality: $e');
-        // If compression fails, try next lower quality or return original
+      // If already smaller than 0.7MB, keep original
+      if (imageBytes.length <= targetSizeBytes) {
+        print('Image already under 0.7MB, preserving original quality');
+        return imageBytes;
       }
-    }
 
-    // If all compression attempts fail, return original
-    return imageBytes;
+      // Compress to exactly 0.7MB
+      final Uint8List compressedImage = await compressImage(
+        imageBytes,
+        targetWidth: 1200, // Initial width
+        quality: 90, // Initial quality
+      );
+
+      // Log results
+      final double compressedSizeMB = compressedImage.length / (1024 * 1024);
+      final double compressionRatio = imageSizeMB / compressedSizeMB;
+
+      print('Image compression complete:');
+      print('  - Original: ${imageSizeMB.toStringAsFixed(2)} MB');
+      print('  - Compressed: ${compressedSizeMB.toStringAsFixed(2)} MB');
+      print('  - Target: 0.7MB');
+      print('  - Compression ratio: ${compressionRatio.toStringAsFixed(2)}x');
+
+      return compressedImage;
+    } catch (e) {
+      print('Error during image compression: $e');
+      return imageBytes; // Return original if compression fails
+    }
   }
 
   void _displayAnalysisResults(Map<String, dynamic> analysisData) {
@@ -555,6 +671,81 @@ class _SnapFoodState extends State<SnapFood> {
         print("Fat: ${fat.toInt()}g");
         print("Carbs: ${carbs.toInt()}g");
         print("Vitamin C: ${vitaminC.toInt()}mg");
+
+        // Extract and display additional nutritional information
+        print("\n----- ADDITIONAL NUTRITIONAL INFORMATION -----");
+
+        // Vitamins
+        Map<String, dynamic> vitamins = analysisData['vitamins'] ?? {};
+        if (vitamins.isNotEmpty) {
+          print("VITAMINS:");
+          vitamins.forEach((key, value) {
+            String vitaminName = key;
+            // Format vitamin A, B, C, D, E, K specially
+            if (vitaminName.length == 1 ||
+                (vitaminName.length == 2 && vitaminName.startsWith("B"))) {
+              vitaminName = "Vitamin $vitaminName";
+            }
+            print(
+                "  $vitaminName: ${_extractDecimalValue(value.toString())}${_getUnitForVitamin(key)}");
+          });
+        }
+
+        // Minerals
+        Map<String, dynamic> minerals = analysisData['minerals'] ?? {};
+        if (minerals.isNotEmpty) {
+          print("\nMINERALS:");
+          minerals.forEach((key, value) {
+            print(
+                "  $key: ${_extractDecimalValue(value.toString())}${_getUnitForMineral(key)}");
+          });
+        }
+
+        // Amino acids
+        Map<String, dynamic> aminoAcids = analysisData['amino_acids'] ?? {};
+        if (aminoAcids.isNotEmpty) {
+          print("\nAMINO ACIDS:");
+          aminoAcids.forEach((key, value) {
+            print("  $key: ${_extractDecimalValue(value.toString())}g");
+          });
+        }
+
+        // Other nutritional values
+        Map<String, dynamic> otherNutrition =
+            analysisData['nutrition_other'] ?? {};
+        if (otherNutrition.isNotEmpty) {
+          print("\nOTHER NUTRITION VALUES:");
+          otherNutrition.forEach((key, value) {
+            String unit = _getUnitForNutrient(key);
+            print("  $key: ${_extractDecimalValue(value.toString())}$unit");
+          });
+        }
+
+        // Additional values that might be directly in the root
+        final additionalValues = [
+          {'key': 'fiber', 'label': 'Fiber', 'unit': 'g'},
+          {'key': 'sugar', 'label': 'Sugar', 'unit': 'g'},
+          {'key': 'sodium', 'label': 'Sodium', 'unit': 'mg'},
+          {'key': 'cholesterol', 'label': 'Cholesterol', 'unit': 'mg'},
+          {'key': 'saturated_fat', 'label': 'Saturated Fat', 'unit': 'g'},
+          {'key': 'trans_fat', 'label': 'Trans Fat', 'unit': 'g'},
+          {'key': 'potassium', 'label': 'Potassium', 'unit': 'mg'},
+          {'key': 'calcium', 'label': 'Calcium', 'unit': 'mg'},
+          {'key': 'iron', 'label': 'Iron', 'unit': 'mg'},
+        ];
+
+        bool foundAdditional = false;
+        for (var item in additionalValues) {
+          if (analysisData.containsKey(item['key'])) {
+            if (!foundAdditional) {
+              print("\nADDITIONAL VALUES:");
+              foundAdditional = true;
+            }
+            print(
+                "  ${item['label']}: ${_extractDecimalValue(analysisData[item['key']].toString())}${item['unit']}");
+          }
+        }
+
         print("Health Score: $healthScore");
         print(
             "TOTAL CALORIES: ${calories.toInt()}kcal"); // Format as integer for terminal
@@ -927,6 +1118,149 @@ class _SnapFoodState extends State<SnapFood> {
           print("Total Fat: ${totalFat.toStringAsFixed(1)}g");
           print("Total Carbs: ${totalCarbs.toStringAsFixed(1)}g");
 
+          // Extract and display any additional nutritional information
+          print("\n----- ADDITIONAL NUTRITIONAL INFORMATION -----");
+
+          // Combine all nutritional info from all meal items
+          Map<String, dynamic> combinedVitamins = {};
+          Map<String, dynamic> combinedMinerals = {};
+          Map<String, dynamic> combinedAminoAcids = {};
+          Map<String, dynamic> combinedOtherNutrition = {};
+
+          for (var mealItem in mealItems) {
+            // Process vitamins
+            if (mealItem.containsKey('vitamins') &&
+                mealItem['vitamins'] is Map) {
+              Map<String, dynamic> vitamins =
+                  Map<String, dynamic>.from(mealItem['vitamins'] as Map);
+              vitamins.forEach((key, value) {
+                double currentValue = _extractDecimalValue(value.toString());
+                if (combinedVitamins.containsKey(key)) {
+                  combinedVitamins[key] = combinedVitamins[key] + currentValue;
+                } else {
+                  combinedVitamins[key] = currentValue;
+                }
+              });
+            }
+
+            // Process minerals
+            if (mealItem.containsKey('minerals') &&
+                mealItem['minerals'] is Map) {
+              Map<String, dynamic> minerals =
+                  Map<String, dynamic>.from(mealItem['minerals'] as Map);
+              minerals.forEach((key, value) {
+                double currentValue = _extractDecimalValue(value.toString());
+                if (combinedMinerals.containsKey(key)) {
+                  combinedMinerals[key] = combinedMinerals[key] + currentValue;
+                } else {
+                  combinedMinerals[key] = currentValue;
+                }
+              });
+            }
+
+            // Process amino acids
+            if (mealItem.containsKey('amino_acids') &&
+                mealItem['amino_acids'] is Map) {
+              Map<String, dynamic> aminoAcids =
+                  Map<String, dynamic>.from(mealItem['amino_acids'] as Map);
+              aminoAcids.forEach((key, value) {
+                double currentValue = _extractDecimalValue(value.toString());
+                if (combinedAminoAcids.containsKey(key)) {
+                  combinedAminoAcids[key] =
+                      combinedAminoAcids[key] + currentValue;
+                } else {
+                  combinedAminoAcids[key] = currentValue;
+                }
+              });
+            }
+
+            // Process other nutrition values
+            if (mealItem.containsKey('nutrition_other') &&
+                mealItem['nutrition_other'] is Map) {
+              Map<String, dynamic> otherNutrition =
+                  Map<String, dynamic>.from(mealItem['nutrition_other'] as Map);
+              otherNutrition.forEach((key, value) {
+                double currentValue = _extractDecimalValue(value.toString());
+                if (combinedOtherNutrition.containsKey(key)) {
+                  combinedOtherNutrition[key] =
+                      combinedOtherNutrition[key] + currentValue;
+                } else {
+                  combinedOtherNutrition[key] = currentValue;
+                }
+              });
+            }
+
+            // Process additional values that might be directly in the meal item
+            final additionalValues = [
+              {'key': 'fiber', 'label': 'Fiber', 'unit': 'g'},
+              {'key': 'sugar', 'label': 'Sugar', 'unit': 'g'},
+              {'key': 'sodium', 'label': 'Sodium', 'unit': 'mg'},
+              {'key': 'cholesterol', 'label': 'Cholesterol', 'unit': 'mg'},
+              {'key': 'saturated_fat', 'label': 'Saturated Fat', 'unit': 'g'},
+              {'key': 'trans_fat', 'label': 'Trans Fat', 'unit': 'g'},
+              {'key': 'potassium', 'label': 'Potassium', 'unit': 'mg'},
+              {'key': 'calcium', 'label': 'Calcium', 'unit': 'mg'},
+              {'key': 'iron', 'label': 'Iron', 'unit': 'mg'},
+            ];
+
+            for (var item in additionalValues) {
+              if (mealItem.containsKey(item['key'])) {
+                double currentValue =
+                    _extractDecimalValue(mealItem[item['key']].toString());
+                String key = item['label'] as String;
+                if (combinedOtherNutrition.containsKey(key)) {
+                  combinedOtherNutrition[key] =
+                      combinedOtherNutrition[key] + currentValue;
+                } else {
+                  combinedOtherNutrition[key] = currentValue;
+                }
+              }
+            }
+          }
+
+          // Display combined vitamins
+          if (combinedVitamins.isNotEmpty) {
+            print("VITAMINS:");
+            combinedVitamins.forEach((key, value) {
+              String vitaminName = key;
+              // Format vitamin A, B, C, D, E, K specially
+              if (vitaminName.length == 1 ||
+                  (vitaminName.length == 2 && vitaminName.startsWith("B"))) {
+                vitaminName = "Vitamin $vitaminName";
+              }
+              print(
+                  "  $vitaminName: ${value.toStringAsFixed(1)}${_getUnitForVitamin(key)}");
+            });
+          }
+
+          // Display combined minerals
+          if (combinedMinerals.isNotEmpty) {
+            print("\nMINERALS:");
+            combinedMinerals.forEach((key, value) {
+              print(
+                  "  $key: ${value.toStringAsFixed(1)}${_getUnitForMineral(key)}");
+            });
+          }
+
+          // Display combined amino acids
+          if (combinedAminoAcids.isNotEmpty) {
+            print("\nAMINO ACIDS:");
+            combinedAminoAcids.forEach((key, value) {
+              print("  $key: ${value.toStringAsFixed(1)}g");
+            });
+          }
+
+          // Display combined other nutrition values
+          if (combinedOtherNutrition.isNotEmpty) {
+            print("\nOTHER NUTRITION VALUES:");
+            combinedOtherNutrition.forEach((key, value) {
+              String unit = _getUnitForNutrient(key);
+              print("  $key: ${value.toStringAsFixed(1)}$unit");
+            });
+          }
+
+          print("---------------------------------\n");
+
           _saveFoodCardData(combinedName, combinedIngredients, combinedCalories,
               combinedProtein, combinedFat, combinedCarbs, allIngredientsList);
         }
@@ -1039,6 +1373,96 @@ class _SnapFoodState extends State<SnapFood> {
       print("Fat: ${_extractNumericValue(fat)}g");
       print("Carbs: ${_extractNumericValue(carbs)}g");
       print("Vitamin C: ${_extractNumericValue(vitaminC)}mg");
+
+      // Extract and display additional nutritional information for the alternative format
+      print("\n----- ADDITIONAL NUTRITIONAL INFORMATION -----");
+
+      // Vitamins
+      if (analysisData.containsKey('vitamins') &&
+          analysisData['vitamins'] is Map) {
+        Map<String, dynamic> vitamins =
+            Map<String, dynamic>.from(analysisData['vitamins']);
+        if (vitamins.isNotEmpty) {
+          print("VITAMINS:");
+          vitamins.forEach((key, value) {
+            String vitaminName = key;
+            // Format vitamin A, B, C, D, E, K specially
+            if (vitaminName.length == 1 ||
+                (vitaminName.length == 2 && vitaminName.startsWith("B"))) {
+              vitaminName = "Vitamin $vitaminName";
+            }
+            print(
+                "  $vitaminName: ${_extractDecimalValue(value.toString())}${_getUnitForVitamin(key)}");
+          });
+        }
+      }
+
+      // Minerals
+      if (analysisData.containsKey('minerals') &&
+          analysisData['minerals'] is Map) {
+        Map<String, dynamic> minerals =
+            Map<String, dynamic>.from(analysisData['minerals']);
+        if (minerals.isNotEmpty) {
+          print("\nMINERALS:");
+          minerals.forEach((key, value) {
+            print(
+                "  $key: ${_extractDecimalValue(value.toString())}${_getUnitForMineral(key)}");
+          });
+        }
+      }
+
+      // Amino acids
+      if (analysisData.containsKey('amino_acids') &&
+          analysisData['amino_acids'] is Map) {
+        Map<String, dynamic> aminoAcids =
+            Map<String, dynamic>.from(analysisData['amino_acids']);
+        if (aminoAcids.isNotEmpty) {
+          print("\nAMINO ACIDS:");
+          aminoAcids.forEach((key, value) {
+            print("  $key: ${_extractDecimalValue(value.toString())}g");
+          });
+        }
+      }
+
+      // Other nutritional values
+      if (analysisData.containsKey('nutrition_other') &&
+          analysisData['nutrition_other'] is Map) {
+        Map<String, dynamic> otherNutrition =
+            Map<String, dynamic>.from(analysisData['nutrition_other']);
+        if (otherNutrition.isNotEmpty) {
+          print("\nOTHER NUTRITION VALUES:");
+          otherNutrition.forEach((key, value) {
+            String unit = _getUnitForNutrient(key);
+            print("  $key: ${_extractDecimalValue(value.toString())}$unit");
+          });
+        }
+      }
+
+      // Additional values that might be directly in the root
+      final additionalValues = [
+        {'key': 'fiber', 'label': 'Fiber', 'unit': 'g'},
+        {'key': 'sugar', 'label': 'Sugar', 'unit': 'g'},
+        {'key': 'sodium', 'label': 'Sodium', 'unit': 'mg'},
+        {'key': 'cholesterol', 'label': 'Cholesterol', 'unit': 'mg'},
+        {'key': 'saturated_fat', 'label': 'Saturated Fat', 'unit': 'g'},
+        {'key': 'trans_fat', 'label': 'Trans Fat', 'unit': 'g'},
+        {'key': 'potassium', 'label': 'Potassium', 'unit': 'mg'},
+        {'key': 'calcium', 'label': 'Calcium', 'unit': 'mg'},
+        {'key': 'iron', 'label': 'Iron', 'unit': 'mg'},
+      ];
+
+      bool foundAdditional = false;
+      for (var item in additionalValues) {
+        if (analysisData.containsKey(item['key'])) {
+          if (!foundAdditional) {
+            print("\nADDITIONAL VALUES:");
+            foundAdditional = true;
+          }
+          print(
+              "  ${item['label']}: ${_extractDecimalValue(analysisData[item['key']].toString())}${item['unit']}");
+        }
+      }
+
       print("---------------------------------\n");
 
       // Save the food card to SharedPreferences for the Recent Activity section
@@ -2222,6 +2646,48 @@ class _SnapFoodState extends State<SnapFood> {
   String _formatAnalysisResult(Map<String, dynamic> analysis) {
     // This is no longer used for displaying UI, but we keep it for compatibility
     return "";
+  }
+
+  // Helper method to determine unit for a vitamin
+  String _getUnitForVitamin(String vitaminName) {
+    // Common units for vitamins
+    vitaminName = vitaminName.toUpperCase();
+    if (vitaminName == 'A') return 'μg'; // Vitamin A - micrograms
+    if (vitaminName == 'C') return 'mg'; // Vitamin C - milligrams
+    if (vitaminName == 'D') return 'μg'; // Vitamin D - micrograms
+    if (vitaminName == 'E') return 'mg'; // Vitamin E - milligrams
+    if (vitaminName.startsWith('B'))
+      return 'mg'; // B Vitamins - usually milligrams
+    if (vitaminName == 'K') return 'μg'; // Vitamin K - micrograms
+    return 'mg'; // Default to milligrams
+  }
+
+  // Helper method to determine unit for a mineral
+  String _getUnitForMineral(String mineralName) {
+    // Common units for minerals
+    mineralName = mineralName.toLowerCase();
+    if (mineralName == 'sodium' ||
+        mineralName == 'potassium' ||
+        mineralName == 'calcium' ||
+        mineralName == 'magnesium') return 'mg';
+    if (mineralName == 'iron' ||
+        mineralName == 'zinc' ||
+        mineralName == 'copper') return 'mg';
+    if (mineralName == 'selenium') return 'μg';
+    return 'mg'; // Default to milligrams
+  }
+
+  // Helper method to determine unit for other nutrients
+  String _getUnitForNutrient(String nutrientName) {
+    // Common units for other nutrients
+    nutrientName = nutrientName.toLowerCase();
+    if (nutrientName.contains('fiber') ||
+        nutrientName.contains('sugar') ||
+        nutrientName.contains('fat')) return 'g';
+    if (nutrientName.contains('cholesterol') || nutrientName.contains('sodium'))
+      return 'mg';
+    if (nutrientName.contains('calorie')) return 'kcal';
+    return ''; // Default to no unit if unknown
   }
 }
 

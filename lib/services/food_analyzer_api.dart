@@ -31,6 +31,8 @@ class FoodAnalyzerApi {
               'detail_level': 'high',
               'include_ingredient_macros': true,
               'return_ingredient_nutrition': true,
+              'include_additional_nutrition': true,
+              'include_vitamins_minerals': true,
             }),
           )
           .timeout(const Duration(seconds: 30));
@@ -54,6 +56,25 @@ class FoodAnalyzerApi {
           'API response format: ${responseData['data'] is Map ? 'Map' : 'Other type'}');
       if (responseData['data'] is Map) {
         print('Keys in data: ${(responseData['data'] as Map).keys.join(', ')}');
+
+        // Log additional nutritional information when available
+        final data = responseData['data'] as Map<String, dynamic>;
+
+        if (data.containsKey('vitamins')) {
+          print('Vitamins detected in API response');
+        }
+
+        if (data.containsKey('minerals')) {
+          print('Minerals detected in API response');
+        }
+
+        if (data.containsKey('amino_acids')) {
+          print('Amino acids detected in API response');
+        }
+
+        if (data.containsKey('nutrition_other')) {
+          print('Other nutrition values detected in API response');
+        }
       }
 
       // Return the data
