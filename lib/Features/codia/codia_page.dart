@@ -2074,21 +2074,22 @@ class _CodiaPageState extends State<CodiaPage> {
     print('- Carbs: ${(carbPercent * 100).toStringAsFixed(1)}%');
     print('- Fat: ${(fatPercent * 100).toStringAsFixed(1)}%');
 
-    // Calculate macro targets in grams
-    int proteinTarget = ((caloriesToShow * proteinPercent) / 4).round();
-    int fatTarget = ((caloriesToShow * fatPercent) / 9).round();
-    int carbTarget = ((caloriesToShow * carbPercent) / 4).round();
+    // Calculate macro targets in grams - ALWAYS USE targetCalories instead of caloriesToShow
+    // This ensures target macros don't change as food is logged
+    int proteinTarget = ((targetCalories * proteinPercent) / 4).round();
+    int fatTarget = ((targetCalories * fatPercent) / 9).round();
+    int carbTarget = ((targetCalories * carbPercent) / 4).round();
 
     // Log the calculations with the exact same format as calculation_screen.dart
-    print('Calculated macro targets for $caloriesToShow calories:');
+    print('Calculated macro targets for $targetCalories calories:');
     print(
-        '- Protein: ${proteinTarget}g (${(caloriesToShow * proteinPercent).round()} kcal)');
+        '- Protein: ${proteinTarget}g (${(targetCalories * proteinPercent).round()} kcal)');
     print(
-        '- Fat: ${fatTarget}g (${(caloriesToShow * fatPercent).round()} kcal)');
+        '- Fat: ${fatTarget}g (${(targetCalories * fatPercent).round()} kcal)');
     print(
-        '- Carbs: ${carbTarget}g (${(caloriesToShow * carbPercent).round()} kcal)');
+        '- Carbs: ${carbTarget}g (${(targetCalories * carbPercent).round()} kcal)');
     print(
-        '- Total: ${((caloriesToShow * proteinPercent) + (caloriesToShow * fatPercent) + (caloriesToShow * carbPercent)).round()} kcal');
+        '- Total: ${((targetCalories * proteinPercent) + (targetCalories * fatPercent) + (targetCalories * carbPercent)).round()} kcal');
 
     // If we're still loading or have 0 calories, show a loading indicator
     if (isLoading || targetCalories == 0) {
