@@ -2161,44 +2161,16 @@ class _CodiaPageState extends State<CodiaPage> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Instead of using CircularProgressIndicator or CustomPaint,
-                    // directly tint the circle.png image with a ClipPath and colored overlay
+                    // SIMPLE APPROACH: Just use the original circle.png image
+                    // No overlay, no clip path, no custom painters
                     Transform.translate(
                       offset:
                           Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
-                      child: Stack(
-                        children: [
-                          // First render the original gray circle image
-                          Image.asset(
-                            'assets/images/circle.png',
-                            width: 130,
-                            height: 130,
-                            fit: BoxFit.contain,
-                          ),
-
-                          // Then overlay a black arc with the same thickness on top
-                          // This arc will be masked by a ClipPath to show only the portion filled
-                          ClipPath(
-                            clipper: ArcClipper(
-                              progress: targetCalories > 0
-                                  ? (consumedCalories / targetCalories)
-                                      .clamp(0.0, 1.0)
-                                  : 0.0,
-                            ),
-                            child: Container(
-                              width: 130,
-                              height: 130,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Color(0xFF333333).withOpacity(0.7),
-                                  width:
-                                      9.0, // Match the stroke width in circle.png
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: Image.asset(
+                        'assets/images/circle.png',
+                        width: 130,
+                        height: 130,
+                        fit: BoxFit.contain,
                       ),
                     ),
 
@@ -2627,97 +2599,4 @@ class _CodiaPageState extends State<CodiaPage> {
       _loadNutritionData();
     });
   }
-}
-
-class CircleProgressPainter extends CustomPainter {
-  final double progress;
-  final Color progressColor;
-  final Color backgroundColor;
-  final double strokeWidth;
-  final bool drawBackground;
-
-  CircleProgressPainter({
-    required this.progress,
-    required this.progressColor,
-    required this.backgroundColor,
-    required this.strokeWidth,
-    this.drawBackground = true,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-
-    // Draw background circle if needed
-    if (backgroundColor != Colors.transparent && drawBackground) {
-      final backgroundPaint = Paint()
-        ..color = backgroundColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth;
-
-      canvas.drawCircle(center, radius, backgroundPaint);
-    }
-
-    // Draw progress arc
-    final progressPaint = Paint()
-      ..color = progressColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final sweepAngle = 2 * math.pi * progress;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2, // Start from top
-      sweepAngle,
-      false,
-      progressPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(CircleProgressPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.progressColor != progressColor ||
-        oldDelegate.backgroundColor != backgroundColor ||
-        oldDelegate.strokeWidth != strokeWidth ||
-        oldDelegate.drawBackground != drawBackground;
-  }
-}
-
-// Add this ArcClipper class at the end of the file after the CircleProgressPainter class
-class ArcClipper extends CustomClipper<Path> {
-  final double progress;
-
-  ArcClipper({required this.progress});
-
-  @override
-  Path getClip(Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-
-    // Create a path that represents an arc
-    final path = Path();
-    path.moveTo(center.dx, center.dy);
-
-    // Draw the arc from top center, clockwise
-    final startAngle = -math.pi / 2; // Start from top
-    final sweepAngle = 2 * math.pi * progress; // Sweep based on progress
-
-    // Add the arc and close the path
-    path.arcTo(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle,
-      false,
-    );
-    path.close();
-
-    return path;
-  }
-
-  @override
-  bool shouldReclip(ArcClipper oldClipper) => oldClipper.progress != progress;
 }
