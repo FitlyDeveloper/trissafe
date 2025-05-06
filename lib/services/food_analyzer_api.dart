@@ -35,7 +35,9 @@ class FoodAnalyzerApi {
               'include_vitamins_minerals': true,
             }),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(
+              seconds:
+                  90)); // Increased timeout for render.com cold starts which can take 30-60+ seconds
 
       // Check for HTTP errors
       if (response.statusCode != 200) {

@@ -225,119 +225,34 @@ class _SnapFoodState extends State<SnapFood> {
       } catch (e) {
         print("API analysis error: $e");
 
-        // Even if API fails, navigate to FoodCardOpen with default values
+        // Instead of navigating to FoodCardOpen with default values,
+        // show an error dialog and go back to codia_page
         if (mounted) {
-          // Create a default food card with the image
-          final String defaultName = "Unknown Food";
-          final String defaultCalories = "0";
-          final String defaultProtein = "0";
-          final String defaultFat = "0";
-          final String defaultCarbs = "0";
-          final String healthScore = "5/10";
-          final List<Map<String, dynamic>> defaultIngredients = [
-            {'name': 'Unknown ingredients', 'amount': '0g', 'calories': 0}
-          ];
-
-          // Convert image to base64 for FoodCardOpen
-          String? imageBase64;
-          try {
-            imageBase64 = base64Encode(processedBytes);
-          } catch (e) {
-            print("Error encoding image: $e");
-          }
-
-          print(
-              "API failed, but navigating to FoodCardOpen with default values");
-
-          // Navigate to FoodCardOpen with default values
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => FoodCardOpen(
-                foodName: defaultName,
-                healthScore: healthScore,
-                calories: defaultCalories,
-                protein: defaultProtein,
-                fat: defaultFat,
-                carbs: defaultCarbs,
-                imageBase64: imageBase64,
-                ingredients: defaultIngredients,
-              ),
-            ),
-          ).then((_) {
-            // Set _isAnalyzing to false only after returning from FoodCardOpen
-            if (mounted) {
-              setState(() {
-                _isAnalyzing = false;
-              });
-            }
+          setState(() {
+            _isAnalyzing = false;
           });
+
+          // Show error dialog
+          _showCustomDialog("Analysis Failed",
+              "We couldn't analyze your food image. The server took too long to respond. Please try again later.");
+
+          // Pop back to codia_page
+          Navigator.of(context).pop();
         }
       }
     } catch (e) {
       print("Error analyzing image: $e");
       if (mounted) {
-        // Try to use the image even if analysis completely fails
-        try {
-          Uint8List imageBytes;
-          if (kIsWeb && _webImageBytes != null) {
-            imageBytes = _webImageBytes!;
-          } else if (_imageFile != null && !kIsWeb) {
-            imageBytes = await _imageFile!.readAsBytes();
-          } else if (image != null) {
-            imageBytes = await image.readAsBytes();
-          } else {
-            throw Exception("No image available");
-          }
+        setState(() {
+          _isAnalyzing = false;
+        });
 
-          // Create a default food card with the image
-          final String defaultName = "Unknown Food";
-          final String defaultCalories = "0";
-          final String defaultProtein = "0";
-          final String defaultFat = "0";
-          final String defaultCarbs = "0";
-          final String healthScore = "5/10";
-          final List<Map<String, dynamic>> defaultIngredients = [
-            {'name': 'Unknown ingredients', 'amount': '0g', 'calories': 0}
-          ];
+        // Show error dialog
+        _showCustomDialog("Analysis Failed",
+            "We couldn't process your food image. Please try again with a clearer photo.");
 
-          // Convert image to base64 for FoodCardOpen
-          String? imageBase64 = base64Encode(imageBytes);
-
-          print(
-              "Analysis completely failed, but navigating to FoodCardOpen with default values");
-
-          // Navigate to FoodCardOpen with default values
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => FoodCardOpen(
-                foodName: defaultName,
-                healthScore: healthScore,
-                calories: defaultCalories,
-                protein: defaultProtein,
-                fat: defaultFat,
-                carbs: defaultCarbs,
-                imageBase64: imageBase64,
-                ingredients: defaultIngredients,
-              ),
-            ),
-          ).then((_) {
-            if (mounted) {
-              setState(() {
-                _isAnalyzing = false;
-              });
-            }
-          });
-        } catch (imageError) {
-          // If we can't even get the image, show an error dialog
-          print("Failed to process image: $imageError");
-          setState(() {
-            _isAnalyzing = false;
-          });
-          _showCustomDialog("Analysis Failed",
-              "Failed to analyze the image. Please try again.");
-        }
+        // Pop back to codia_page
+        Navigator.of(context).pop();
       }
     }
   }
