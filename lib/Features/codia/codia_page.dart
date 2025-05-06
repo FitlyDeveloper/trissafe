@@ -2161,30 +2161,46 @@ class _CodiaPageState extends State<CodiaPage> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Show original circle.png
+                    // Use ColorFiltered to directly color the circle.png image
+                    // This applies the coloring to the actual image
                     Transform.translate(
                       offset:
                           Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
-                      child: Image.asset(
-                        'assets/images/circle.png',
-                        width: 130,
-                        height: 130,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-
-                    // Draw black circle (with partial sweep based on consumed calories)
-                    // using a CustomPaint directly on the canvas
-                    Transform.translate(
-                      offset:
-                          Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
-                      child: CustomPaint(
-                        size: Size(130, 130),
-                        painter: SimpleArcPainter(
-                          progress: targetCalories > 0
+                      child: ShaderMask(
+                        shaderCallback: (Rect bounds) {
+                          // Create a SweepGradient to color a portion of the circle
+                          final double progress = targetCalories > 0
                               ? (consumedCalories / targetCalories)
                                   .clamp(0.0, 1.0)
-                              : 0.0,
+                              : 0.0;
+
+                          // Calculate angles in radians
+                          final double startAngle =
+                              -math.pi / 2; // Start from top
+                          final double endAngle =
+                              startAngle + (2 * math.pi * progress);
+
+                          return SweepGradient(
+                            startAngle: startAngle,
+                            endAngle: endAngle,
+                            colors: [
+                              Color(0xFF333333).withOpacity(0.7), // 70% black
+                              Colors.transparent, // Transparent for the rest
+                            ],
+                            stops: [
+                              1.0,
+                              1.0
+                            ], // Hard stop at the calculated progress
+                            transform: GradientRotation(startAngle),
+                          ).createShader(bounds);
+                        },
+                        // Only apply the mask to the actual gray parts of the image
+                        blendMode: BlendMode.srcATop,
+                        child: Image.asset(
+                          'assets/images/circle.png',
+                          width: 130,
+                          height: 130,
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),
@@ -2614,39 +2630,4 @@ class _CodiaPageState extends State<CodiaPage> {
       _loadNutritionData();
     });
   }
-}
-
-// Add a simple arc painter at the end of the file
-class SimpleArcPainter extends CustomPainter {
-  final double progress;
-
-  SimpleArcPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = Color(0xFF333333).withOpacity(0.7) // 70% black
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 9.0; // Same thickness as circle.png's ring
-
-    final double radius = (size.width - 9.0) / 2; // Account for stroke width
-    final Offset center = Offset(size.width / 2, size.height / 2);
-
-    // Start from top (-90 degrees) and sweep based on progress
-    final double startAngle = -math.pi / 2;
-    final double sweepAngle = 2 * math.pi * progress;
-
-    // Draw arc
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle,
-      false,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(SimpleArcPainter oldDelegate) =>
-      oldDelegate.progress != progress;
 }
