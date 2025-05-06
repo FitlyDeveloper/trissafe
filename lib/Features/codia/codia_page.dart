@@ -13,6 +13,315 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:grouped_list/grouped_list.dart';
 
+// Observer class for app lifecycle events
+class _AppLifecycleObserver extends WidgetsBindingObserver {
+  final VoidCallback onResume;
+
+  _AppLifecycleObserver({required this.onResume});
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      onResume();
+    }
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is _AppLifecycleObserver;
+  }
+
+  @override
+  int get hashCode => onResume.hashCode;
+}
+
+// Class to track nutrition data from food logs
+class NutritionTracker {
+  // Singleton instance
+  static final NutritionTracker _instance = NutritionTracker._internal();
+  factory NutritionTracker() => _instance;
+  NutritionTracker._internal();
+
+  // Current nutrition values
+  int _currentProtein = 0;
+  int _currentFat = 0;
+  int _currentCarb = 0;
+  int _consumedCalories = 0;
+
+  // Getters for nutrition values
+  int get currentProtein => _currentProtein;
+  int get currentFat => _currentFat;
+  int get currentCarb => _currentCarb;
+  int get consumedCalories => _consumedCalories;
+
+  // Add a new food log entry
+  Future<bool> logFood({
+    required String name,
+    required dynamic calories,
+    required dynamic protein,
+    required dynamic fat,
+    required dynamic carbs,
+    String? imageBase64,
+    List<dynamic>? ingredients,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Get today's date
+      String today = DateTime.now().toString().split(' ')[0];
+      String foodLogsKey = 'food_logs_$today';
+
+      // Create the food log entry
+      Map<String, dynamic> foodLog = {
+        'name': name,
+        'calories': calories,
+        'protein': protein,
+        'fat': fat,
+        'carbs': carbs,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      if (imageBase64 != null) {
+        foodLog['image'] = imageBase64;
+      }
+
+      if (ingredients != null) {
+        foodLog['ingredients'] = ingredients;
+      }
+
+      // Load existing food logs for today
+      List<dynamic> foodLogs = [];
+      if (prefs.containsKey(foodLogsKey)) {
+        String? existingLogs = prefs.getString(foodLogsKey);
+        if (existingLogs != null && existingLogs.isNotEmpty) {
+          try {
+            foodLogs = jsonDecode(existingLogs);
+          } catch (e) {
+            print('Error parsing existing food logs: $e');
+            foodLogs = [];
+          }
+        }
+      }
+
+      // Add the new food log
+      foodLogs.add(foodLog);
+
+      // Save the updated food logs
+      await prefs.setString(foodLogsKey, jsonEncode(foodLogs));
+
+      print(
+          'Added food log: $name with calories=$calories, protein=$protein, fat=$fat, carbs=$carbs');
+
+      // Update the current nutrition values
+      _currentProtein += _parseNutritionValue(protein);
+      _currentFat += _parseNutritionValue(fat);
+      _currentCarb += _parseNutritionValue(carbs);
+      _consumedCalories += _parseNutritionValue(calories);
+
+      return true;
+    } catch (e) {
+      print('Error logging food: $e');
+      return false;
+    }
+  }
+
+  // Load nutrition data from SharedPreferences
+  Future<void> loadNutritionData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Reset values first
+      _currentProtein = 0;
+      _currentFat = 0;
+      _currentCarb = 0;
+      _consumedCalories = 0;
+
+      // Try to load today's food logs
+      String today = DateTime.now().toString().split(' ')[0]; // YYYY-MM-DD
+
+      // First try to get data from any known food log formats
+      bool dataFound = await _tryLoadFromFoodLogs(prefs, today) ||
+          await _tryLoadFromFoodCards(prefs) ||
+          await _tryLoadFromDailyNutrition(prefs, today);
+
+      if (!dataFound) {
+        print('No food log data found in any known format');
+
+        // For testing ONLY - use hardcoded values, COMMENT THIS OUT IN PRODUCTION
+        _setupTestData();
+      }
+    } catch (e) {
+      print('Error loading nutrition data: $e');
+    }
+  }
+
+  // Try to load from food_logs_DATE format
+  Future<bool> _tryLoadFromFoodLogs(
+      SharedPreferences prefs, String today) async {
+    String foodLogsKey = 'food_logs_$today';
+    print('Trying to load from $foodLogsKey');
+
+    if (prefs.containsKey(foodLogsKey)) {
+      String? foodLogsJson = prefs.getString(foodLogsKey);
+      print('Food logs JSON: ${foodLogsJson?.length ?? 0} characters');
+
+      if (foodLogsJson != null && foodLogsJson.isNotEmpty) {
+        try {
+          List<dynamic> foodLogs = jsonDecode(foodLogsJson);
+          print('Decoded ${foodLogs.length} food logs from $foodLogsKey');
+
+          // Sum up nutrition values from all food logs
+          for (var foodLog in foodLogs) {
+            try {
+              _currentProtein += _parseNutritionValue(foodLog['protein']);
+              _currentFat += _parseNutritionValue(foodLog['fat']);
+              _currentCarb += _parseNutritionValue(foodLog['carbs']);
+              _consumedCalories += _parseNutritionValue(foodLog['calories']);
+
+              print('Processed food log: ${foodLog['name'] ?? 'Unknown'}, '
+                  'calories: ${foodLog['calories']}, '
+                  'protein: ${foodLog['protein']}, '
+                  'fat: ${foodLog['fat']}, '
+                  'carbs: ${foodLog['carbs']}');
+            } catch (e) {
+              print('Error processing food log entry: $e');
+            }
+          }
+
+          print('Loaded nutrition data from $foodLogsKey: '
+              'protein=$_currentProtein, fat=$_currentFat, '
+              'carbs=$_currentCarb, calories=$_consumedCalories');
+          return true;
+        } catch (e) {
+          print('Error parsing food logs JSON from $foodLogsKey: $e');
+        }
+      }
+    }
+    return false;
+  }
+
+  // Try to load from food_cards format (used by SnapFood)
+  Future<bool> _tryLoadFromFoodCards(SharedPreferences prefs) async {
+    print('Trying to load from food_cards');
+
+    if (prefs.containsKey('food_cards')) {
+      List<String>? cardStrings = prefs.getStringList('food_cards');
+
+      if (cardStrings != null && cardStrings.isNotEmpty) {
+        print('Found ${cardStrings.length} food cards');
+
+        // Get today's date for filtering
+        String today = DateTime.now().toString().split(' ')[0]; // YYYY-MM-DD
+
+        for (String cardJson in cardStrings) {
+          try {
+            Map<String, dynamic> card = jsonDecode(cardJson);
+
+            // Check if this card is from today
+            int timestamp = card['timestamp'] ?? 0;
+            DateTime cardDate = DateTime.fromMillisecondsSinceEpoch(timestamp);
+            String cardDateStr = cardDate.toString().split(' ')[0];
+
+            if (cardDateStr == today) {
+              // This card is from today, add its nutrition values
+              _currentProtein += _parseNutritionValue(card['protein']);
+              _currentFat += _parseNutritionValue(card['fat']);
+              _currentCarb += _parseNutritionValue(card['carbs']);
+              _consumedCalories += _parseNutritionValue(card['calories']);
+
+              print('Added food card from today: ${card['name']}, '
+                  'calories: ${card['calories']}, '
+                  'protein: ${card['protein']}, '
+                  'fat: ${card['fat']}, '
+                  'carbs: ${card['carbs']}');
+            }
+          } catch (e) {
+            print('Error processing food card: $e');
+          }
+        }
+
+        print('Loaded nutrition data from food_cards: '
+            'protein=$_currentProtein, fat=$_currentFat, '
+            'carbs=$_currentCarb, calories=$_consumedCalories');
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Try to load from daily nutrition format
+  Future<bool> _tryLoadFromDailyNutrition(
+      SharedPreferences prefs, String today) async {
+    String dailyNutritionKey = 'daily_nutrition_$today';
+    print('Trying to load from $dailyNutritionKey');
+
+    if (prefs.containsKey(dailyNutritionKey)) {
+      String? nutritionJson = prefs.getString(dailyNutritionKey);
+
+      if (nutritionJson != null && nutritionJson.isNotEmpty) {
+        try {
+          Map<String, dynamic> nutrition = jsonDecode(nutritionJson);
+          _currentProtein = _parseNutritionValue(nutrition['protein']);
+          _currentFat = _parseNutritionValue(nutrition['fat']);
+          _currentCarb = _parseNutritionValue(nutrition['carbs']);
+          _consumedCalories = _parseNutritionValue(nutrition['calories']);
+
+          print('Loaded nutrition data from $dailyNutritionKey: '
+              'protein=$_currentProtein, fat=$_currentFat, '
+              'carbs=$_currentCarb, calories=$_consumedCalories');
+          return true;
+        } catch (e) {
+          print('Error parsing nutrition JSON from $dailyNutritionKey: $e');
+        }
+      }
+    }
+    return false;
+  }
+
+  // Helper method to parse nutrition values safely
+  int _parseNutritionValue(dynamic value) {
+    if (value == null) return 0;
+
+    if (value is int) {
+      return value;
+    }
+
+    if (value is double) {
+      return value.round();
+    }
+
+    if (value is String) {
+      // Remove any non-numeric characters except decimals
+      String cleanedValue = value.replaceAll(RegExp(r'[^0-9.]'), '');
+      if (cleanedValue.isEmpty) return 0;
+
+      try {
+        return double.parse(cleanedValue).round();
+      } catch (e) {
+        print('Error parsing nutrition value "$value": $e');
+        return 0;
+      }
+    }
+
+    return 0;
+  }
+
+  // Setup test data for debugging
+  void _setupTestData() {
+    print('No food log data found - setting all nutrition values to zero');
+
+    // Set all values to zero when no food logs are found
+    _currentProtein = 0;
+    _currentFat = 0;
+    _currentCarb = 0;
+    _consumedCalories = 0;
+
+    print(
+        'Set nutrition values to zero: protein=$_currentProtein, fat=$_currentFat, carbs=$_currentCarb, calories=$_consumedCalories');
+  }
+}
+
 class CodiaPage extends StatefulWidget {
   CodiaPage({super.key});
 
@@ -29,6 +338,9 @@ class _CodiaPageState extends State<CodiaPage> {
   bool isImperial = false; // Track metric/imperial setting
   double originalGoalSpeed = 0.0; // Track original goal speed for logs
   int streakCount = 0; // Track user's streak count
+
+  // Create instance of NutritionTracker
+  final NutritionTracker _nutritionTracker = NutritionTracker();
 
   // User data variables - will be populated from saved answers
   String userGender = 'Female'; // Default values, will be overridden
@@ -102,6 +414,24 @@ class _CodiaPageState extends State<CodiaPage> {
 
     _loadUserData(); // Load the user's actual data from storage
     _loadFoodCards(); // Load food cards from SharedPreferences
+    _loadNutritionData(); // Load nutrition data from food logs
+
+    // Add listener to refresh data when app resumes
+    WidgetsBinding.instance.addObserver(_AppLifecycleObserver(
+      onResume: () {
+        print('App resumed - refreshing nutrition data');
+        _loadNutritionData();
+      },
+    ));
+  }
+
+  @override
+  void dispose() {
+    // Remove observers
+    WidgetsBinding.instance.removeObserver(
+      _AppLifecycleObserver(onResume: () {}),
+    );
+    super.dispose();
   }
 
   // Load user data from SharedPreferences
@@ -845,24 +1175,24 @@ class _CodiaPageState extends State<CodiaPage> {
           final List<String> updatedCards =
               cards.map((card) => jsonEncode(card)).toList();
           await prefs.setStringList('food_cards', updatedCards);
-      }
-
-      // Sort by timestamp (most recent first)
-      cards.sort(
-          (a, b) => (b['timestamp'] as int).compareTo(a['timestamp'] as int));
-
-      // Update streak count if we have food cards
-      setState(() {
-        _foodCards = cards;
-        _isLoadingFoodCards = false;
-        
-        // Update streak count if we have food cards
-        if (cards.isNotEmpty) {
-          streakCount = 1; // Set streak to 1 if any food images are uploaded
         }
-      });
 
-      print("Loaded ${cards.length} food cards");
+        // Sort by timestamp (most recent first)
+        cards.sort(
+            (a, b) => (b['timestamp'] as int).compareTo(a['timestamp'] as int));
+
+        // Update streak count if we have food cards
+        setState(() {
+          _foodCards = cards;
+          _isLoadingFoodCards = false;
+
+          // Update streak count if we have food cards
+          if (cards.isNotEmpty) {
+            streakCount = 1; // Set streak to 1 if any food images are uploaded
+          }
+        });
+
+        print("Loaded ${cards.length} food cards");
       }
     } catch (e) {
       print("Error loading food cards: $e");
@@ -1052,9 +1382,9 @@ class _CodiaPageState extends State<CodiaPage> {
             'amount': amount,
             'calories': calories,
           });
-      } catch (e) {
+        } catch (e) {
           print("Skipping invalid ingredient: $e");
-      }
+        }
       }
     }
 
@@ -1076,7 +1406,11 @@ class _CodiaPageState extends State<CodiaPage> {
                 healthScore: foodCard['health_score'] ?? '8/10',
               ),
             ),
-          );
+          ).then((_) {
+            // Refresh data when returning from FoodCardOpen
+            _loadFoodCards();
+            _loadNutritionData();
+          });
         },
         child: Container(
           padding: EdgeInsets.only(right: 12),
@@ -1265,365 +1599,355 @@ class _CodiaPageState extends State<CodiaPage> {
       backgroundColor:
           Color(0xFFF5F5F5), // Light background color to match the app's theme
       body: Stack(
-      children: [
-        // Background and scrollable content
-        Container(
+        children: [
+          // Background and scrollable content
+          Container(
             // Ensure the container fills the entire screen
             width: MediaQuery.of(context).size.width,
             height: MediaQuery.of(context).size.height,
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('assets/images/background4.jpg'),
-              fit: BoxFit.cover,
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/background4.jpg'),
+                fit: BoxFit.cover,
+              ),
             ),
-          ),
-          child: SingleChildScrollView(
+            child: SingleChildScrollView(
               // Ensure the scrollable content fills the available space
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Add padding for status bar
-                SizedBox(height: statusBarHeight),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Add padding for status bar
+                  SizedBox(height: statusBarHeight),
 
-                // Header with Fitly title and icons
-                Padding(
+                  // Header with Fitly title and icons
+                  Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 29, vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Calendar icon
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const MemoriesScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Calendar icon
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MemoriesScreen(),
+                              ),
+                            );
+                          },
+                          child: Container(
                             padding: EdgeInsets.symmetric(
                                 horizontal: 26, vertical: 8),
-                          width: 70,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Image.asset(
-                            'assets/images/calendar.png',
-                            width: 19.4,
-                            height: 19.4,
-                          ),
-                        ),
-                      ),
-
-                      // Fitly title
-                      Text(
-                        'Fitly',
-                        style: TextStyle(
-                          fontSize: 34.56,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'SF Pro Display',
-                          color: Colors.black,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-
-                      // Streak icon with count
-                      GestureDetector(
-                        onTap: () async {
-                          // Show streak popup
-                          _showStreakPopup();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          width: 70, // Fixed width
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.asset(
-                                'assets/images/streak0.png',
-                                width: 19.4,
-                                height: 19.4,
-                                color: streakCount > 0 ? Color(0xFFFF9801) : null, // Orange for active streak
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                streakCount > 0 ? '1' : '0',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                  decoration: TextDecoration.none,
+                            width: 70,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                            child: Image.asset(
+                              'assets/images/calendar.png',
+                              width: 19.4,
+                              height: 19.4,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
 
-                // Today text
-                Padding(
-                    padding:
-                        const EdgeInsets.only(left: 29, top: 8, bottom: 16),
-                  child: Text(
-                    'Today',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'SF Pro Display',
-                      color: Colors.black,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ),
-
-                // Flippable Calorie/Activity card
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 29),
-                  child: FlipCard(
-                    frontSide: _buildCalorieCard(),
-                    backSide: HomeCard2(),
-                    onFlip: () {
-                      setState(() {
-                        _showFrontCard = !_showFrontCard;
-                      });
-                    },
-                  ),
-                ),
-
-                // Pagination dots
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _showFrontCard
-                                ? Colors.black
-                                : Color(0xFFDADADA),
+                        // Fitly title
+                        Text(
+                          'Fitly1',
+                          style: TextStyle(
+                            fontSize: 34.56,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'SF Pro Display',
+                            color: Colors.black,
+                            decoration: TextDecoration.none,
                           ),
                         ),
-                        SizedBox(width: 8),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _showFrontCard
-                                ? Color(0xFFDADADA)
-                                : Colors.black,
+
+                        // Streak icon with count
+                        GestureDetector(
+                          onTap: () async {
+                            // Show streak popup
+                            _showStreakPopup();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            width: 70, // Fixed width
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Image.asset(
+                                  'assets/images/streak0.png',
+                                  width: 19.4,
+                                  height: 19.4,
+                                  color: streakCount > 0
+                                      ? Color(0xFFFF9801)
+                                      : null, // Orange for active streak
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  streakCount > 0 ? '1' : '0',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
 
-                // Snap Meal and Coach buttons
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 29),
-                  child: Row(
-                    children: [
-                      // Snap Meal button
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            // Navigate to SnapFood screen
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SnapFood(),
-                              ),
-                            ).then((_) {
-                              _loadFoodCards();
-                            });
-                          },
-                          child: Container(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.asset(
-                                  'assets/images/camera.png',
-                                  width: 24,
-                                  height: 24,
-                                ),
-                                SizedBox(width: 14),
-                                Text(
-                                  'Snap Meal',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black,
-                                    decoration: TextDecoration.none,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(width: 22),
-
-                      // Coach button
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            print("Navigating to Coach screen");
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => CoachScreen()),
-                            );
-                          },
-                          child: Container(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.asset(
-                                  'assets/images/coach.png',
-                                  width: 24,
-                                  height: 24,
-                                ),
-                                SizedBox(width: 14),
-                                Text(
-                                  'Coach',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black,
-                                    decoration: TextDecoration.none,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Recent Activity section
-                Padding(
+                  // Today text
+                  Padding(
                     padding:
-                        const EdgeInsets.only(left: 29, top: 24, bottom: 16),
-                  child: Text(
-                    'Recent Activity',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'SF Pro Display',
-                      color: Colors.black,
-                      decoration: TextDecoration.none,
+                        const EdgeInsets.only(left: 29, top: 8, bottom: 16),
+                    child: Text(
+                      'Today',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'SF Pro Display',
+                        color: Colors.black,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
                   ),
-                ),
 
-                // Dynamic food cards
-                ..._buildDynamicFoodCards(),
+                  // Flippable Calorie/Activity card
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 29),
+                    child: FlipCard(
+                      frontSide: _buildCalorieCard(),
+                      backSide: HomeCard2(),
+                      onFlip: () {
+                        setState(() {
+                          _showFrontCard = !_showFrontCard;
+                        });
+                      },
+                    ),
+                  ),
 
-                // Add padding at the bottom to ensure content doesn't get cut off by the nav bar
-                SizedBox(height: 90),
-              ],
+                  // Pagination dots
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _showFrontCard
+                                  ? Colors.black
+                                  : Color(0xFFDADADA),
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _showFrontCard
+                                  ? Color(0xFFDADADA)
+                                  : Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Snap Meal and Coach buttons
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 29),
+                    child: Row(
+                      children: [
+                        // Snap Meal button
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              // Navigate to SnapFood screen
+                              _navigateToSnapFood();
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Image.asset(
+                                    'assets/images/camera.png',
+                                    width: 24,
+                                    height: 24,
+                                  ),
+                                  SizedBox(width: 14),
+                                  Text(
+                                    'Snap Meal',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(width: 22),
+
+                        // Coach button
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              _navigateToCoach();
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Image.asset(
+                                    'assets/images/coach.png',
+                                    width: 24,
+                                    height: 24,
+                                  ),
+                                  SizedBox(width: 14),
+                                  Text(
+                                    'Coach',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Recent Activity section
+                  Padding(
+                    padding:
+                        const EdgeInsets.only(left: 29, top: 24, bottom: 16),
+                    child: Text(
+                      'Recent Activity',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'SF Pro Display',
+                        color: Colors.black,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+
+                  // Dynamic food cards
+                  ..._buildDynamicFoodCards(),
+
+                  // Add padding at the bottom to ensure content doesn't get cut off by the nav bar
+                  SizedBox(height: 90),
+                ],
+              ),
             ),
           ),
-        ),
 
-        // Fixed bottom navigation bar
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: 90, // Increased from 60px to 90px
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: Offset(0, -2),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 0),
-              child: Transform.translate(
-                offset: Offset(0, -5),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildNavItem('Home', 'assets/images/home.png',
-                        _selectedIndex == 0, 0),
-                    _buildNavItem('Social', 'assets/images/socialicon.png',
-                        _selectedIndex == 1, 1),
-                    _buildNavItem('Nutrition', 'assets/images/nutrition.png',
-                        _selectedIndex == 2, 2),
-                    _buildNavItem('Workout', 'assets/images/dumbbell.png',
-                        _selectedIndex == 3, 3),
-                    _buildNavItem('Profile', 'assets/images/profile.png',
-                        _selectedIndex == 4, 4),
-                  ],
+          // Fixed bottom navigation bar
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 90, // Increased from 60px to 90px
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 0),
+                child: Transform.translate(
+                  offset: Offset(0, -5),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildNavItem('Home', 'assets/images/home.png',
+                          _selectedIndex == 0, 0),
+                      _buildNavItem('Social', 'assets/images/socialicon.png',
+                          _selectedIndex == 1, 1),
+                      _buildNavItem('Nutrition', 'assets/images/nutrition.png',
+                          _selectedIndex == 2, 2),
+                      _buildNavItem('Workout', 'assets/images/dumbbell.png',
+                          _selectedIndex == 3, 3),
+                      _buildNavItem('Profile', 'assets/images/profile.png',
+                          _selectedIndex == 4, 4),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
@@ -1673,8 +1997,17 @@ class _CodiaPageState extends State<CodiaPage> {
   }
 
   Widget _buildCalorieCard() {
-    // Don't recalculate here - use the value calculated in _loadUserData
-    double caloriesToShow = targetCalories.toDouble();
+    double caloriesToShow = remainingCalories > 0
+        ? remainingCalories.toDouble()
+        : targetCalories.toDouble();
+
+    // Get the consumed calories
+    int consumedCalories = _nutritionTracker.consumedCalories;
+
+    // Get the macronutrient values
+    int currentProtein = _nutritionTracker.currentProtein;
+    int currentFat = _nutritionTracker.currentFat;
+    int currentCarb = _nutritionTracker.currentCarb;
 
     // Calculate TDEE for maintenance display - USING EXACTLY THE SAME METHOD AS calculateTDEE()
     int maintenanceCalories = calculateTDEE(
@@ -1757,16 +2090,16 @@ class _CodiaPageState extends State<CodiaPage> {
     print(
         '- Total: ${((caloriesToShow * proteinPercent) + (caloriesToShow * fatPercent) + (caloriesToShow * carbPercent)).round()} kcal');
 
-    // Set current intake to 0 until user logs food
-    int currentProtein = 0;
-    int currentFat = 0;
-    int currentCarb = 0;
-
     // If we're still loading or have 0 calories, show a loading indicator
     if (isLoading || targetCalories == 0) {
       print('Loading calorie data or no calories calculated yet');
       // We could return a loading indicator here if needed
     }
+
+    // Variables were already defined earlier, no need to redefine
+    // int currentProtein = 0;
+    // int currentFat = 0;
+    // int currentCarb = 0;
 
     return Container(
       height: 220,
@@ -1912,8 +2245,9 @@ class _CodiaPageState extends State<CodiaPage> {
                       color: Color(0xFFEEEEEE),
                     ),
                     child: FractionallySizedBox(
-                      widthFactor:
-                          currentProtein / proteinTarget, // Dynamic progress
+                      widthFactor: proteinTarget > 0
+                          ? (currentProtein / proteinTarget).clamp(0.0, 1.0)
+                          : 0.0,
                       alignment: Alignment.centerLeft,
                       child: Container(
                         decoration: BoxDecoration(
@@ -1956,7 +2290,9 @@ class _CodiaPageState extends State<CodiaPage> {
                       color: Color(0xFFEEEEEE),
                     ),
                     child: FractionallySizedBox(
-                      widthFactor: currentFat / fatTarget, // Dynamic progress
+                      widthFactor: fatTarget > 0
+                          ? (currentFat / fatTarget).clamp(0.0, 1.0)
+                          : 0.0,
                       alignment: Alignment.centerLeft,
                       child: Container(
                         decoration: BoxDecoration(
@@ -1999,7 +2335,9 @@ class _CodiaPageState extends State<CodiaPage> {
                       color: Color(0xFFEEEEEE),
                     ),
                     child: FractionallySizedBox(
-                      widthFactor: currentCarb / carbTarget, // Dynamic progress
+                      widthFactor: carbTarget > 0
+                          ? (currentCarb / carbTarget).clamp(0.0, 1.0)
+                          : 0.0,
                       alignment: Alignment.centerLeft,
                       child: Container(
                         decoration: BoxDecoration(
@@ -2077,30 +2415,33 @@ class _CodiaPageState extends State<CodiaPage> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 SizedBox(height: 35), // Increased for more vertical space
-                
+
                 // Streak icon - 175x175 as specified
                 Image.asset(
                   'assets/images/streak0.png',
                   width: 175,
                   height: 175,
-                  color: streakCount > 0 ? Color(0xFFFF9801) : null, // Orange color for active streak
+                  color: streakCount > 0
+                      ? Color(0xFFFF9801)
+                      : null, // Orange color for active streak
                 ),
-                
+
                 SizedBox(height: 20),
-                
+
                 // Streak count text - changes based on streak
                 Text(
                   streakCount > 0 ? "1 Day Streak" : "0 Day Streak",
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: streakCount > 0 ? Color(0xFFFF9801) : Color(0xFFD9D9D9),
+                    color:
+                        streakCount > 0 ? Color(0xFFFF9801) : Color(0xFFD9D9D9),
                     fontFamily: 'SF Pro Display',
                   ),
                 ),
-                
+
                 SizedBox(height: 20),
-                
+
                 // Level 1 text and progress bar for streaks > 0
                 if (streakCount > 0) ...[
                   Text(
@@ -2111,9 +2452,9 @@ class _CodiaPageState extends State<CodiaPage> {
                       fontFamily: 'SF Pro Display',
                     ),
                   ),
-                  
+
                   SizedBox(height: 10),
-                  
+
                   // Progress bar
                   Container(
                     width: 280, // Same width as Continue button
@@ -2125,7 +2466,9 @@ class _CodiaPageState extends State<CodiaPage> {
                     child: Row(
                       children: [
                         Container(
-                          width: (280.0 / 7.0) * streakCount.toDouble(), // Calculate exact width based on button width (280px / 7 days)
+                          width: (280.0 / 7.0) *
+                              streakCount
+                                  .toDouble(), // Calculate exact width based on button width (280px / 7 days)
                           height: 10.0,
                           decoration: BoxDecoration(
                             color: Color(0xFFFF9801),
@@ -2135,17 +2478,17 @@ class _CodiaPageState extends State<CodiaPage> {
                       ],
                     ),
                   ),
-                  
+
                   SizedBox(height: 20),
                 ],
-                
+
                 // Motivational text - changes based on streak
                 Container(
                   width: 280, // Match button width for alignment
                   child: Text(
-                    streakCount > 0 
-                      ? "You're building a habit of success!" // 37 character limit
-                      : "Every journey starts at zero - \nStart Now!", 
+                    streakCount > 0
+                        ? "You're building a habit of success!" // 37 character limit
+                        : "Every journey starts at zero - \nStart Now!",
                     style: TextStyle(
                       fontSize: 18,
                       color: Colors.black.withOpacity(0.6),
@@ -2154,9 +2497,9 @@ class _CodiaPageState extends State<CodiaPage> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-                
+
                 SizedBox(height: 35),
-                
+
                 // Continue button - match sizing of Fix with AI button
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -2173,8 +2516,8 @@ class _CodiaPageState extends State<CodiaPage> {
                         Navigator.of(context).pop();
                       },
                       style: ButtonStyle(
-                        overlayColor: MaterialStateProperty.all(
-                            Colors.transparent),
+                        overlayColor:
+                            MaterialStateProperty.all(Colors.transparent),
                       ),
                       child: const Text(
                         'Continue',
@@ -2194,6 +2537,58 @@ class _CodiaPageState extends State<CodiaPage> {
         );
       },
     );
+  }
+
+  // Load nutrition data from food logs
+  Future<void> _loadNutritionData() async {
+    await _nutritionTracker.loadNutritionData();
+    setState(() {
+      // Update remaining calories based on consumed calories
+      if (targetCalories > 0) {
+        remainingCalories = targetCalories - _nutritionTracker.consumedCalories;
+        if (remainingCalories < 0) remainingCalories = 0;
+      }
+    });
+    print(
+        'Updated remaining calories: $remainingCalories (target=$targetCalories, consumed=${_nutritionTracker.consumedCalories})');
+  }
+
+  // Navigation methods for Snap Meal and Coach buttons
+  void _navigateToSnapFood() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SnapFood(),
+      ),
+    ).then((_) {
+      // Refresh both food cards and nutrition data when returning from SnapFood
+      print('Returned from SnapFood - refreshing data');
+      _loadFoodCards();
+      _loadNutritionData();
+    });
+  }
+
+  void _navigateToCoach() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CoachScreen(),
+      ),
+    );
+  }
+
+  void _navigateToFoodCardOpen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const FoodCardOpen(),
+      ),
+    ).then((_) {
+      // Refresh both food cards and nutrition data when returning
+      print('Returned from FoodCardOpen - refreshing data');
+      _loadFoodCards();
+      _loadNutritionData();
+    });
   }
 }
 
