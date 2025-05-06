@@ -47,6 +47,8 @@ class _SnapFoodState extends State<SnapFood> {
   String _activeButton = 'Scan Food'; // Default active button
   bool _permissionsRequested = false;
   bool _isAnalyzing = false; // Track if analysis is in progress
+  int _loadingDots = 0; // Add this to track loading animation state
+  Timer? _dotsAnimationTimer;
 
   // Food analysis result
   Map<String, dynamic>? _analysisResult;
@@ -64,6 +66,17 @@ class _SnapFoodState extends State<SnapFood> {
   @override
   void initState() {
     super.initState();
+    // Don't initialize _picker here since it's already declared as final
+
+    // Add timer for loading animation dots
+    _dotsAnimationTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
+      if (mounted && _isAnalyzing) {
+        setState(() {
+          _loadingDots = (_loadingDots + 1) % 4; // Cycles between 0, 1, 2, 3
+        });
+      }
+    });
+
     if (!kIsWeb) {
       // Simplified permission check - no permission_handler
       _checkPermissionsSimple();
@@ -1751,20 +1764,21 @@ class _SnapFoodState extends State<SnapFood> {
                         ),
                         SizedBox(height: 20),
                         Text(
-                          "Analyzing meal...",
+                          "Analyzing meal" + ".".padRight(_loadingDots, '.'),
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        SizedBox(height: 8),
+                        SizedBox(height: 5),
                         Text(
                           "This may take up to 2-3 minutes\nif the server needs to start up",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.8),
                             fontSize: 14,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
@@ -2186,6 +2200,7 @@ class _SnapFoodState extends State<SnapFood> {
 
   @override
   void dispose() {
+    _dotsAnimationTimer?.cancel();
     // Clean up resources
     super.dispose();
   }
