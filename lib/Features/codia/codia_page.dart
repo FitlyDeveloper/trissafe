@@ -2154,7 +2154,35 @@ class _CodiaPageState extends State<CodiaPage> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Circle image as background
+                    // Progress ring that fills up based on consumed calories
+                    Transform.translate(
+                      offset:
+                          Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
+                      child: SizedBox(
+                        width: 130,
+                        height: 130,
+                        child: CustomPaint(
+                          painter: CircleProgressPainter(
+                            // Progress is calculated based on how much is consumed out of the target
+                            // progress = 0.0 means nothing consumed (empty gray ring)
+                            // progress = 1.0 means everything consumed (full gray ring)
+                            progress: targetCalories > 0
+                                ? (consumedCalories / targetCalories)
+                                    .clamp(0.0, 1.0)
+                                : 0.0,
+                            progressColor: Color(
+                                0xFF333333), // Dark gray color that matches circle.png
+                            backgroundColor: Colors.transparent,
+                            strokeWidth:
+                                9.0, // Match the stroke width in circle.png
+                            drawBackground:
+                                false, // Don't draw a background, only the arc
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Circle image with transparent gap (for the progress to show through)
                     Transform.translate(
                       offset:
                           Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
@@ -2166,34 +2194,7 @@ class _CodiaPageState extends State<CodiaPage> {
                       ),
                     ),
 
-                    // Add a progress indicator on top
-                    Transform.translate(
-                      offset:
-                          Offset(0, -3.9), // Match offset of background image
-                      child: SizedBox(
-                        width: 130,
-                        height: 130,
-                        child: CustomPaint(
-                          painter: CircleProgressPainter(
-                            // Show progress of consumption as a ring
-                            // As user eats more, the ring fills up
-                            // When the user has eaten all calories, the ring is 100% filled
-                            progress: targetCalories > 0
-                                ? (consumedCalories / targetCalories)
-                                    .clamp(0.0, 1.0)
-                                : 0.0,
-                            progressColor: Colors.black.withOpacity(0.8),
-                            backgroundColor: Colors.transparent,
-                            strokeWidth:
-                                9.0, // Match the stroke width in circle.png
-                          ),
-                          child:
-                              Container(), // Empty container for the CustomPaint
-                        ),
-                      ),
-                    ),
-
-                    // Remaining calories text - UPDATED to show exact calculation
+                    // Remaining calories text
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -2625,12 +2626,14 @@ class CircleProgressPainter extends CustomPainter {
   final Color progressColor;
   final Color backgroundColor;
   final double strokeWidth;
+  final bool drawBackground;
 
   CircleProgressPainter({
     required this.progress,
     required this.progressColor,
     required this.backgroundColor,
     required this.strokeWidth,
+    this.drawBackground = true,
   });
 
   @override
@@ -2639,7 +2642,7 @@ class CircleProgressPainter extends CustomPainter {
     final radius = (size.width - strokeWidth) / 2;
 
     // Draw background circle if needed
-    if (backgroundColor != Colors.transparent) {
+    if (backgroundColor != Colors.transparent && drawBackground) {
       final backgroundPaint = Paint()
         ..color = backgroundColor
         ..style = PaintingStyle.stroke
@@ -2671,6 +2674,7 @@ class CircleProgressPainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.progressColor != progressColor ||
         oldDelegate.backgroundColor != backgroundColor ||
-        oldDelegate.strokeWidth != strokeWidth;
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.drawBackground != drawBackground;
   }
 }
