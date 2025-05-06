@@ -2154,21 +2154,7 @@ class _CodiaPageState extends State<CodiaPage> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Custom progress ring that fills as calories are consumed
-                    CustomPaint(
-                      size: Size(130, 130),
-                      painter: CircleProgressPainter(
-                        progress: targetCalories > 0
-                            ? (consumedCalories / targetCalories)
-                                .clamp(0.0, 1.0)
-                            : 0.0,
-                        progressColor: Colors.black,
-                        backgroundColor: Color(0xFFEEEEEE),
-                        strokeWidth: 5.0,
-                      ),
-                    ),
-
-                    // Circle image for added visual effect
+                    // Circle image as background
                     Transform.translate(
                       offset:
                           Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
@@ -2177,6 +2163,33 @@ class _CodiaPageState extends State<CodiaPage> {
                         width: 130,
                         height: 130,
                         fit: BoxFit.contain,
+                      ),
+                    ),
+
+                    // Add a progress indicator on top
+                    Transform.translate(
+                      offset:
+                          Offset(0, -3.9), // Match offset of background image
+                      child: SizedBox(
+                        width: 130,
+                        height: 130,
+                        child: CustomPaint(
+                          painter: CircleProgressPainter(
+                            // Show progress of consumption as a ring
+                            // As user eats more, the ring fills up
+                            // When the user has eaten all calories, the ring is 100% filled
+                            progress: targetCalories > 0
+                                ? (consumedCalories / targetCalories)
+                                    .clamp(0.0, 1.0)
+                                : 0.0,
+                            progressColor: Colors.black.withOpacity(0.8),
+                            backgroundColor: Colors.transparent,
+                            strokeWidth:
+                                9.0, // Match the stroke width in circle.png
+                          ),
+                          child:
+                              Container(), // Empty container for the CustomPaint
+                        ),
                       ),
                     ),
 
@@ -2625,34 +2638,32 @@ class CircleProgressPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
 
-    // Draw background circle
-    final backgroundPaint = Paint()
-      ..color = backgroundColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-
-    canvas.drawCircle(center, radius, backgroundPaint);
-
-    // Draw progress arc - clockwise from the top
-    if (progress > 0) {
-      final progressPaint = Paint()
-        ..color = progressColor
+    // Draw background circle if needed
+    if (backgroundColor != Colors.transparent) {
+      final backgroundPaint = Paint()
+        ..color = backgroundColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round;
+        ..strokeWidth = strokeWidth;
 
-      // Calculate sweep angle - note that we're drawing clockwise from top
-      // Progress of 1.0 means a full circle (2*pi radians)
-      final sweepAngle = 2 * math.pi * progress;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        -math.pi / 2, // Start at top (negative pi/2)
-        sweepAngle,
-        false,
-        progressPaint,
-      );
+      canvas.drawCircle(center, radius, backgroundPaint);
     }
+
+    // Draw progress arc
+    final progressPaint = Paint()
+      ..color = progressColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final sweepAngle = 2 * math.pi * progress;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2, // Start from top
+      sweepAngle,
+      false,
+      progressPaint,
+    );
   }
 
   @override
