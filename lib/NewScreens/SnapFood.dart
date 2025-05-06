@@ -152,6 +152,20 @@ class _SnapFoodState extends State<SnapFood> {
       _isAnalyzing = true;
     });
 
+    // Start a timer to show a "still working" message after 90 seconds
+    // This happens before the full timeout but reassures the user
+    Timer? processingTimer = Timer(Duration(seconds: 90), () {
+      if (mounted && _isAnalyzing) {
+        // If still analyzing after 90 seconds, show a toast or update UI
+        // to let user know we're still working
+        setState(() {
+          // This will refresh the UI and show updated loading message
+          // We don't need to change anything as the updated loading UI
+          // already mentions the waiting time
+        });
+      }
+    });
+
     try {
       print("Processing image ${image.path}");
       Uint8List imageBytes;
@@ -208,6 +222,9 @@ class _SnapFoodState extends State<SnapFood> {
         // Use our secure API service via Firebase
         final response = await FoodAnalyzerApi.analyzeFoodImage(processedBytes);
 
+        // Cancel the processing timer as we got a response
+        processingTimer.cancel();
+
         print("API call successful!");
         print('Response: $response');
 
@@ -223,6 +240,9 @@ class _SnapFoodState extends State<SnapFood> {
           // _isAnalyzing will be set to false after navigation to FoodCardOpen
         }
       } catch (e) {
+        // Cancel the processing timer
+        processingTimer.cancel();
+
         print("API analysis error: $e");
 
         // Instead of navigating to FoodCardOpen with default values,
@@ -232,15 +252,27 @@ class _SnapFoodState extends State<SnapFood> {
             _isAnalyzing = false;
           });
 
+          // Show a more helpful error message based on the error type
+          String errorMessage;
+          if (e.toString().contains("TimeoutException")) {
+            errorMessage =
+                "The server is taking longer than expected to respond. This usually happens when the server is starting up after being idle. Please try again in a few minutes when the server is ready.";
+          } else {
+            errorMessage =
+                "We couldn't analyze your food image. Please try again with a clearer photo or check your internet connection.";
+          }
+
           // Show error dialog
-          _showCustomDialog("Analysis Failed",
-              "We couldn't analyze your food image. The server took too long to respond. Please try again later.");
+          _showCustomDialog("Analysis Taking Too Long", errorMessage);
 
           // Pop back to codia_page
           Navigator.of(context).pop();
         }
       }
     } catch (e) {
+      // Cancel the processing timer
+      processingTimer.cancel();
+
       print("Error analyzing image: $e");
       if (mounted) {
         setState(() {
@@ -248,7 +280,7 @@ class _SnapFoodState extends State<SnapFood> {
         });
 
         // Show error dialog
-        _showCustomDialog("Analysis Failed",
+        _showCustomDialog("Analysis Error",
             "We couldn't process your food image. Please try again with a clearer photo.");
 
         // Pop back to codia_page
@@ -1724,6 +1756,15 @@ class _SnapFoodState extends State<SnapFood> {
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          "This may take up to 2-3 minutes\nif the server needs to start up",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 14,
                           ),
                         ),
                       ],
