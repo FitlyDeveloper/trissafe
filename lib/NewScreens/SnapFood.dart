@@ -49,6 +49,21 @@ class _SnapFoodState extends State<SnapFood> {
   bool _isAnalyzing = false; // Track if analysis is in progress
   int _loadingDots = 0; // Add this to track loading animation state
   Timer? _dotsAnimationTimer;
+  int _processingStep = 0; // Track which processing step to show
+  int _dotCycles = 0; // Track how many dot cycles have completed
+  List<int> _cycleThresholds = []; // Dynamic thresholds for step changes
+
+  // Processing step messages to cycle through
+  final List<String> _processingSteps = [
+    "Reading Image",
+    "Identifying Food Type",
+    "Detecting Ingredients",
+    "Estimating Portion Size",
+    "Calculating Calories & Macros",
+    "Analyzing Vitamins & Minerals",
+    "Cross-checking with Nutrition Database",
+    "Finalizing Meal Summary"
+  ];
 
   // Food analysis result
   Map<String, dynamic>? _analysisResult;
@@ -73,6 +88,19 @@ class _SnapFoodState extends State<SnapFood> {
       if (mounted && _isAnalyzing) {
         setState(() {
           _loadingDots = (_loadingDots + 1) % 4; // Cycles between 0, 1, 2, 3
+
+          // If we complete a dot cycle (back to 0)
+          if (_loadingDots == 0) {
+            _dotCycles++; // Increment the cycle counter
+
+            // Check if we've reached the next threshold for step change
+            if (_cycleThresholds.isNotEmpty &&
+                _dotCycles >= _cycleThresholds[0] &&
+                _processingStep < _processingSteps.length - 1) {
+              _processingStep++;
+              _cycleThresholds.removeAt(0); // Remove the used threshold
+            }
+          }
         });
       }
     });
@@ -163,6 +191,10 @@ class _SnapFoodState extends State<SnapFood> {
 
     setState(() {
       _isAnalyzing = true;
+      _processingStep = 0; // Reset to first step
+      _dotCycles = 0; // Reset dot cycle counter
+      _cycleThresholds =
+          _generateCycleThresholds(); // Generate new random thresholds
     });
 
     // Start a timer to show a "still working" message after 90 seconds
@@ -172,9 +204,8 @@ class _SnapFoodState extends State<SnapFood> {
         // If still analyzing after 90 seconds, show a toast or update UI
         // to let user know we're still working
         setState(() {
-          // This will refresh the UI and show updated loading message
-          // We don't need to change anything as the updated loading UI
-          // already mentions the waiting time
+          // Force the final step after 90 seconds of processing
+          _processingStep = _processingSteps.length - 1;
         });
       }
     });
@@ -1770,35 +1801,40 @@ class _SnapFoodState extends State<SnapFood> {
                             mainAxisAlignment: MainAxisAlignment
                                 .center, // Center the entire row
                             children: [
-                              // Fixed text that is centered when alone
-                              Text(
-                                "Analyzing meal",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              // Animated dots in fixed width container
-                              Container(
-                                width: 30, // Fixed width for dots area
-                                child: Text(
-                                  _loadingDots > 0
-                                      ? ".".padRight(_loadingDots, '.')
-                                      : "", // Ensure 0 dots shows nothing
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
+                              // Row containing "Analyzing meal" text and dots
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center, // Center the row
+                                children: [
+                                  // Fixed text "Analyzing meal" that stays centered
+                                  Text(
+                                    "Analyzing meal",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
-                                ),
+                                  // Animated dots added after the text
+                                  Text(
+                                    _loadingDots > 0
+                                        ? ".".padRight(_loadingDots, '.')
+                                        : "",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
                         SizedBox(height: 5),
+                        // Dynamic processing step text instead of static message
                         Text(
-                          "This may take up to 2-3 minutes\nif the server needs to start up",
+                          _processingSteps[_processingStep],
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.8),
@@ -2684,6 +2720,43 @@ class _SnapFoodState extends State<SnapFood> {
       return 'mg';
     if (nutrientName.contains('calorie')) return 'kcal';
     return ''; // Default to no unit if unknown
+  }
+
+  // Generate slightly randomized cycle thresholds for a more natural progression
+  List<int> _generateCycleThresholds() {
+    // Create a new Random instance
+    final random = math.Random();
+
+    // Generate thresholds for each step transition (except the last one)
+    final thresholds = <int>[];
+    int cumulativeThreshold = 0;
+
+    // For each step except the last one
+    for (int i = 0; i < _processingSteps.length - 1; i++) {
+      // Base is around 3 cycles, with some randomness
+      // Earlier steps are a bit faster, later steps take longer
+      int baseValue = 3;
+      if (i < 2) baseValue = 2; // First steps are quicker
+      if (i > 4) baseValue = 4; // Later steps take longer
+
+      // Add some randomness: baseValue plus or minus 1, with a slight bias toward longer times
+      int variation = random.nextInt(5) - 1; // Values from -1 to 3
+      int stepThreshold = baseValue + variation;
+
+      // Ensure at least 1 cycle per step
+      stepThreshold = math.max(stepThreshold, 1);
+
+      // For the very last transition to "Finalizing", make it a bit longer
+      if (i == _processingSteps.length - 2) {
+        stepThreshold += 2; // Add extra cycles before showing "Finalizing"
+      }
+
+      // Add to cumulative total (each threshold is the absolute cycle count)
+      cumulativeThreshold += stepThreshold;
+      thresholds.add(cumulativeThreshold);
+    }
+
+    return thresholds;
   }
 }
 
