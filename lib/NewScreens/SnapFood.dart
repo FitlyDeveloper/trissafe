@@ -68,8 +68,8 @@ class _SnapFoodState extends State<SnapFood> {
     super.initState();
     // Don't initialize _picker here since it's already declared as final
 
-    // Add timer for loading animation dots
-    _dotsAnimationTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
+    // Add timer for loading animation dots - make it faster (300ms instead of 500ms)
+    _dotsAnimationTimer = Timer.periodic(Duration(milliseconds: 300), (timer) {
       if (mounted && _isAnalyzing) {
         setState(() {
           _loadingDots = (_loadingDots + 1) % 4; // Cycles between 0, 1, 2, 3
@@ -1763,13 +1763,32 @@ class _SnapFoodState extends State<SnapFood> {
                           strokeWidth: 3,
                         ),
                         SizedBox(height: 20),
-                        Text(
-                          "Analyzing meal" + ".".padRight(_loadingDots, '.'),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Fixed text that doesn't move
+                            Text(
+                              "Analyzing meal",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            // Animated dots in fixed width container
+                            Container(
+                              width: 30, // Fixed width for dots area
+                              child: Text(
+                                ".".padRight(_loadingDots, '.'),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 5),
                         Text(

@@ -1592,6 +1592,12 @@ class _CodiaPageState extends State<CodiaPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Update nutrition data when building to ensure consistent values
+    if (!isLoading && targetCalories > 0) {
+      remainingCalories = targetCalories - _nutritionTracker.consumedCalories;
+      if (remainingCalories < 0) remainingCalories = 0;
+    }
+
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
     return Scaffold(
@@ -1997,14 +2003,15 @@ class _CodiaPageState extends State<CodiaPage> {
   }
 
   Widget _buildCalorieCard() {
+    // Ensure we're using the current values from NutritionTracker
     double caloriesToShow = remainingCalories > 0
         ? remainingCalories.toDouble()
         : targetCalories.toDouble();
 
-    // Get the consumed calories
+    // Get the consumed calories from the NutritionTracker singleton
     int consumedCalories = _nutritionTracker.consumedCalories;
 
-    // Get the macronutrient values
+    // Get the macronutrient values from the NutritionTracker singleton
     int currentProtein = _nutritionTracker.currentProtein;
     int currentFat = _nutritionTracker.currentFat;
     int currentCarb = _nutritionTracker.currentCarb;
@@ -2154,34 +2161,44 @@ class _CodiaPageState extends State<CodiaPage> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Use a similar approach as in FoodCardOpen.dart - directly colorize the circle
+                    // Instead of using CircularProgressIndicator or CustomPaint,
+                    // directly tint the circle.png image with a ClipPath and colored overlay
                     Transform.translate(
                       offset:
                           Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
-                      child: CircularProgressIndicator(
-                        value: targetCalories > 0
-                            ? (consumedCalories / targetCalories)
-                                .clamp(0.0, 1.0)
-                            : 0.0,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(
-                              0xFF333333), // Dark gray that matches circle.png
-                        ),
-                        backgroundColor: Colors.transparent,
-                        strokeWidth:
-                            9.0, // Match the stroke width in circle.png
-                      ),
-                    ),
+                      child: Stack(
+                        children: [
+                          // First render the original gray circle image
+                          Image.asset(
+                            'assets/images/circle.png',
+                            width: 130,
+                            height: 130,
+                            fit: BoxFit.contain,
+                          ),
 
-                    // Circle image - now displayed on top with transparent background
-                    Transform.translate(
-                      offset:
-                          Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
-                      child: Image.asset(
-                        'assets/images/circle.png',
-                        width: 130,
-                        height: 130,
-                        fit: BoxFit.contain,
+                          // Then overlay a black arc with the same thickness on top
+                          // This arc will be masked by a ClipPath to show only the portion filled
+                          ClipPath(
+                            clipper: ArcClipper(
+                              progress: targetCalories > 0
+                                  ? (consumedCalories / targetCalories)
+                                      .clamp(0.0, 1.0)
+                                  : 0.0,
+                            ),
+                            child: Container(
+                              width: 130,
+                              height: 130,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Color(0xFF333333).withOpacity(0.7),
+                                  width:
+                                      9.0, // Match the stroke width in circle.png
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -2668,4 +2685,39 @@ class CircleProgressPainter extends CustomPainter {
         oldDelegate.strokeWidth != strokeWidth ||
         oldDelegate.drawBackground != drawBackground;
   }
+}
+
+// Add this ArcClipper class at the end of the file after the CircleProgressPainter class
+class ArcClipper extends CustomClipper<Path> {
+  final double progress;
+
+  ArcClipper({required this.progress});
+
+  @override
+  Path getClip(Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    // Create a path that represents an arc
+    final path = Path();
+    path.moveTo(center.dx, center.dy);
+
+    // Draw the arc from top center, clockwise
+    final startAngle = -math.pi / 2; // Start from top
+    final sweepAngle = 2 * math.pi * progress; // Sweep based on progress
+
+    // Add the arc and close the path
+    path.arcTo(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+    );
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(ArcClipper oldClipper) => oldClipper.progress != progress;
 }
