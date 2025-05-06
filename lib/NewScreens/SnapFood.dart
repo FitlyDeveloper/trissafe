@@ -1763,32 +1763,38 @@ class _SnapFoodState extends State<SnapFood> {
                           strokeWidth: 3,
                         ),
                         SizedBox(height: 20),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Fixed text that doesn't move
-                            Text(
-                              "Analyzing meal",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            // Animated dots in fixed width container
-                            Container(
-                              width: 30, // Fixed width for dots area
-                              child: Text(
-                                ".".padRight(_loadingDots, '.'),
+                        Container(
+                          width:
+                              200, // Give it enough width for both text and dots
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment
+                                .center, // Center the entire row
+                            children: [
+                              // Fixed text that is centered when alone
+                              Text(
+                                "Analyzing meal",
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            ),
-                          ],
+                              // Animated dots in fixed width container
+                              Container(
+                                width: 30, // Fixed width for dots area
+                                child: Text(
+                                  _loadingDots > 0
+                                      ? ".".padRight(_loadingDots, '.')
+                                      : "", // Ensure 0 dots shows nothing
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         SizedBox(height: 5),
                         Text(

@@ -2161,8 +2161,7 @@ class _CodiaPageState extends State<CodiaPage> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // SIMPLE APPROACH: Just use the original circle.png image
-                    // No overlay, no clip path, no custom painters
+                    // Show original circle.png
                     Transform.translate(
                       offset:
                           Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
@@ -2171,6 +2170,22 @@ class _CodiaPageState extends State<CodiaPage> {
                         width: 130,
                         height: 130,
                         fit: BoxFit.contain,
+                      ),
+                    ),
+
+                    // Draw black circle (with partial sweep based on consumed calories)
+                    // using a CustomPaint directly on the canvas
+                    Transform.translate(
+                      offset:
+                          Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
+                      child: CustomPaint(
+                        size: Size(130, 130),
+                        painter: SimpleArcPainter(
+                          progress: targetCalories > 0
+                              ? (consumedCalories / targetCalories)
+                                  .clamp(0.0, 1.0)
+                              : 0.0,
+                        ),
                       ),
                     ),
 
@@ -2599,4 +2614,39 @@ class _CodiaPageState extends State<CodiaPage> {
       _loadNutritionData();
     });
   }
+}
+
+// Add a simple arc painter at the end of the file
+class SimpleArcPainter extends CustomPainter {
+  final double progress;
+
+  SimpleArcPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = Color(0xFF333333).withOpacity(0.7) // 70% black
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9.0; // Same thickness as circle.png's ring
+
+    final double radius = (size.width - 9.0) / 2; // Account for stroke width
+    final Offset center = Offset(size.width / 2, size.height / 2);
+
+    // Start from top (-90 degrees) and sweep based on progress
+    final double startAngle = -math.pi / 2;
+    final double sweepAngle = 2 * math.pi * progress;
+
+    // Draw arc
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(SimpleArcPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
