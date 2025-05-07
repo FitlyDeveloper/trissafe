@@ -13,8 +13,6 @@ import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_image_compress/flutter_image_compress.dart'
     as flutter_compress;
-// Remove permission_handler temporarily
-// import 'package:permission_handler/permission_handler.dart';
 
 // Conditionally import dart:io only on non-web
 import 'dart:io' if (dart.library.html) 'package:fitness_app/web_io_stub.dart';
@@ -26,7 +24,6 @@ import 'web_impl.dart' if (dart.library.io) 'web_impl_stub.dart';
 import 'web_image_compress_stub.dart' as img_compress;
 
 // Conditionally import the image compress library
-// We need to use a different approach to avoid conflicts
 import 'image_compress.dart';
 
 // Add import for our secure API service
@@ -47,6 +44,23 @@ class _SnapFoodState extends State<SnapFood> {
   String _activeButton = 'Scan Food'; // Default active button
   bool _permissionsRequested = false;
   bool _isAnalyzing = false; // Track if analysis is in progress
+  int _loadingDots = 0; // Add this to track loading animation state
+  Timer? _dotsAnimationTimer;
+  int _processingStep = 0; // Track which processing step to show
+  int _dotCycles = 0; // Track how many dot cycles have completed
+  List<int> _cycleThresholds = []; // Dynamic thresholds for step changes
+
+  // Processing step messages to cycle through
+  final List<String> _processingSteps = [
+    "Reading Image",
+    "Identifying Food Type",
+    "Detecting Ingredients",
+    "Estimating Portion Size",
+    "Calculating Calories & Macros",
+    "Analyzing Vitamins & Minerals",
+    "Cross-checking with Nutrition Database",
+    "Finalizing Meal Summary"
+  ];
 
   // Food analysis result
   Map<String, dynamic>? _analysisResult;
@@ -64,6 +78,30 @@ class _SnapFoodState extends State<SnapFood> {
   @override
   void initState() {
     super.initState();
+    // Don't initialize _picker here since it's already declared as final
+
+    // Add timer for loading animation dots - make it faster (300ms instead of 500ms)
+    _dotsAnimationTimer = Timer.periodic(Duration(milliseconds: 300), (timer) {
+      if (mounted && _isAnalyzing) {
+        setState(() {
+          _loadingDots = (_loadingDots + 1) % 4; // Cycles between 0, 1, 2, 3
+
+          // If we complete a dot cycle (back to 0)
+          if (_loadingDots == 0) {
+            _dotCycles++; // Increment the cycle counter
+
+            // Check if we've reached the next threshold for step change
+            if (_cycleThresholds.isNotEmpty &&
+                _dotCycles >= _cycleThresholds[0] &&
+                _processingStep < _processingSteps.length - 1) {
+              _processingStep++;
+              _cycleThresholds.removeAt(0); // Remove the used threshold
+            }
+          }
+        });
+      }
+    });
+
     if (!kIsWeb) {
       // Simplified permission check - no permission_handler
       _checkPermissionsSimple();
@@ -150,6 +188,23 @@ class _SnapFoodState extends State<SnapFood> {
 
     setState(() {
       _isAnalyzing = true;
+      _processingStep = 0; // Reset to first step
+      _dotCycles = 0; // Reset dot cycle counter
+      _cycleThresholds =
+          _generateCycleThresholds(); // Generate new random thresholds
+    });
+
+    // Start a timer to show a "still working" message after 90 seconds
+    // This happens before the full timeout but reassures the user
+    Timer? processingTimer = Timer(Duration(seconds: 90), () {
+      if (mounted && _isAnalyzing) {
+        // If still analyzing after 90 seconds, show a toast or update UI
+        // to let user know we're still working
+        setState(() {
+          // Force the final step after 90 seconds of processing
+          _processingStep = _processingSteps.length - 1;
+        });
+      }
     });
 
     try {
@@ -273,71 +328,52 @@ class _SnapFoodState extends State<SnapFood> {
             }
           });
         }
-      }
-    } catch (e) {
-      print("Error analyzing image: $e");
-      if (mounted) {
-        // Try to use the image even if analysis completely fails
-        try {
-          Uint8List imageBytes;
-          if (kIsWeb && _webImageBytes != null) {
-            imageBytes = _webImageBytes!;
-          } else if (_imageFile != null && !kIsWeb) {
-            imageBytes = await _imageFile!.readAsBytes();
-          } else if (image != null) {
-            imageBytes = await image.readAsBytes();
-          } else {
-            throw Exception("No image available");
-          }
+      } catch (e) {
+        // Cancel the processing timer
+        processingTimer.cancel();
 
-          // Create a default food card with the image
-          final String defaultName = "Unknown Food";
-          final String defaultCalories = "0";
-          final String defaultProtein = "0";
-          final String defaultFat = "0";
-          final String defaultCarbs = "0";
-          final String healthScore = "5/10";
-          final List<Map<String, dynamic>> defaultIngredients = [
-            {'name': 'Unknown ingredients', 'amount': '0g', 'calories': 0}
-          ];
+        print("API analysis error: $e");
 
-          // Convert image to base64 for FoodCardOpen
-          String? imageBase64 = base64Encode(imageBytes);
-
-          print(
-              "Analysis completely failed, but navigating to FoodCardOpen with default values");
-
-          // Navigate to FoodCardOpen with default values
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => FoodCardOpen(
-                foodName: defaultName,
-                healthScore: healthScore,
-                calories: defaultCalories,
-                protein: defaultProtein,
-                fat: defaultFat,
-                carbs: defaultCarbs,
-                imageBase64: imageBase64,
-                ingredients: defaultIngredients,
-              ),
-            ),
-          ).then((_) {
-            if (mounted) {
-              setState(() {
-                _isAnalyzing = false;
-              });
-            }
-          });
-        } catch (imageError) {
-          // If we can't even get the image, show an error dialog
-          print("Failed to process image: $imageError");
+        // Instead of navigating to FoodCardOpen with default values,
+        // show an error dialog and go back to codia_page
+        if (mounted) {
           setState(() {
             _isAnalyzing = false;
           });
-          _showCustomDialog("Analysis Failed",
-              "Failed to analyze the image. Please try again.");
+
+          // Show a more helpful error message based on the error type
+          String errorMessage;
+          if (e.toString().contains("TimeoutException")) {
+            errorMessage =
+                "The server is taking longer than expected to respond. This usually happens when the server is starting up after being idle. Please try again in a few minutes when the server is ready.";
+          } else {
+            errorMessage =
+                "We couldn't analyze your food image. Please try again with a clearer photo or check your internet connection.";
+          }
+
+          // Show error dialog
+          _showCustomDialog("Analysis Taking Too Long", errorMessage);
+
+          // Pop back to codia_page
+          Navigator.of(context).pop();
         }
+      }
+    } catch (e) {
+      // Cancel the processing timer
+      processingTimer.cancel();
+
+      print("Error analyzing image: $e");
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+        });
+
+        // Show error dialog
+        _showCustomDialog("Analysis Error",
+            "We couldn't process your food image. Please try again with a clearer photo.");
+
+        // Pop back to codia_page
+        Navigator.of(context).pop();
       }
     }
   }
@@ -1803,12 +1839,52 @@ class _SnapFoodState extends State<SnapFood> {
                           strokeWidth: 3,
                         ),
                         SizedBox(height: 20),
+                        Container(
+                          width:
+                              200, // Give it enough width for both text and dots
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment
+                                .center, // Center the entire row
+                            children: [
+                              // Row containing "Analyzing meal" text and dots
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center, // Center the row
+                                children: [
+                                  // Fixed text "Analyzing meal" that stays centered
+                                  Text(
+                                    "Analyzing meal",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  // Animated dots added after the text
+                                  Text(
+                                    _loadingDots > 0
+                                        ? ".".padRight(_loadingDots, '.')
+                                        : "",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 5),
+                        // Dynamic processing step text instead of static message
                         Text(
-                          "Analyzing meal...",
+                          _processingSteps[_processingStep],
+                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
@@ -2230,6 +2306,7 @@ class _SnapFoodState extends State<SnapFood> {
 
   @override
   void dispose() {
+    _dotsAnimationTimer?.cancel();
     // Clean up resources
     super.dispose();
   }
@@ -2688,6 +2765,43 @@ class _SnapFoodState extends State<SnapFood> {
       return 'mg';
     if (nutrientName.contains('calorie')) return 'kcal';
     return ''; // Default to no unit if unknown
+  }
+
+  // Generate slightly randomized cycle thresholds for a more natural progression
+  List<int> _generateCycleThresholds() {
+    // Create a new Random instance
+    final random = math.Random();
+
+    // Generate thresholds for each step transition (except the last one)
+    final thresholds = <int>[];
+    int cumulativeThreshold = 0;
+
+    // For each step except the last one
+    for (int i = 0; i < _processingSteps.length - 1; i++) {
+      // Base is around 3 cycles, with some randomness
+      // Earlier steps are a bit faster, later steps take longer
+      int baseValue = 3;
+      if (i < 2) baseValue = 2; // First steps are quicker
+      if (i > 4) baseValue = 4; // Later steps take longer
+
+      // Add some randomness: baseValue plus or minus 1, with a slight bias toward longer times
+      int variation = random.nextInt(5) - 1; // Values from -1 to 3
+      int stepThreshold = baseValue + variation;
+
+      // Ensure at least 1 cycle per step
+      stepThreshold = math.max(stepThreshold, 1);
+
+      // For the very last transition to "Finalizing", make it a bit longer
+      if (i == _processingSteps.length - 2) {
+        stepThreshold += 2; // Add extra cycles before showing "Finalizing"
+      }
+
+      // Add to cumulative total (each threshold is the absolute cycle count)
+      cumulativeThreshold += stepThreshold;
+      thresholds.add(cumulativeThreshold);
+    }
+
+    return thresholds;
   }
 }
 
