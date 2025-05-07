@@ -13,6 +13,100 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:grouped_list/grouped_list.dart';
 
+// Custom painter for drawing the calorie gauge
+class CalorieGaugePainter extends CustomPainter {
+  final double consumedPercentage;
+
+  CalorieGaugePainter({required this.consumedPercentage});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2,
+        size.height / 2 + 11); // Moved down 11px total (1px up from before)
+    final radius = size.width / 2 - 8;
+
+    // Use exact degree calculations for precise control
+    // Convert angles from degrees to radians for the drawArc method
+    final double startAngleDegrees =
+        47.0; // Moved -1 degree from previous position (48°)
+    final double sweepAngleDegrees =
+        -270.0; // Cover 3/4 of the circle clockwise
+
+    // Convert to radians for Flutter's drawArc
+    final double startAngleRadians = startAngleDegrees * math.pi / 180;
+    final double sweepAngleRadians = sweepAngleDegrees * math.pi / 180;
+
+    // Draw background arc (remaining calories) - gray
+    final backgroundPaint = Paint()
+      ..color = Color(0xFFE1E1E1)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14.0 // Increased from 12.0 to make it wider
+      ..strokeCap = StrokeCap.round; // Rounded edges for the background gauge
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngleRadians,
+      sweepAngleRadians,
+      false,
+      backgroundPaint,
+    );
+
+    // Draw consumed calories arc - black
+    if (consumedPercentage > 0) {
+      // To create a fill with one end rounded and one end straight,
+      // we'll draw two arcs - one with rounded caps for the "back" and
+      // one with butt cap for the "front"
+
+      final double endAngle = startAngleRadians +
+          sweepAngleRadians; // The end of the background arc
+
+      // Create paint for the main fill (most of the arc) with rounded cap at the back
+      final mainFillPaint = Paint()
+        ..color = Colors.black
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 14.0
+        ..strokeCap = StrokeCap.round; // Rounded edge for the back of the fill
+
+      // If we're filling more than a tiny amount, draw the main portion with rounded back
+      if (consumedPercentage > 0.02) {
+        final adjustedSweepAngle = -sweepAngleRadians *
+            (consumedPercentage - 0.01); // Slightly shorter
+
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: radius),
+          endAngle + 0.01, // Start slightly ahead to avoid overlap issues
+          adjustedSweepAngle, // Go in opposite direction
+          false,
+          mainFillPaint,
+        );
+      }
+
+      // Create paint for the front edge with butt cap
+      final frontEdgePaint = Paint()
+        ..color = Colors.black
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 14.0
+        ..strokeCap = StrokeCap.butt; // Straight edge for the front of the fill
+
+      // Draw a very small arc at the front edge to create the straight cap
+      final frontEdgeAngle = -sweepAngleRadians * consumedPercentage;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        endAngle + frontEdgeAngle - 0.02, // Just the very front part
+        0.02, // Tiny arc
+        false,
+        frontEdgePaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(CalorieGaugePainter oldDelegate) {
+    return oldDelegate.consumedPercentage != consumedPercentage;
+  }
+}
+
 // Observer class for app lifecycle events
 class _AppLifecycleObserver extends WidgetsBindingObserver {
   final VoidCallback onResume;
@@ -224,17 +318,28 @@ class NutritionTracker {
             String cardDateStr = cardDate.toString().split(' ')[0];
 
             if (cardDateStr == today) {
-              // This card is from today, add its nutrition values
+              // Get counter (portions) value with fallback to 1
+              int counter = 1;
+              if (card.containsKey('counter')) {
+                counter = card['counter'] is int
+                    ? card['counter']
+                    : int.tryParse(card['counter'].toString()) ?? 1;
+
+                // Ensure counter is between 1 and 3
+                counter = counter.clamp(1, 3);
+              }
+
+              // This card is from today, add its nutrition values WITHOUT counter multiplier
               _currentProtein += _parseNutritionValue(card['protein']);
               _currentFat += _parseNutritionValue(card['fat']);
               _currentCarb += _parseNutritionValue(card['carbs']);
               _consumedCalories += _parseNutritionValue(card['calories']);
 
-              print('Added food card from today: ${card['name']}, '
-                  'calories: ${card['calories']}, '
-                  'protein: ${card['protein']}, '
-                  'fat: ${card['fat']}, '
-                  'carbs: ${card['carbs']}');
+              print('Added food card from today: ${card['name']} (×$counter), '
+                  'calories: ${_parseNutritionValue(card['calories'])} (base: ${card['calories']}), '
+                  'protein: ${_parseNutritionValue(card['protein'])} (base: ${card['protein']}), '
+                  'fat: ${_parseNutritionValue(card['fat'])} (base: ${card['fat']}), '
+                  'carbs: ${_parseNutritionValue(card['carbs'])} (base: ${card['carbs']})');
             }
           } catch (e) {
             print('Error processing food card: $e');
@@ -280,15 +385,15 @@ class NutritionTracker {
   }
 
   // Helper method to parse nutrition values safely
-  int _parseNutritionValue(dynamic value) {
+  int _parseNutritionValue(dynamic value, [int multiplier = 1]) {
     if (value == null) return 0;
 
     if (value is int) {
-      return value;
+      return value * multiplier;
     }
 
     if (value is double) {
-      return value.round();
+      return (value * multiplier).round();
     }
 
     if (value is String) {
@@ -297,7 +402,7 @@ class NutritionTracker {
       if (cleanedValue.isEmpty) return 0;
 
       try {
-        return double.parse(cleanedValue).round();
+        return (double.parse(cleanedValue) * multiplier).round();
       } catch (e) {
         print('Error parsing nutrition value "$value": $e');
         return 0;
@@ -1203,19 +1308,19 @@ class _CodiaPageState extends State<CodiaPage> {
   }
 
   // Helper method to extract numeric value from a string and convert to int
-  int _extractNumericValueAsInt(dynamic input) {
+  int _extractNumericValueAsInt(dynamic input, {int multiplier = 1}) {
     if (input is int) {
-      return input;
+      return input * multiplier;
     } else if (input is double) {
-      return input.round();
+      return (input * multiplier).round();
     } else if (input is String) {
       // Try to extract digits from the string, including possible decimal values
       final match = RegExp(r'(\d+\.?\d*)').firstMatch(input);
       if (match != null && match.group(1) != null) {
         // Parse as double first to handle potential decimal values
         final value = double.tryParse(match.group(1)!) ?? 0.0;
-        // Then round to nearest int
-        return value.round();
+        // Then round to nearest int, after applying multiplier
+        return (value * multiplier).round();
       }
     }
     return 0;
@@ -1312,7 +1417,18 @@ class _CodiaPageState extends State<CodiaPage> {
     // Get values with fallbacks ensuring correct types
     String name = foodCard['name'] ?? 'Unknown Meal';
 
-    // Handle numeric values with proper parsing
+    // Get counter (portions) value with fallback to 1
+    int counter = 1;
+    if (foodCard.containsKey('counter')) {
+      counter = foodCard['counter'] is int
+          ? foodCard['counter']
+          : _extractNumericValueAsInt(foodCard['counter']);
+
+      // Ensure counter is between 1 and 3
+      counter = counter.clamp(1, 3);
+    }
+
+    // Handle numeric values with proper parsing - DO NOT apply counter multiplier
     int calories = _extractNumericValueAsInt(foodCard['calories']);
     int protein = _extractNumericValueAsInt(foodCard['protein']);
     int fat = _extractNumericValueAsInt(foodCard['fat']);
@@ -1334,7 +1450,7 @@ class _CodiaPageState extends State<CodiaPage> {
 
         // Try to find amount and calories by examining foodCard
         String amount = '1 serving';
-        dynamic calories = 0;
+        dynamic ingredientCalories = 0;
 
         // If the parent foodCard has calories data for this specific ingredient, use it
         if (foodCard.containsKey('ingredient_amounts') &&
@@ -1346,14 +1462,15 @@ class _CodiaPageState extends State<CodiaPage> {
         if (foodCard.containsKey('ingredient_calories') &&
             foodCard['ingredient_calories'] is Map &&
             foodCard['ingredient_calories'].containsKey(ingredientName)) {
-          calories =
-              foodCard['ingredient_calories'][ingredientName] ?? calories;
+          ingredientCalories = foodCard['ingredient_calories']
+                  [ingredientName] ??
+              ingredientCalories;
         }
 
         processedIngredients.add({
           'name': ingredientName,
           'amount': amount,
-          'calories': calories,
+          'calories': ingredientCalories,
         });
       } else {
         // Try to convert other types to String then to Map
@@ -1362,7 +1479,7 @@ class _CodiaPageState extends State<CodiaPage> {
 
           // Use the same logic as above to try to find amount and calories
           String amount = '1 serving';
-          dynamic calories = 0;
+          dynamic ingredientCalories = 0;
 
           if (foodCard.containsKey('ingredient_amounts') &&
               foodCard['ingredient_amounts'] is Map &&
@@ -1373,14 +1490,15 @@ class _CodiaPageState extends State<CodiaPage> {
           if (foodCard.containsKey('ingredient_calories') &&
               foodCard['ingredient_calories'] is Map &&
               foodCard['ingredient_calories'].containsKey(ingredientStr)) {
-            calories =
-                foodCard['ingredient_calories'][ingredientStr] ?? calories;
+            ingredientCalories = foodCard['ingredient_calories']
+                    [ingredientStr] ??
+                ingredientCalories;
           }
 
           processedIngredients.add({
             'name': ingredientStr,
             'amount': amount,
-            'calories': calories,
+            'calories': ingredientCalories,
           });
         } catch (e) {
           print("Skipping invalid ingredient: $e");
@@ -1392,15 +1510,22 @@ class _CodiaPageState extends State<CodiaPage> {
       padding: const EdgeInsets.symmetric(horizontal: 29, vertical: 8),
       child: GestureDetector(
         onTap: () {
+          // Pass the original base values to FoodCardOpen, not the multiplied ones
+          // This ensures FoodCardOpen works with the base values and can multiply them as needed
+          int baseCalories = _extractNumericValueAsInt(foodCard['calories']);
+          int baseProtein = _extractNumericValueAsInt(foodCard['protein']);
+          int baseFat = _extractNumericValueAsInt(foodCard['fat']);
+          int baseCarbs = _extractNumericValueAsInt(foodCard['carbs']);
+
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => FoodCardOpen(
                 foodName: name,
-                calories: calories.toString(),
-                protein: protein.toString(),
-                fat: fat.toString(),
-                carbs: carbs.toString(),
+                calories: baseCalories.toString(),
+                protein: baseProtein.toString(),
+                fat: baseFat.toString(),
+                carbs: baseCarbs.toString(),
                 imageBase64: base64Image,
                 ingredients: processedIngredients,
                 healthScore: foodCard['health_score'] ?? '8/10',
@@ -1447,7 +1572,7 @@ class _CodiaPageState extends State<CodiaPage> {
                         children: [
                           Flexible(
                             child: Text(
-                              name,
+                              counter > 1 ? '$name (×$counter)' : name,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 16,
@@ -2003,32 +2128,21 @@ class _CodiaPageState extends State<CodiaPage> {
   }
 
   Widget _buildCalorieCard() {
-    // Ensure we're using the current values from NutritionTracker
-    double caloriesToShow = remainingCalories > 0
-        ? remainingCalories.toDouble()
-        : targetCalories.toDouble();
-
-    // Get the consumed calories from the NutritionTracker singleton
+    // Get the consumed calories directly from the NutritionTracker singleton
     int consumedCalories = _nutritionTracker.consumedCalories;
+
+    // Calculate remaining calories directly - don't rely on class variables that might be stale
+    int directRemaining = targetCalories - consumedCalories;
 
     // Get the macronutrient values from the NutritionTracker singleton
     int currentProtein = _nutritionTracker.currentProtein;
     int currentFat = _nutritionTracker.currentFat;
     int currentCarb = _nutritionTracker.currentCarb;
 
-    // Calculate TDEE for maintenance display - USING EXACTLY THE SAME METHOD AS calculateTDEE()
-    int maintenanceCalories = calculateTDEE(
-      gender: userGender,
-      weightKg: ((userWeightKg * 10).round() / 10.0)
-          .round(), // Round to 1 decimal then to int
-      heightCm: userHeightCm.round(), // Make sure height is whole number
-      userAge: userAge, // Use the calculated age
-    );
-
-    // When goal is maintain, ensure deficit shows same value as remaining calories
-    if (userGoal == 'maintain') {
-      maintenanceCalories = caloriesToShow.toInt();
-    }
+    // Define macro targets for UI
+    int proteinTarget = 123; // Default values
+    int fatTarget = 55;
+    int carbTarget = 246;
 
     // Define macro distribution based on gym goal
     Map<String, Map<String, double>> macroTargets = {
@@ -2055,63 +2169,71 @@ class _CodiaPageState extends State<CodiaPage> {
       }
     };
 
-    // Get the macro distribution for the selected gym goal (default to balanced macros if null or not found)
-    debugPrint('Using gym goal for macros: "$userGymGoal"');
-    Map<String, double> selectedMacros =
-        macroTargets["null"]!; // Default to balanced macros
-
-    // Only try to use userGymGoal if it's a valid key in the map - EXACTLY like in calculation_screen.dart
+    // Get the macro distribution for the selected gym goal
+    Map<String, double> selectedMacros = macroTargets["null"]!; // Default
     String goalKey = userGymGoal ?? "null";
     if (macroTargets.containsKey(goalKey)) {
       selectedMacros = macroTargets[goalKey]!;
-      print('Using macro distribution for: "$goalKey"');
-    } else {
+    }
+
+    // Calculate macronutrient targets based on calorie goal
+    if (targetCalories > 0) {
+      double proteinPercent = selectedMacros["proteinPercent"]!;
+      double carbPercent = selectedMacros["carbPercent"]!;
+      double fatPercent = selectedMacros["fatPercent"]!;
+
+      proteinTarget = ((targetCalories * proteinPercent) / 4).round();
+      fatTarget = ((targetCalories * fatPercent) / 9).round();
+      carbTarget = ((targetCalories * carbPercent) / 4).round();
+    }
+
+    // Determine deficit or surplus based on consumed vs target
+    String deficitLabel = "Deficit";
+    String deficitValue = "-${calculateTDEE(
+      gender: userGender,
+      weightKg: ((userWeightKg * 10).round() / 10.0).round(),
+      heightCm: userHeightCm.round(),
+      userAge: userAge,
+    ).round()}";
+
+    // If consumed calories exceed target, show as surplus
+    if (consumedCalories >= targetCalories) {
+      deficitLabel = "Surplus";
+      int surplusAmount = consumedCalories - targetCalories;
+      deficitValue = "${surplusAmount}";
+
       print(
-          'No matching macro distribution for: "$goalKey", using balanced default');
+          "SURPLUS DETECTED: Consumed=$consumedCalories, Target=$targetCalories, Surplus=$surplusAmount");
     }
 
-    // Calculate macronutrient targets based on calorie goal and gym goal
-    double proteinPercent = selectedMacros["proteinPercent"]!;
-    double carbPercent = selectedMacros["carbPercent"]!;
-    double fatPercent = selectedMacros["fatPercent"]!;
-
-    // Log the selected macro distribution exactly like calculation_screen.dart
-    print('Using macro distribution for gym goal: "$userGymGoal"');
-    print('- Protein: ${(proteinPercent * 100).toStringAsFixed(1)}%');
-    print('- Carbs: ${(carbPercent * 100).toStringAsFixed(1)}%');
-    print('- Fat: ${(fatPercent * 100).toStringAsFixed(1)}%');
-
-    // Calculate macro targets in grams - ALWAYS USE targetCalories instead of caloriesToShow
-    // This ensures target macros don't change as food is logged
-    int proteinTarget = ((targetCalories * proteinPercent) / 4).round();
-    int fatTarget = ((targetCalories * fatPercent) / 9).round();
-    int carbTarget = ((targetCalories * carbPercent) / 4).round();
-
-    // Log the calculations with the exact same format as calculation_screen.dart
-    print('Calculated macro targets for $targetCalories calories:');
-    print(
-        '- Protein: ${proteinTarget}g (${(targetCalories * proteinPercent).round()} kcal)');
-    print(
-        '- Fat: ${fatTarget}g (${(targetCalories * fatPercent).round()} kcal)');
-    print(
-        '- Carbs: ${carbTarget}g (${(targetCalories * carbPercent).round()} kcal)');
-    print(
-        '- Total: ${((targetCalories * proteinPercent) + (targetCalories * fatPercent) + (targetCalories * carbPercent)).round()} kcal');
-
-    // If we're still loading or have 0 calories, show a loading indicator
-    if (isLoading || targetCalories == 0) {
-      print('Loading calorie data or no calories calculated yet');
-      // We could return a loading indicator here if needed
+    // Special handling for maintain goal
+    if (userGoal == 'maintain') {
+      if (directRemaining > 0) {
+        deficitLabel = "Deficit";
+        deficitValue = "-${directRemaining.abs().round()}";
+      } else {
+        deficitLabel = "Surplus";
+        deficitValue = "${directRemaining.abs().round()}";
+      }
     }
 
-    // Variables were already defined earlier, no need to redefine
-    // int currentProtein = 0;
-    // int currentFat = 0;
-    // int currentCarb = 0;
+    // Format remaining calories text to show negative when below 0
+    String remainingText = directRemaining < 0
+        ? "-${directRemaining.abs().round()}"
+        : "${directRemaining.round()}";
+
+    // Debug print to verify our calculations
+    print("DEBUG VALUES:");
+    print("Target calories: $targetCalories");
+    print("Consumed calories: $consumedCalories");
+    print("Direct remaining: $directRemaining");
+    print("Deficit/Surplus label: $deficitLabel");
+    print("Deficit/Surplus value: $deficitValue");
+    print("Remaining text: $remainingText");
 
     return Container(
       height: 220,
-      padding: EdgeInsets.fromLTRB(20, 15, 20, 15), // Reduced vertical padding
+      padding: EdgeInsets.fromLTRB(20, 15, 20, 15),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -2124,17 +2246,17 @@ class _CodiaPageState extends State<CodiaPage> {
         ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min, // Add this to prevent expansion
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Calorie stats row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              // Deficit (now showing maintenance calories)
+              // Deficit/Surplus
               Column(
                 children: [
                   Text(
-                    '-${maintenanceCalories.round()}',
+                    deficitValue,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -2143,7 +2265,7 @@ class _CodiaPageState extends State<CodiaPage> {
                     ),
                   ),
                   Text(
-                    'Deficit',
+                    deficitLabel,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.normal,
@@ -2156,51 +2278,23 @@ class _CodiaPageState extends State<CodiaPage> {
 
               // Circular progress
               Container(
-                width: 130,
-                height: 130,
+                width: 132,
+                height: 132,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Use ColorFiltered to directly color the circle.png image
-                    // This applies the coloring to the actual image
+                    // Simple circle gauge using CustomPaint
                     Transform.translate(
-                      offset:
-                          Offset(0, -3.9), // Move up by 3% (130 * 0.03 = 3.9)
-                      child: ShaderMask(
-                        shaderCallback: (Rect bounds) {
-                          // Create a SweepGradient to color a portion of the circle
-                          final double progress = targetCalories > 0
+                      offset: Offset(0, -3.9), // Move up by 3%
+                      child: CustomPaint(
+                        size: Size(132, 132),
+                        painter: CalorieGaugePainter(
+                          // Important: Always directly use consumed calories divided by target
+                          // Without relying on a state variable that might not be updating
+                          consumedPercentage: targetCalories > 0
                               ? (consumedCalories / targetCalories)
                                   .clamp(0.0, 1.0)
-                              : 0.0;
-
-                          // Calculate angles in radians
-                          final double startAngle =
-                              -math.pi / 2; // Start from top
-                          final double endAngle =
-                              startAngle + (2 * math.pi * progress);
-
-                          return SweepGradient(
-                            startAngle: startAngle,
-                            endAngle: endAngle,
-                            colors: [
-                              Color(0xFF333333).withOpacity(0.7), // 70% black
-                              Colors.transparent, // Transparent for the rest
-                            ],
-                            stops: [
-                              1.0,
-                              1.0
-                            ], // Hard stop at the calculated progress
-                            transform: GradientRotation(startAngle),
-                          ).createShader(bounds);
-                        },
-                        // Only apply the mask to the actual gray parts of the image
-                        blendMode: BlendMode.srcATop,
-                        child: Image.asset(
-                          'assets/images/circle.png',
-                          width: 130,
-                          height: 130,
-                          fit: BoxFit.contain,
+                              : 0.0,
                         ),
                       ),
                     ),
@@ -2210,7 +2304,7 @@ class _CodiaPageState extends State<CodiaPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          caloriesToShow.round().toString(),
+                          remainingText,
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -2586,7 +2680,10 @@ class _CodiaPageState extends State<CodiaPage> {
       // Update remaining calories based on consumed calories
       if (targetCalories > 0) {
         remainingCalories = targetCalories - _nutritionTracker.consumedCalories;
-        if (remainingCalories < 0) remainingCalories = 0;
+        // Important: Print debug info to see what's happening with the values
+        print(
+            'LOAD DATA DEBUG: Target=$targetCalories, Consumed=${_nutritionTracker.consumedCalories}, Remaining=$remainingCalories');
+        // No clamping - we need negative values to show overage
       }
     });
     print(
