@@ -2159,9 +2159,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
             _showStandardDialog(
               title: "Invalid Food Item",
               message: "Sorry, the food name or serving size you entered is not recognized. Please try a more specific name or common serving size.",
-              positiveButtonText: "OK",
-              positiveButtonColor: Colors.black,
-              negativeButtonText: "OK",
+              confirmText: "OK",
+              cancelText: null,
+              onConfirm: () => Navigator.of(context).pop(),
             );
         }
 
@@ -2194,10 +2194,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         _showStandardDialog(
           title: "Calculation Error",
           message: "We couldn't calculate the nutrition for this ingredient. Using estimated values instead.",
-          positiveButtonText: "OK",
-          positiveButtonColor: Colors.black,
-          // Only use one button to avoid confusion
-          negativeButtonText: "OK",
+          confirmText: "OK",
+          cancelText: null,
+          onConfirm: () => Navigator.of(context).pop(),
         );
       }
 
@@ -4042,9 +4041,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                     _showStandardDialog(
                       title: 'Calculation Error',
                       message: 'We couldn\'t calculate the nutrition for this ingredient. Using estimated values instead.',
-                      positiveButtonText: 'OK',
-                      positiveButtonColor: Colors.black,
-                      negativeButtonText: 'OK', // Use same text to show only one button
+                      confirmText: 'OK',
+                      cancelText: null,
+                      onConfirm: () => Navigator.of(context).pop(),
                     );
                   }
                 }
@@ -4558,9 +4557,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     _showStandardDialog(
       title: "Service Unavailable",
       message: "The food modification service is currently unavailable. Please try again later.",
-      positiveButtonText: "OK",
-      positiveButtonColor: Colors.black,
-      negativeButtonText: "OK",
+      confirmText: "OK",
+      cancelText: null,
+      onConfirm: () => Navigator.of(context).pop(),
     );
   }
 
@@ -4569,12 +4568,11 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     _showStandardDialog(
       title: "Invalid Ingredient",
       message: "Please enter a valid food name and serving size that we can calculate nutrition for",
-      positiveButtonText: "Try Again",
-      positiveButtonColor: Colors.black,
-      positiveButtonIcon: 'assets/images/edit.png', // Make sure this asset exists
-      onPositivePressed: () {
-                                Navigator.of(context).pop();
-                                _showAddIngredientDialog();
+      confirmText: "Try Again",
+      cancelText: "Cancel",
+      onConfirm: () {
+        Navigator.of(context).pop();
+        _showAddIngredientDialog();
       },
     );
   }
@@ -6110,7 +6108,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                   _showStandardDialog(
                     title: "Error",
                     message: result['message'] ?? "An unknown error occurred",
-                    positiveButtonText: "OK",
+                    confirmText: "OK",
+                    cancelText: null,
+                    onConfirm: () => Navigator.of(context).pop(),
                   );
                   return;
                 }
@@ -6873,10 +6873,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     _showStandardDialog(
       title: "Success",
       message: details != null ? "$message\n\n$details" : message,
-      positiveButtonText: "OK",
-      positiveButtonColor: Colors.green,
-      negativeButtonText: "OK",
-      onNegativePressed: () => Navigator.of(context).pop(),
+      confirmText: "OK",
+      cancelText: null,
+      onConfirm: () => Navigator.of(context).pop(),
     );
   }
 
@@ -6939,24 +6938,19 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   void _showStandardDialog({
     required String title,
     required String message,
-    String? positiveButtonText,
-    String? positiveButtonIcon,
-    Color positiveButtonColor = Colors.black,
-    VoidCallback? onPositivePressed,
-    String negativeButtonText = "Cancel",
-    VoidCallback? onNegativePressed,
+    String? confirmText,
+    String? cancelText,
+    VoidCallback? onConfirm,
+    VoidCallback? onCancel,
   }) {
-    // Use the external helper to avoid syntax issues
     DialogHelper.showStandardDialog(
       context: context,
       title: title,
       message: message,
-      positiveButtonText: positiveButtonText,
-      positiveButtonIcon: positiveButtonIcon,
-      positiveButtonColor: positiveButtonColor,
-      onPositivePressed: onPositivePressed,
-      negativeButtonText: negativeButtonText,
-      onNegativePressed: onNegativePressed,
+      confirmText: confirmText,
+      cancelText: cancelText,
+      onConfirm: onConfirm,
+      onCancel: onCancel,
     );
   }
 

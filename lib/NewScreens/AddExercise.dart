@@ -109,41 +109,33 @@ class _CodiaPage extends State<CodiaPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 29, vertical: 8.5),
-                      child: Stack(
+                      padding: const EdgeInsets.symmetric(horizontal: 29).copyWith(top: 16, bottom: 8.5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Center(
-                            child: Text(
-                              'Add Exercise',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'SF Pro Display',
-                                decoration: TextDecoration.none,
-                              ),
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.black, size: 24),
+                            onPressed: () => Navigator.pop(context),
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(),
+                          ),
+                          Text(
+                            'Add Exercise',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'SF Pro Display',
+                              decoration: TextDecoration.none,
                             ),
                           ),
-                          Positioned(
-                            left: 0,
-                            top: 0,
-                            child: IconButton(
-                              icon: Icon(Icons.arrow_back,
-                                  color: Colors.black, size: 24),
-                              onPressed: () => Navigator.pop(context),
-                              padding: EdgeInsets.zero,
-                              constraints: BoxConstraints(),
-                              focusColor: Colors.transparent,
-                              highlightColor: Colors.transparent,
-                            ),
-                          ),
+                          SizedBox(width: 24),
                         ],
                       ),
                     ),
                     Container(
                       margin: EdgeInsets.symmetric(horizontal: 29),
-                      height: 0.5,
+                      height: 1,
                       color: Color(0xFFBDBDBD),
                     ),
                   ],

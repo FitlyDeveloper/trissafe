@@ -25,66 +25,117 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
         body: SafeArea(
           child: Column(
             children: [
-              // Header
+              // Header (Figma/Memories style)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Stack(
-                  alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 29).copyWith(top: 16, bottom: 8.5),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.black, size: 24),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                        SizedBox(width: 24), // for symmetry
-                        Image.asset('assets/images/Stopwatch.png', width: 28, height: 28),
-                      ],
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.black, size: 24),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: BoxConstraints(),
                     ),
-                    Center(
-                      child: Text(
-                        'Weight Lifting',
-                        style: TextStyle(
-                          fontSize: 26,
-                          color: Colors.black,
-                          fontFamily: 'SFProDisplay-Bold',
-                          fontWeight: FontWeight.bold,
-                        ),
+                    Text(
+                      'Weight Lifting',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'SF Pro Display',
+                        color: Colors.black,
+                        decoration: TextDecoration.none,
                       ),
                     ),
+                    Image.asset('assets/images/Stopwatch.png', width: 24, height: 24),
                   ],
                 ),
               ),
-              // Stats Row
+              // Slim divider line
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: 29),
+                height: 1,
+                color: Color(0xFFBDBDBD),
+              ),
+              // Stats Row (match StartWorkout.dart exactly)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 29, vertical: 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Column(
                       children: [
-                        Text('Duration', style: TextStyle(fontSize: 14, color: Colors.black)),
-                        SizedBox(height: 2),
-                        Text('0 s', style: TextStyle(fontSize: 16, color: Colors.grey[700], fontWeight: FontWeight.bold)),
+                        Text(
+                          '0',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Duration',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
                       ],
                     ),
                     Column(
                       children: [
-                        Text('Volume', style: TextStyle(fontSize: 14, color: Colors.black)),
-                        SizedBox(height: 2),
-                        Text('0 kg', style: TextStyle(fontSize: 16, color: Colors.grey[700], fontWeight: FontWeight.bold)),
+                        Text(
+                          '0',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Volume',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
                       ],
                     ),
                     Column(
                       children: [
-                        Text('PRs', style: TextStyle(fontSize: 14, color: Colors.black)),
-                        SizedBox(height: 2),
-                        Text('0', style: TextStyle(fontSize: 16, color: Colors.grey[700], fontWeight: FontWeight.bold)),
+                        Text(
+                          '0',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'PRs',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 ),
+              ),
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: 29),
+                height: 1,
+                color: Color(0xFFBDBDBD),
               ),
               SizedBox(height: 12),
               // Exercise Card
