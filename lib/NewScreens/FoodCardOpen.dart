@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import '../Features/codia/codia_page.dart';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:flutter/cupertino.dart';
+import '../Features/codia/codia_page.dart';
+import '../Features/codia/Nutrition.dart' as nutrition_page;
 import 'dart:math';
 import 'dart:ui';
-import 'dart:io' if (dart.library.html) 'package:fitness_app/web_io_stub.dart';
 import 'dart:async';
 import 'package:fitness_app/NewScreens/food_helper_methods.dart';
-import 'package:fitness_app/NewScreens/dialog_helper.dart';
+import 'package:provider/provider.dart';
 import 'dialog_helper.dart';
 
 // Custom scroll physics optimized for mouse wheel
@@ -39,8 +37,10 @@ class FoodCardOpen extends StatefulWidget {
   final String? protein;
   final String? fat;
   final String? carbs;
-  final String? imageBase64; // Add parameter for base64 encoded image
-  final List<Map<String, dynamic>>? ingredients; // Add ingredients parameter
+  final String? imageBase64;
+  final List<Map<String, dynamic>>? ingredients;
+  final Map<String, dynamic>? additionalNutrients;
+  final String? scanId; // Add scan ID parameter
 
   const FoodCardOpen({
     super.key,
@@ -50,8 +50,10 @@ class FoodCardOpen extends StatefulWidget {
     this.protein,
     this.fat,
     this.carbs,
-    this.imageBase64, // Include in constructor
-    this.ingredients, // Include in constructor
+    this.imageBase64,
+    this.ingredients,
+    this.additionalNutrients,
+    this.scanId, // Include scan ID in constructor
   });
 
   @override
@@ -65,7 +67,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
   bool _isBookmarked = false; // Track bookmark state
   bool _isEditMode = false; // Track if we're in edit mode for teal outlines
   int _counter = 1; // Counter for +/- buttons
-  String _privacyStatus = 'Public'; // Default privacy status
+  String _privacyStatus = 'Private'; // Default privacy status changed to Private
   bool _hasUnsavedChanges = false; // Track whether user has made changes
   // Original values to compare for changes
   String _originalFoodName = '';
@@ -610,7 +612,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         _isBookmarked = prefs.getBool('food_bookmarked_$foodId') ?? false;
         _counter = prefs.getInt('food_counter_$foodId') ?? 1;
         // Load privacy status for this food item
-        _privacyStatus = prefs.getString('food_privacy_$foodId') ?? 'Public';
+        _privacyStatus = prefs.getString('food_privacy_$foodId') ?? 'Private';
 
         // Only load nutrition values if they weren't passed as parameters
         if (widget.calories == null || widget.calories!.isEmpty) {
@@ -1365,8 +1367,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Show Private option first to make it most prominent
               _buildPrivacyOption(
-                  'Public', 'assets/images/globe.png', _selectedPrivacy,
+                  'Private', 'assets/images/Lock.png', _selectedPrivacy,
                   (value) {
                 // Update both the modal state and the parent state
                 setModalState(() => _selectedPrivacy = value);
@@ -1387,7 +1390,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
                 Navigator.pop(context);
               }),
               _buildPrivacyOption(
-                  'Private', 'assets/images/Lock.png', _selectedPrivacy,
+                  'Public', 'assets/images/globe.png', _selectedPrivacy,
                   (value) {
                 // Update both the modal state and the parent state
                 setModalState(() => _selectedPrivacy = value);
@@ -3357,6 +3360,9 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         } else if (title == 'Fix with AI') {
           // Show the Fix with AI dialog
           _showFixWithAIDialog();
+        } else if (title == 'In-Depth Nutrition') {
+          // Navigate to the Nutrition screen
+          _openNutritionScreen();
         }
         // Add other handlers for different options if needed
       },
@@ -6928,7 +6934,7 @@ class _FoodCardOpenState extends State<FoodCardOpen>
         print('Updated food_cards list, removed deleted meal');
       }
 
-      // Navigate to CodiaPage with pushReplacement to ensure proper screen stack
+      // Navigate to main CodiaPage (not Nutrition) with pushReplacement 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => CodiaPage()),
       );
@@ -6985,6 +6991,198 @@ class _FoodCardOpenState extends State<FoodCardOpen>
     } else {
       return str;
     }
+  }
+  
+  // Open the Nutrition screen to see updated nutrient values
+  void _openNutritionScreen() async {
+    // Create a map with basic nutrition data
+    Map<String, dynamic> nutritionData = {
+      'protein': _protein,
+      'fat': _fat,
+      'carbs': _carbs,
+    };
+    
+    // Add additional nutrients from widget parameter if available
+    if (widget.additionalNutrients != null && widget.additionalNutrients!.isNotEmpty) {
+      print("Adding additional nutrients from widget parameter: ${widget.additionalNutrients}");
+      nutritionData.addAll(widget.additionalNutrients!);
+    }
+    
+    // Extract and add additional nutrition data from ingredients if available
+    if (_ingredients.isNotEmpty) {
+      // Check if ingredients contain additional nutrient information
+      Map<String, dynamic> otherNutrients = _extractOtherNutrients();
+      
+      // Add any nutrients found in ingredients that weren't already added
+      otherNutrients.forEach((key, value) {
+        if (!nutritionData.containsKey(key)) {
+          nutritionData[key] = value;
+        }
+      });
+    }
+    
+    // Get a simple, deterministic food ID without timestamp
+    String foodName = _foodName.toLowerCase().trim().replaceAll(' ', '_');
+    // Construct a simple deterministic ID that will be the same every time for this food
+    String foodSpecificScanId = "food_nutrition_${foodName}";
+    
+    print("Passing nutrition data to Nutrition.dart: $nutritionData");
+    print("Using CONSISTENT food-specific scan ID: $foodSpecificScanId");
+    
+    // Save this ID in our food's data to make it discoverable later
+    final prefs = await SharedPreferences.getInstance();
+    // Use a simple standardized key based on the food name
+    String foodId = _foodName.toLowerCase().replaceAll(' ', '_');
+    await prefs.setString('food_nutrition_id_$foodId', foodSpecificScanId);
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => nutrition_page.CodiaPage(
+          nutritionData: nutritionData,
+          scanId: foodSpecificScanId, // Pass the unique scan ID
+        ),
+      ),
+    ).then((_) {
+      // No need to check for updated scanId when returning
+      print("Returned from Nutrition.dart");
+    });
+  }
+  
+  // Helper method to generate a scanId specific to this food
+  String generateFoodSpecificScanId() {
+    // Create a CONSISTENT ID based on this food's properties
+    // Don't use a timestamp which changes each time and causes data loss
+    String foodIdentifier = _foodName.replaceAll(' ', '_').toLowerCase();
+    String calIdentifier = _calories.replaceAll('.', '_');
+    
+    // Create a stable ID that won't change between visits
+    String scanId = 'food_nutrition_${foodIdentifier}_${calIdentifier}';
+    print("Generated PERSISTENT food-specific scanId: $scanId");
+    return scanId;
+  }
+  
+  // Helper method to extract other nutrients from ingredients
+  Map<String, dynamic> _extractOtherNutrients() {
+    Map<String, dynamic> result = {};
+    
+    // Common nutrient fields to extract from ingredients
+    List<String> commonNutrients = [
+      'fiber', 'cholesterol', 'sodium', 'sugar', 'saturated_fat',
+      'omega_3', 'omega_6', 'potassium', 'calcium', 'iron',
+      'magnesium', 'zinc', 'selenium', 'phosphorus', 'copper',
+      'manganese', 'iodine', 'chromium', 'fluoride', 'chloride',
+      'molybdenum'
+    ];
+    
+    // Vitamins with different possible naming formats
+    Map<String, String> vitaminMappings = {
+      'vitamin_a': 'vitamin_a',
+      'vitamin a': 'vitamin_a',
+      'a': 'vitamin_a', 
+      'vitamin_c': 'vitamin_c',
+      'vitamin c': 'vitamin_c', 
+      'c': 'vitamin_c',
+      'vitamin_d': 'vitamin_d',
+      'vitamin d': 'vitamin_d',
+      'd': 'vitamin_d',
+      'vitamin_e': 'vitamin_e',
+      'vitamin e': 'vitamin_e',
+      'e': 'vitamin_e',
+      'vitamin_k': 'vitamin_k',
+      'vitamin k': 'vitamin_k',
+      'k': 'vitamin_k',
+      'vitamin_b1': 'vitamin_b1',
+      'vitamin b1': 'vitamin_b1',
+      'b1': 'vitamin_b1',
+      'thiamin': 'vitamin_b1',
+      'thiamine': 'vitamin_b1',
+      'vitamin_b2': 'vitamin_b2',
+      'vitamin b2': 'vitamin_b2',
+      'b2': 'vitamin_b2',
+      'riboflavin': 'vitamin_b2',
+      'vitamin_b3': 'vitamin_b3',
+      'vitamin b3': 'vitamin_b3',
+      'b3': 'vitamin_b3',
+      'niacin': 'vitamin_b3',
+      'vitamin_b5': 'vitamin_b5',
+      'vitamin b5': 'vitamin_b5',
+      'b5': 'vitamin_b5',
+      'pantothenic_acid': 'vitamin_b5',
+      'vitamin_b6': 'vitamin_b6',
+      'vitamin b6': 'vitamin_b6',
+      'b6': 'vitamin_b6',
+      'pyridoxine': 'vitamin_b6',
+      'vitamin_b7': 'vitamin_b7',
+      'vitamin b7': 'vitamin_b7',
+      'b7': 'vitamin_b7',
+      'biotin': 'vitamin_b7',
+      'vitamin_b9': 'vitamin_b9',
+      'vitamin b9': 'vitamin_b9',
+      'b9': 'vitamin_b9',
+      'folate': 'vitamin_b9',
+      'folic_acid': 'vitamin_b9',
+      'vitamin_b12': 'vitamin_b12',
+      'vitamin b12': 'vitamin_b12',
+      'b12': 'vitamin_b12',
+      'cobalamin': 'vitamin_b12'
+    };
+    
+    // Check each ingredient for additional nutrition data
+    for (var ingredient in _ingredients) {
+      // First check for common nutrient fields
+      for (String field in commonNutrients) {
+        if (ingredient.containsKey(field) && ingredient[field] != null) {
+          // If the field exists in the current result, add the values
+          if (result.containsKey(field)) {
+            // Parse both values and add them
+            double existingValue = _parseNutritionValue(result[field]);
+            double newValue = _parseNutritionValue(ingredient[field]);
+            result[field] = (existingValue + newValue).toString();
+          } else {
+            // Just add the field directly
+            result[field] = ingredient[field].toString();
+          }
+        }
+      }
+      
+      // Check for vitamins with different naming formats
+      vitaminMappings.forEach((sourceKey, targetKey) {
+        if (ingredient.containsKey(sourceKey) && ingredient[sourceKey] != null) {
+          // If this vitamin exists in the result under the standardized key, add the values
+          if (result.containsKey(targetKey)) {
+            double existingValue = _parseNutritionValue(result[targetKey]);
+            double newValue = _parseNutritionValue(ingredient[sourceKey]);
+            result[targetKey] = (existingValue + newValue).toString();
+          } else {
+            // Add the vitamin with the standardized key
+            result[targetKey] = ingredient[sourceKey].toString();
+          }
+        }
+      });
+      
+      // Check for any keys that contain "vitamin" but aren't in our mapping
+      ingredient.keys.forEach((key) {
+        String lowerKey = key.toLowerCase();
+        if (lowerKey.contains('vitamin') && !vitaminMappings.containsKey(lowerKey)) {
+          // Standardize the key format: replace spaces with underscores
+          String standardKey = lowerKey.replaceAll(' ', '_');
+          
+          // If this vitamin exists in the result under the standardized key, add the values
+          if (result.containsKey(standardKey)) {
+            double existingValue = _parseNutritionValue(result[standardKey]);
+            double newValue = _parseNutritionValue(ingredient[key]);
+            result[standardKey] = (existingValue + newValue).toString();
+          } else {
+            // Add the vitamin with the standardized key
+            result[standardKey] = ingredient[key].toString();
+        }
+      }
+    });
+    }
+    
+    print("Extracted additional nutrients from ingredients: $result");
+    return result;
   }
 }
 

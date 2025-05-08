@@ -194,7 +194,7 @@ class _CodiaPage extends State<CodiaPage> {
       if (other.containsKey('Protein')) {
         int proteinValue = nutritionTracker.currentProtein;
         double target = 100.0; // Target in grams
-        double progress = proteinValue > 0 ? (proteinValue / target).clamp(0.0, 1.0) : 0.0;
+        double progress = proteinValue > 0 ? (proteinValue / target) : 0.0; // Removed clamp
         int percentage = (progress * 100).round();
         
         // Get color based on progress
@@ -213,7 +213,7 @@ class _CodiaPage extends State<CodiaPage> {
       if (other.containsKey('Fat')) {
         int fatValue = nutritionTracker.currentFat;
         double target = 70.0; // Target in grams
-        double progress = fatValue > 0 ? (fatValue / target).clamp(0.0, 1.0) : 0.0;
+        double progress = fatValue > 0 ? (fatValue / target) : 0.0; // Removed clamp
         int percentage = (progress * 100).round();
         
         // Get color based on progress
@@ -232,7 +232,7 @@ class _CodiaPage extends State<CodiaPage> {
       if (other.containsKey('Carbs')) {
         int carbValue = nutritionTracker.currentCarb;
         double target = 200.0; // Target in grams
-        double progress = carbValue > 0 ? (carbValue / target).clamp(0.0, 1.0) : 0.0;
+        double progress = carbValue > 0 ? (carbValue / target) : 0.0; // Removed clamp
         int percentage = (progress * 100).round();
         
         // Get color based on progress
@@ -507,7 +507,7 @@ class _CodiaPage extends State<CodiaPage> {
     if (data.containsKey('fiber')) {
       double fiber = _parseNutrientValue(data['fiber']);
       double target = 30; // Target in grams
-      double progress = (fiber / target).clamp(0.0, 1.0);
+      double progress = (fiber / target); // Removed clamp
       int percentage = (progress * 100).round();
       
       // Get color based on progress
@@ -527,7 +527,7 @@ class _CodiaPage extends State<CodiaPage> {
     if (data.containsKey('sugar')) {
       double sugar = _parseNutrientValue(data['sugar']);
       double target = 25; // Target in grams
-      double progress = (sugar / target).clamp(0.0, 1.0);
+      double progress = (sugar / target); // Removed clamp
       int percentage = (progress * 100).round();
       
       // Get color based on progress
@@ -547,7 +547,7 @@ class _CodiaPage extends State<CodiaPage> {
     if (data.containsKey('cholesterol')) {
       double cholesterol = _parseNutrientValue(data['cholesterol']);
       double target = 300; // Default target in mg, will be updated from SharedPreferences
-      double progress = (cholesterol / target).clamp(0.0, 1.0);
+      double progress = (cholesterol / target); // Removed clamp
       int percentage = (progress * 100).round();
       
       // Get color based on progress
@@ -567,7 +567,7 @@ class _CodiaPage extends State<CodiaPage> {
     if (data.containsKey('omega_3') || data.containsKey('omega3')) {
       double omega3 = _parseNutrientValue(data['omega_3'] ?? data['omega3'] ?? 0);
       double target = 1500; // Default target in mg, will be updated from SharedPreferences
-      double progress = (omega3 / target).clamp(0.0, 1.0);
+      double progress = (omega3 / target); // Removed clamp
       int percentage = (progress * 100).round();
       
       // Get color based on progress
@@ -587,7 +587,7 @@ class _CodiaPage extends State<CodiaPage> {
     if (data.containsKey('omega_6') || data.containsKey('omega6')) {
       double omega6 = _parseNutrientValue(data['omega_6'] ?? data['omega6'] ?? 0);
       double target = 14; // Default target in g, will be updated from SharedPreferences
-      double progress = (omega6 / target).clamp(0.0, 1.0);
+      double progress = (omega6 / target); // Removed clamp
       int percentage = (progress * 100).round();
       
       // Get color based on progress
@@ -607,7 +607,7 @@ class _CodiaPage extends State<CodiaPage> {
     if (data.containsKey('sodium')) {
       double sodium = _parseNutrientValue(data['sodium']);
       double target = 2300; // Default target in mg, will be updated from SharedPreferences
-      double progress = (sodium / target).clamp(0.0, 1.0);
+      double progress = (sodium / target); // Removed clamp
       int percentage = (progress * 100).round();
       
       // Get color based on progress
@@ -627,7 +627,7 @@ class _CodiaPage extends State<CodiaPage> {
     if (data.containsKey('saturated_fat') || data.containsKey('saturated_fats')) {
       double saturatedFat = _parseNutrientValue(data['saturated_fat'] ?? data['saturated_fats'] ?? 0);
       double target = 22; // Default target in g, will be updated from SharedPreferences
-      double progress = (saturatedFat / target).clamp(0.0, 1.0);
+      double progress = (saturatedFat / target); // Removed clamp
       int percentage = (progress * 100).round();
       
       // Get color based on progress
@@ -762,7 +762,7 @@ class _CodiaPage extends State<CodiaPage> {
       if (data.containsKey(dataKey)) {
         double value = _parseNutrientValue(data[dataKey]);
         double target = info['target'] as double;
-        double progress = (value / target).clamp(0.0, 1.0);
+        double progress = (value / target); // Removed clamp
         String unit = info['unit'] as String;
         
         // Determine color based on progress
@@ -788,7 +788,7 @@ class _CodiaPage extends State<CodiaPage> {
         if (info != null) {
           double value = _parseNutrientValue(data[shortKey]);
           double target = info['target'] as double;
-          double progress = (value / target).clamp(0.0, 1.0);
+          double progress = (value / target); // Removed clamp
           String unit = info['unit'] as String;
           
           // Determine color based on progress
@@ -814,7 +814,7 @@ class _CodiaPage extends State<CodiaPage> {
     } else if (progress < 0.8) {
       return yellowColor; // Yellow for 40-80%
     } else {
-      return greenColor;  // Green for 80-100%+
+      return greenColor;  // Green for 80-100%+ (anything above 0.8 is good)
     }
   }
   
@@ -916,7 +916,7 @@ class _CodiaPage extends State<CodiaPage> {
       if (data.containsKey(dataKey)) {
         double value = _parseNutrientValue(data[dataKey]);
         double target = info['target'] as double;
-        double progress = (value / target).clamp(0.0, 1.0);
+        double progress = (value / target); // Removed clamp
         String unit = info['unit'] as String;
         
         // Determine color based on progress
@@ -1292,7 +1292,7 @@ class _CodiaPage extends State<CodiaPage> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: LinearProgressIndicator(
-                          value: nutrient.progress,
+                          value: nutrient.progress.clamp(0.0, 1.0), // Clamp only for UI display, still show >100% in text
                           minHeight: 8,
                           backgroundColor: Colors.grey.withOpacity(0.3),
                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -1390,7 +1390,7 @@ class _CodiaPage extends State<CodiaPage> {
       // Update nutrient info objects with correct targets
       if (other.containsKey('Cholesterol')) {
         double currentValue = _parseCurrentValue(other['Cholesterol']!.value);
-        double progress = (currentValue / cholesterolTarget).clamp(0.0, 1.0);
+        double progress = (currentValue / cholesterolTarget); // Removed clamp
         int percentage = (progress * 100).round();
         
         // Get color based on progress
@@ -1407,7 +1407,7 @@ class _CodiaPage extends State<CodiaPage> {
       
       if (other.containsKey('Omega-3')) {
         double currentValue = _parseCurrentValue(other['Omega-3']!.value);
-        double progress = (currentValue / omega3Target).clamp(0.0, 1.0);
+        double progress = (currentValue / omega3Target); // Removed clamp
         int percentage = (progress * 100).round();
         
         // Get color based on progress
@@ -1424,7 +1424,7 @@ class _CodiaPage extends State<CodiaPage> {
       
       if (other.containsKey('Omega-6')) {
         double currentValue = _parseCurrentValue(other['Omega-6']!.value);
-        double progress = (currentValue / omega6Target).clamp(0.0, 1.0);
+        double progress = (currentValue / omega6Target); // Removed clamp
         int percentage = (progress * 100).round();
         
         // Get color based on progress
@@ -1441,7 +1441,7 @@ class _CodiaPage extends State<CodiaPage> {
       
       if (other.containsKey('Sodium')) {
         double currentValue = _parseCurrentValue(other['Sodium']!.value);
-        double progress = (currentValue / sodiumTarget).clamp(0.0, 1.0);
+        double progress = (currentValue / sodiumTarget); // Removed clamp
         int percentage = (progress * 100).round();
         
         // Get color based on progress
@@ -1458,7 +1458,7 @@ class _CodiaPage extends State<CodiaPage> {
       
       if (other.containsKey('Saturated Fats')) {
         double currentValue = _parseCurrentValue(other['Saturated Fats']!.value);
-        double progress = (currentValue / saturatedFatTarget).clamp(0.0, 1.0);
+        double progress = (currentValue / saturatedFatTarget); // Removed clamp
         int percentage = (progress * 100).round();
         
         // Get color based on progress
@@ -1827,7 +1827,7 @@ class _CodiaPage extends State<CodiaPage> {
           }
         }
         
-        double progress = targetValue > 0 ? (currentValue / targetValue).clamp(0.0, 1.0) : 0.0;
+        double progress = targetValue > 0 ? (currentValue / targetValue) : 0.0; // Removed clamp
         Color progressColor = _getColorBasedOnProgress(progress);
         
         targetMap[key] = NutrientInfo(
