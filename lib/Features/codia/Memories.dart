@@ -63,7 +63,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
                 // Slim gray divider line
                 Container(
                   margin: EdgeInsets.symmetric(horizontal: 29),
-                  height: 1,
+                  height: 0.5,
                   color: Color(0xFFBDBDBD),
                 ),
 

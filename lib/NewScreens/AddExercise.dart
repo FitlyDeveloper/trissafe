@@ -135,7 +135,7 @@ class _CodiaPage extends State<CodiaPage> {
                     ),
                     Container(
                       margin: EdgeInsets.symmetric(horizontal: 29),
-                      height: 1,
+                      height: 0.5,
                       color: Color(0xFFBDBDBD),
                     ),
                   ],

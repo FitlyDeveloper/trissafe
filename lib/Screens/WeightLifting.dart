@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../NewScreens/AddExercise.dart';
 import '../NewScreens/AddRoutine.dart';
 import '../NewScreens/StartWorkout.dart';
+import '../NewScreens/ChooseWorkout.dart';
 
 class WeightLifting extends StatefulWidget {
   const WeightLifting({Key? key}) : super(key: key);
@@ -60,7 +61,23 @@ class _WeightLiftingState extends State<WeightLifting> {
                           child: IconButton(
                             icon: Icon(Icons.arrow_back,
                                 color: Colors.black, size: 24),
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () {
+                              Navigator.of(context).pushReplacement(
+                                PageRouteBuilder(
+                                  pageBuilder: (context, animation, secondaryAnimation) => ChooseWorkout(),
+                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                    const begin = Offset(-1.0, 0.0);
+                                    const end = Offset.zero;
+                                    const curve = Curves.ease;
+                                    final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                                    return SlideTransition(
+                                      position: animation.drive(tween),
+                                      child: child,
+                                    );
+                                  },
+                                ),
+                              );
+                            },
                             padding: EdgeInsets.zero,
                             constraints: BoxConstraints(),
                           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../Screens/WeightLifting.dart';
 
 class ExerciseInfo extends StatefulWidget {
   final String exerciseName;
@@ -63,7 +64,11 @@ class _ExerciseInfoState extends State<ExerciseInfo> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.black, size: 24),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(builder: (context) => const WeightLifting()),
+                          );
+                        },
                         padding: EdgeInsets.zero,
                         constraints: BoxConstraints(),
                       ),
@@ -83,7 +88,7 @@ class _ExerciseInfoState extends State<ExerciseInfo> {
                 ),
                 Container(
                   margin: EdgeInsets.symmetric(horizontal: 29),
-                  height: 1,
+                  height: 0.5,
                   color: Color(0xFFBDBDBD),
                 ),
                 SizedBox(height: 10), // Updated from 24 to 10
