@@ -40,6 +40,14 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
   // Track whether data was loaded successfully
   bool _dataLoaded = false;
   
+  // Flag to track if there are unsaved changes
+  bool _hasUnsavedChanges = false;
+  
+  // Track nutrient counts
+  int vitaminCount = 0;
+  int mineralCount = 0;
+  int otherCount = 0;
+  
   // Timer to periodically save data while screen is visible
   Timer? _autoSaveTimer;
   
@@ -65,12 +73,16 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         // If global key fails, start regular data loading process
         _loadData();
       }
+      
+      // Load personalized targets for all nutrients after data is loaded
+      _loadNutrientTargets();
     });
     
     // Set up periodic auto-save
     _autoSaveTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (mounted && _dataLoaded) {
+      if (_hasUnsavedChanges) {
         _saveNutritionData();
+        _hasUnsavedChanges = false;
       }
     });
     
@@ -688,250 +700,60 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
     }
   }
   
+  // Initialize default values for vitamins, minerals, and other nutrients
   void _initializeDefaultValues() {
-    // Initialize vitamins
+    print("Initializing default nutrient values...");
+    
+    // VITAMINS
     vitamins = {
-      'Vitamin A': NutrientInfo(
-        name: "Vitamin A",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: greenColor
-      ),
-      'Vitamin C': NutrientInfo(
-        name: "Vitamin C",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: redColor
-      ),
-      'Vitamin D': NutrientInfo(
-        name: "Vitamin D",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor,
-        hasInfo: true
-      ),
-      'Vitamin E': NutrientInfo(
-        name: "Vitamin E",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: redColor
-      ),
-      'Vitamin K': NutrientInfo(
-        name: "Vitamin K",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Vitamin B1': NutrientInfo(
-        name: "Vitamin B1",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: redColor
-      ),
-      'Vitamin B2': NutrientInfo(
-        name: "Vitamin B2",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Vitamin B3': NutrientInfo(
-        name: "Vitamin B3",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: redColor
-      ),
-      'Vitamin B5': NutrientInfo(
-        name: "Vitamin B5",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Vitamin B6': NutrientInfo(
-        name: "Vitamin B6",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: redColor
-      ),
-      'Vitamin B7': NutrientInfo(
-        name: "Vitamin B7",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Vitamin B9': NutrientInfo(
-        name: "Vitamin B9",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: redColor
-      ),
-      'Vitamin B12': NutrientInfo(
-        name: "Vitamin B12",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: redColor
-      ),
+      'Vitamin A': NutrientInfo(name: 'Vitamin A', value: '0/700 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin C': NutrientInfo(name: 'Vitamin C', value: '0/75 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin D': NutrientInfo(name: 'Vitamin D', value: '0/15 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin E': NutrientInfo(name: 'Vitamin E', value: '0/15 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin K': NutrientInfo(name: 'Vitamin K', value: '0/90 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin B1': NutrientInfo(name: 'Vitamin B1', value: '0/1.1 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin B2': NutrientInfo(name: 'Vitamin B2', value: '0/1.1 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin B3': NutrientInfo(name: 'Vitamin B3', value: '0/14 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin B5': NutrientInfo(name: 'Vitamin B5', value: '0/5 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin B6': NutrientInfo(name: 'Vitamin B6', value: '0/1.3 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin B7': NutrientInfo(name: 'Vitamin B7', value: '0/30 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin B9': NutrientInfo(name: 'Vitamin B9', value: '0/400 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin B12': NutrientInfo(name: 'Vitamin B12', value: '0/2.4 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
     };
     
-    // Initialize minerals
+    // MINERALS
     minerals = {
-      'Calcium': NutrientInfo(
-        name: "Calcium",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Chloride': NutrientInfo(
-        name: "Chloride",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Chromium': NutrientInfo(
-        name: "Chromium",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Copper': NutrientInfo(
-        name: "Copper",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Fluoride': NutrientInfo(
-        name: "Fluoride",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Iodine': NutrientInfo(
-        name: "Iodine",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Iron': NutrientInfo(
-        name: "Iron",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Magnesium': NutrientInfo(
-        name: "Magnesium",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Manganese': NutrientInfo(
-        name: "Manganese",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Molybdenum': NutrientInfo(
-        name: "Molybdenum",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Phosphorus': NutrientInfo(
-        name: "Phosphorus",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Potassium': NutrientInfo(
-        name: "Potassium",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Selenium': NutrientInfo(
-        name: "Selenium",
-        value: "0/0 mcg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Sodium': NutrientInfo(
-        name: "Sodium",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Zinc': NutrientInfo(
-        name: "Zinc",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
+      'Calcium': NutrientInfo(name: 'Calcium', value: '0/1000 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Chloride': NutrientInfo(name: 'Chloride', value: '0/2300 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Chromium': NutrientInfo(name: 'Chromium', value: '0/35 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Copper': NutrientInfo(name: 'Copper', value: '0/900 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Fluoride': NutrientInfo(name: 'Fluoride', value: '0/4 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Iodine': NutrientInfo(name: 'Iodine', value: '0/150 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Iron': NutrientInfo(name: 'Iron', value: '0/18 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Magnesium': NutrientInfo(name: 'Magnesium', value: '0/400 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Manganese': NutrientInfo(name: 'Manganese', value: '0/2.3 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Molybdenum': NutrientInfo(name: 'Molybdenum', value: '0/45 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Phosphorus': NutrientInfo(name: 'Phosphorus', value: '0/700 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Potassium': NutrientInfo(name: 'Potassium', value: '0/3500 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Selenium': NutrientInfo(name: 'Selenium', value: '0/55 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Sodium': NutrientInfo(name: 'Sodium', value: '0/2300 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Zinc': NutrientInfo(name: 'Zinc', value: '0/11 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
     };
     
-    // Initialize other nutrients
+    // OTHER NUTRIENTS
     other = {
-      'Fiber': NutrientInfo(
-        name: "Fiber",
-        value: "0/0 g",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Cholesterol': NutrientInfo(
-        name: "Cholesterol",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Omega-3': NutrientInfo(
-        name: "Omega-3",
-        value: "0/0 mg",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Omega-6': NutrientInfo(
-        name: "Omega-6",
-        value: "0/0 g",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
-      'Saturated Fats': NutrientInfo(
-        name: "Saturated Fats",
-        value: "0/0 g",
-        percent: "0%",
-        progress: 0,
-        progressColor: yellowColor
-      ),
+      'Fiber': NutrientInfo(name: 'Fiber', value: '0/30 g', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Cholesterol': NutrientInfo(name: 'Cholesterol', value: '0/300 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Sugar': NutrientInfo(name: 'Sugar', value: '0/50 g', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Saturated Fats': NutrientInfo(name: 'Saturated Fats', value: '0/22 g', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Omega-3': NutrientInfo(name: 'Omega-3', value: '0/1500 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Omega-6': NutrientInfo(name: 'Omega-6', value: '0/14 g', percent: '0%', progress: 0.0, progressColor: Colors.red),
     };
+    
+    // Set the counters for each category
+    vitaminCount = vitamins.length;
+    mineralCount = minerals.length;
+    otherCount = other.length;
   }
   
   // Diagnostic function to print all available nutrient target keys
@@ -1043,10 +865,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       'fiber': 'Fiber',
       'cholesterol': 'Cholesterol',
       'sugar': 'Sugar',
-      'saturated_fat': 'Saturated Fat',
-      'trans_fat': 'Trans Fat',
-      'omega_3': 'Omega 3',
-      'omega_6': 'Omega 6',
+      'saturated_fat': 'Saturated Fats',
+      'omega_3': 'Omega-3',
+      'omega_6': 'Omega-6',
     };
     
     try {
@@ -1063,176 +884,13 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       print('Error processing direct root other nutrients: $e');
     }
 
-    // == VITAMINS EXTRACTION (nested objects) ==
-    try {
-      // Process vitamins from the most direct source first
-      if (data.containsKey('vitamins') && data['vitamins'] is Map) {
-        print('Found direct vitamins map');
-        Map<String, dynamic> vitaminData = data['vitamins'];
-        
-        // Create mapping between API keys and internal vitamin keys
-        Map<String, String> vitaminKeyMap = {
-          'vitamin_a': 'Vitamin A',
-          'vitamin_c': 'Vitamin C',
-          'vitamin_d': 'Vitamin D',
-          'vitamin_e': 'Vitamin E',
-          'vitamin_k': 'Vitamin K',
-          'vitamin_b1': 'Vitamin B1',
-          'vitamin_b2': 'Vitamin B2',
-          'vitamin_b3': 'Vitamin B3',
-          'vitamin_b5': 'Vitamin B5',
-          'vitamin_b6': 'Vitamin B6',
-          'vitamin_b7': 'Vitamin B7',
-          'vitamin_b9': 'Vitamin B9',
-          'vitamin_b12': 'Vitamin B12',
-        };
-        
-        // Process each key in vitaminData
-        vitaminData.forEach((key, value) {
-          String normalizedKey = key.toLowerCase().replaceAll(' ', '_');
-          // Check if we have this key in our map or directly in vitamins
-          if (vitaminKeyMap.containsKey(normalizedKey)) {
-            String vitaminKey = vitaminKeyMap[normalizedKey]!;
-            double currentAmount = _extractNumericValue(value.toString());
-            if (vitamins.containsKey(vitaminKey)) {
-              _updateVitaminWithValue(vitaminKey, currentAmount);
-            }
-          } else if (vitamins.containsKey(key)) {
-            // Direct match with exact key
-            double currentAmount = _extractNumericValue(value.toString());
-            _updateVitaminWithValue(key, currentAmount);
-          }
-        });
-      }
-
-      // Try multiple possible naming patterns for each vitamin (process each one separately to prevent one failure affecting others)
-      _processSingleVitamin(data, 'Vitamin A', ['vitamin_a', 'vitamin a', 'vitamin-a', 'vitamina', 'a']);
-      _processSingleVitamin(data, 'Vitamin C', ['vitamin_c', 'vitamin c', 'vitamin-c', 'vitaminc', 'c']);
-      _processSingleVitamin(data, 'Vitamin D', ['vitamin_d', 'vitamin d', 'vitamin-d', 'vitamind', 'd']);
-      _processSingleVitamin(data, 'Vitamin E', ['vitamin_e', 'vitamin e', 'vitamin-e', 'vitamine', 'e']);
-      _processSingleVitamin(data, 'Vitamin K', ['vitamin_k', 'vitamin k', 'vitamin-k', 'vitamink', 'k']);
-      _processSingleVitamin(data, 'Vitamin B1', ['vitamin_b1', 'vitamin b1', 'b1', 'thiamin', 'thiamine']);
-      _processSingleVitamin(data, 'Vitamin B2', ['vitamin_b2', 'vitamin b2', 'b2', 'riboflavin']);
-      _processSingleVitamin(data, 'Vitamin B3', ['vitamin_b3', 'vitamin b3', 'b3', 'niacin']);
-      _processSingleVitamin(data, 'Vitamin B5', ['vitamin_b5', 'vitamin b5', 'b5', 'pantothenic_acid', 'pantothenic acid']);
-      _processSingleVitamin(data, 'Vitamin B6', ['vitamin_b6', 'vitamin b6', 'b6', 'pyridoxine']);
-      _processSingleVitamin(data, 'Vitamin B7', ['vitamin_b7', 'vitamin b7', 'b7', 'biotin']);
-      _processSingleVitamin(data, 'Vitamin B9', ['vitamin_b9', 'vitamin b9', 'b9', 'folate', 'folic_acid', 'folic acid']);
-      _processSingleVitamin(data, 'Vitamin B12', ['vitamin_b12', 'vitamin b12', 'b12', 'cobalamin']);
-    } catch (e) {
-      print('Error processing vitamins: $e');
-    }
-
-    // == MINERALS EXTRACTION ==
-    try {
-      // Process minerals from the most direct source first
-      if (data.containsKey('minerals') && data['minerals'] is Map) {
-        print('Found direct minerals map');
-        Map<String, dynamic> mineralData = data['minerals'];
-        
-        // Create mapping between API keys and internal mineral keys
-        Map<String, String> mineralKeyMap = {
-          'calcium': 'Calcium',
-          'chloride': 'Chloride',
-          'chromium': 'Chromium',
-          'copper': 'Copper',
-          'fluoride': 'Fluoride',
-          'iodine': 'Iodine',
-          'iron': 'Iron',
-          'magnesium': 'Magnesium',
-          'manganese': 'Manganese',
-          'molybdenum': 'Molybdenum',
-          'phosphorus': 'Phosphorus',
-          'potassium': 'Potassium',
-          'selenium': 'Selenium',
-          'sodium': 'Sodium',
-          'zinc': 'Zinc',
-        };
-        
-        // Process each key in mineralData
-        mineralData.forEach((key, value) {
-          String normalizedKey = key.toLowerCase().replaceAll(' ', '_');
-          // Check if we have this key in our map or directly in minerals
-          if (mineralKeyMap.containsKey(normalizedKey)) {
-            String mineralKey = mineralKeyMap[normalizedKey]!;
-            double currentAmount = _extractNumericValue(value.toString());
-            if (minerals.containsKey(mineralKey)) {
-              _updateMineralWithValue(mineralKey, currentAmount);
-            }
-          } else if (minerals.containsKey(key)) {
-            // Direct match with exact key
-            double currentAmount = _extractNumericValue(value.toString());
-            _updateMineralWithValue(key, currentAmount);
-          }
-        });
-      }
-
-      // Try multiple possible naming patterns for each mineral (process each individually)
-      _processSingleMineral(data, 'Calcium', ['calcium', 'ca']);
-      _processSingleMineral(data, 'Chloride', ['chloride', 'cl']);
-      _processSingleMineral(data, 'Chromium', ['chromium', 'cr']);
-      _processSingleMineral(data, 'Copper', ['copper', 'cu']);
-      _processSingleMineral(data, 'Fluoride', ['fluoride', 'f']);
-      _processSingleMineral(data, 'Iodine', ['iodine', 'i']);
-      _processSingleMineral(data, 'Iron', ['iron', 'fe']);
-      _processSingleMineral(data, 'Magnesium', ['magnesium', 'mg']);
-      _processSingleMineral(data, 'Manganese', ['manganese', 'mn']);
-      _processSingleMineral(data, 'Molybdenum', ['molybdenum', 'mo']);
-      _processSingleMineral(data, 'Phosphorus', ['phosphorus', 'p']);
-      _processSingleMineral(data, 'Potassium', ['potassium', 'k']);
-      _processSingleMineral(data, 'Selenium', ['selenium', 'se']);
-      _processSingleMineral(data, 'Sodium', ['sodium', 'na']);
-      _processSingleMineral(data, 'Zinc', ['zinc', 'zn']);
-    } catch (e) {
-      print('Error processing minerals: $e');
-    }
-
-    // == OTHER NUTRIENTS EXTRACTION ==
-    try {
-      // Process other nutrients from the most direct source first
-      if (data.containsKey('other') && data['other'] is Map) {
-        print('Found direct other nutrients map');
-        Map<String, dynamic> otherData = data['other'];
-        otherData.forEach((key, value) {
-          if (other.containsKey(key)) {
-            // Update the other nutrient with the provided data
-            double currentAmount = _extractNumericValue(value.toString());
-            _updateOtherNutrientWithValue(key, currentAmount);
-          }
-        });
-      }
-
-      // Process each nutrient individually to prevent one error affecting others
-      _processSingleOtherNutrient(data, 'Cholesterol', ['cholesterol', 'chol']);
-      _processSingleOtherNutrient(data, 'Fiber', ['fiber', 'dietary_fiber', 'dietary fiber', 'fibre']);
-      _processSingleOtherNutrient(data, 'Sugar', ['sugar', 'sugars', 'total_sugar', 'total sugar']);
-      _processSingleOtherNutrient(data, 'Saturated Fat', ['saturated_fat', 'saturated fat', 'sat_fat']);
-      _processSingleOtherNutrient(data, 'Trans Fat', ['trans_fat', 'trans fat']);
-      _processSingleOtherNutrient(data, 'Monounsaturated Fat', ['monounsaturated_fat', 'monounsaturated fat', 'mono_fat']);
-      _processSingleOtherNutrient(data, 'Polyunsaturated Fat', ['polyunsaturated_fat', 'polyunsaturated fat', 'poly_fat']);
-      _processSingleOtherNutrient(data, 'Omega 3', ['omega_3', 'omega 3', 'omega3']);
-      _processSingleOtherNutrient(data, 'Omega 6', ['omega_6', 'omega 6', 'omega6']);
-    } catch (e) {
-      print('Error processing other nutrients: $e');
-    }
-  }
-  
-  // Process a single vitamin safely - prevents one error from affecting others
-  void _processSingleVitamin(Map<String, dynamic> data, String vitaminKey, List<String> possibleKeys) {
-    try {
-      _extractVitaminByVariants(data, vitaminKey, possibleKeys);
-    } catch (e) {
-      print('Error processing vitamin $vitaminKey: $e');
-    }
-  }
-  
-  // Process a single mineral safely - prevents one error from affecting others
-  void _processSingleMineral(Map<String, dynamic> data, String mineralKey, List<String> possibleKeys) {
-    try {
-      _extractMineralByVariants(data, mineralKey, possibleKeys);
-    } catch (e) {
-      print('Error processing mineral $mineralKey: $e');
-    }
+    // Process each nutrient individually to prevent one error affecting others
+    _processSingleOtherNutrient(data, 'Cholesterol', ['cholesterol', 'chol']);
+    _processSingleOtherNutrient(data, 'Fiber', ['fiber', 'dietary_fiber', 'dietary fiber', 'fibre']);
+    _processSingleOtherNutrient(data, 'Sugar', ['sugar', 'sugars', 'total_sugar', 'total sugar']);
+    _processSingleOtherNutrient(data, 'Saturated Fats', ['saturated_fat', 'saturated fat', 'sat_fat']);
+    _processSingleOtherNutrient(data, 'Omega-3', ['omega_3', 'omega 3', 'omega3']);
+    _processSingleOtherNutrient(data, 'Omega-6', ['omega_6', 'omega 6', 'omega6']);
   }
   
   // Process a single other nutrient safely - prevents one error from affecting others
@@ -1243,203 +901,7 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       print('Error processing nutrient $nutrientKey: $e');
     }
   }
-  
-  // Helper method to extract a vitamin value using multiple possible key variants
-  void _extractVitaminByVariants(Map<String, dynamic> data, String vitaminKey, List<String> possibleKeys) {
-    for (String key in possibleKeys) {
-      // Check for the key in both original and lowercase forms
-      if (data.containsKey(key) || data.containsKey(key.toLowerCase())) {
-        String actualKey = data.containsKey(key) ? key : key.toLowerCase();
-        double amount = _extractNumericValue(data[actualKey].toString());
-        if (amount > 0) {
-          _updateVitaminWithValue(vitaminKey, amount);
-          print('Found $vitaminKey: $amount using key: $actualKey');
-          return; // Stop after the first match
-        }
-      }
-    }
-  }
-  
-  // Helper method to extract a mineral value using multiple possible key variants
-  void _extractMineralByVariants(Map<String, dynamic> data, String mineralKey, List<String> possibleKeys) {
-    for (String key in possibleKeys) {
-      // Check for the key in both original and lowercase forms
-      if (data.containsKey(key) || data.containsKey(key.toLowerCase())) {
-        String actualKey = data.containsKey(key) ? key : key.toLowerCase();
-        double amount = _extractNumericValue(data[actualKey].toString());
-        if (amount > 0) {
-          _updateMineralWithValue(mineralKey, amount);
-          print('Found $mineralKey: $amount using key: $actualKey');
-          return; // Stop after the first match
-        }
-      }
-    }
-  }
-  
-  // Helper method to extract another nutrient value using multiple possible key variants
-  void _extractOtherNutrientByVariants(Map<String, dynamic> data, String nutrientKey, List<String> possibleKeys) {
-    for (String key in possibleKeys) {
-      // Check for the key in both original and lowercase forms
-      if (data.containsKey(key) || data.containsKey(key.toLowerCase())) {
-        String actualKey = data.containsKey(key) ? key : key.toLowerCase();
-        double amount = _extractNumericValue(data[actualKey].toString());
-        if (amount > 0) {
-          _updateOtherNutrientWithValue(nutrientKey, amount);
-          print('Found $nutrientKey: $amount using key: $actualKey');
-          return; // Stop after the first match
-        }
-      }
-    }
-  }
-  
-  // Helper method to update a vitamin with a numeric value
-  void _updateVitaminWithValue(String vitaminKey, double currentAmount) {
-    if (vitamins.containsKey(vitaminKey)) {
-      // Get target value and unit from the existing value
-      String currentValue = vitamins[vitaminKey]!.value;
-      String unit = _extractUnit(currentValue);
-      
-      // Get target value (will be loaded from SharedPreferences)
-      double targetValue = _extractTargetValue(currentValue);
-      
-      // Ensure target value is valid to prevent division by zero
-      if (targetValue <= 0) {
-        print('Warning: Invalid target value for $vitaminKey, using default');
-        // Use default targets based on vitamin type
-        switch (vitaminKey) {
-          case 'Vitamin A': targetValue = 700; break;
-          case 'Vitamin C': targetValue = 75; break;
-          case 'Vitamin D': targetValue = 15; break;
-          case 'Vitamin E': targetValue = 15; break;
-          case 'Vitamin K': targetValue = 90; break;
-          case 'Vitamin B1': targetValue = 1.1; break;
-          case 'Vitamin B2': targetValue = 1.1; break;
-          case 'Vitamin B3': targetValue = 14; break;
-          case 'Vitamin B5': targetValue = 5; break;
-          case 'Vitamin B6': targetValue = 1.3; break;
-          case 'Vitamin B7': targetValue = 30; break;
-          case 'Vitamin B9': targetValue = 400; break;
-          case 'Vitamin B12': targetValue = 2.4; break;
-          default: targetValue = 100; break;
-        }
-      }
-      
-      // Calculate progress and percentage (safely)
-      double progress = targetValue > 0 ? (currentAmount / targetValue) : 0;
-      int percentage = (progress * 100).round();
-      
-      // Update the vitamin info
-      Color progressColor = _getColorBasedOnProgress(progress);
-      vitamins[vitaminKey] = NutrientInfo(
-        name: vitaminKey,
-        value: "$currentAmount/${targetValue.toStringAsFixed(1)} $unit",
-        percent: "$percentage%",
-        progress: progress,
-        progressColor: progressColor
-      );
-      
-      print('Updated $vitaminKey: $currentAmount/$targetValue $unit = $percentage%');
-    }
-  }
-  
-  // Helper method to update a mineral with a numeric value
-  void _updateMineralWithValue(String mineralKey, double currentAmount) {
-    if (minerals.containsKey(mineralKey)) {
-      // Get target value and unit from the existing value
-      String currentValue = minerals[mineralKey]!.value;
-      String unit = _extractUnit(currentValue);
-      
-      // Get target value (will be loaded from SharedPreferences)
-      double targetValue = _extractTargetValue(currentValue);
-      
-      // Ensure target value is valid to prevent division by zero
-      if (targetValue <= 0) {
-        print('Warning: Invalid target value for $mineralKey, using default');
-        // Use default targets based on mineral type
-        switch (mineralKey) {
-          case 'Calcium': targetValue = 1000; break;
-          case 'Chloride': targetValue = 2300; break;
-          case 'Chromium': targetValue = 35; break;
-          case 'Copper': targetValue = 900; break;
-          case 'Fluoride': targetValue = 4; break;
-          case 'Iodine': targetValue = 150; break;
-          case 'Iron': targetValue = 18; break;
-          case 'Magnesium': targetValue = 400; break;
-          case 'Manganese': targetValue = 2.3; break;
-          case 'Molybdenum': targetValue = 45; break;
-          case 'Phosphorus': targetValue = 700; break;
-          case 'Potassium': targetValue = 3500; break;
-          case 'Selenium': targetValue = 55; break;
-          case 'Sodium': targetValue = 2300; break;
-          case 'Zinc': targetValue = 11; break;
-          default: targetValue = 100; break;
-        }
-      }
-      
-      // Calculate progress and percentage (safely)
-      double progress = targetValue > 0 ? (currentAmount / targetValue) : 0;
-      int percentage = (progress * 100).round();
-      
-      // Update the mineral info
-      Color progressColor = _getColorBasedOnProgress(progress);
-      minerals[mineralKey] = NutrientInfo(
-        name: mineralKey,
-        value: "$currentAmount/${targetValue.toStringAsFixed(1)} $unit",
-        percent: "$percentage%",
-        progress: progress,
-        progressColor: progressColor
-      );
-      
-      print('Updated $mineralKey: $currentAmount/$targetValue $unit = $percentage%');
-    }
-  }
-  
-  // Helper method to update another nutrient with a numeric value
-  void _updateOtherNutrientWithValue(String nutrientKey, double currentAmount) {
-    if (other.containsKey(nutrientKey)) {
-      // Get target value and unit from the existing value
-      String currentValue = other[nutrientKey]!.value;
-      String unit = _extractUnit(currentValue);
-      
-      // Get target value (will be loaded from SharedPreferences)
-      double targetValue = _extractTargetValue(currentValue);
-      
-      // Ensure target value is valid to prevent division by zero
-      if (targetValue <= 0) {
-        print('Warning: Invalid target value for $nutrientKey, using default');
-        // Use default targets based on nutrient type
-        switch (nutrientKey) {
-          case 'Fiber': targetValue = 30; break;
-          case 'Cholesterol': targetValue = 300; break;
-          case 'Sugar': targetValue = 50; break;
-          case 'Saturated Fat': targetValue = 22; break;
-          case 'Trans Fat': targetValue = 2; break;
-          case 'Monounsaturated Fat': targetValue = 44; break;
-          case 'Polyunsaturated Fat': targetValue = 22; break;
-          case 'Omega 3': targetValue = 1500; break;
-          case 'Omega 6': targetValue = 14; break;
-          default: targetValue = 100; break;
-        }
-      }
-      
-      // Calculate progress and percentage (safely)
-      double progress = targetValue > 0 ? (currentAmount / targetValue) : 0;
-      int percentage = (progress * 100).round();
-      
-      // Update the nutrient info
-      Color progressColor = _getColorBasedOnProgress(progress);
-      other[nutrientKey] = NutrientInfo(
-        name: nutrientKey,
-        value: "$currentAmount/${targetValue.toStringAsFixed(1)} $unit",
-        percent: "$percentage%",
-        progress: progress,
-        progressColor: progressColor
-      );
-      
-      print('Updated $nutrientKey: $currentAmount/$targetValue $unit = $percentage%');
-    }
-  }
-  
+
   // Helper method to extract a numeric value from a string like "123mg" or "45 g"
   double _extractNumericValue(String input) {
     try {
@@ -1486,18 +948,458 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
     }
   }
   
-  // Helper method to extract target value from formatted string like "10/100 mg"
-  double _extractTargetValue(String formattedValue) {
+  // Helper method to parse current value from formatted string like "0/0 mg"
+  double _parseCurrentValue(String formattedValue) {
     try {
-      // Extract the part after the slash
+      // Extract the part before the slash
       if (formattedValue.contains('/')) {
-        String targetValue = formattedValue.split('/')[1].split(' ')[0];
-        return double.tryParse(targetValue) ?? 0.0;
+        String currentValue = formattedValue.split('/')[0];
+        return double.tryParse(currentValue) ?? 0.0;
       }
       return 0.0;
     } catch (e) {
-      print('Error extracting target value from "$formattedValue": $e');
+      print("Error parsing current value from '$formattedValue': $e");
       return 0.0;
+    }
+  }
+  
+  // Helper method to update a vitamin with a numeric value
+  void _updateVitaminWithValue(String vitaminKey, double currentAmount) {
+    if (vitamins.containsKey(vitaminKey)) {
+      // Get target value and unit from the existing value
+      String currentValue = vitamins[vitaminKey]!.value;
+      String unit = _extractUnit(currentValue);
+      
+      // Get target value from SharedPreferences
+      _loadTargetValueFromPrefs("vitamin_target_" + vitaminKey.toLowerCase().replaceAll(' ', '_')).then((targetValue) {
+        // Ensure target value is valid to prevent division by zero
+        if (targetValue <= 0) {
+          print('Warning: Invalid target value for $vitaminKey, using default');
+          // Use default targets based on vitamin type
+          switch (vitaminKey) {
+            case 'Vitamin A': targetValue = 700; break;
+            case 'Vitamin C': targetValue = 75; break;
+            case 'Vitamin D': targetValue = 15; break;
+            case 'Vitamin E': targetValue = 15; break;
+            case 'Vitamin K': targetValue = 90; break;
+            case 'Vitamin B1': targetValue = 1.1; break;
+            case 'Vitamin B2': targetValue = 1.1; break;
+            case 'Vitamin B3': targetValue = 14; break;
+            case 'Vitamin B5': targetValue = 5; break;
+            case 'Vitamin B6': targetValue = 1.3; break;
+            case 'Vitamin B7': targetValue = 30; break;
+            case 'Vitamin B9': targetValue = 400; break;
+            case 'Vitamin B12': targetValue = 2.4; break;
+            default: targetValue = 100; break;
+          }
+        }
+        
+        // Calculate progress and percentage (safely)
+        double progress = targetValue > 0 ? (currentAmount / targetValue) : 0;
+        int percentage = (progress * 100).round();
+        
+        // Update the vitamin info
+        Color progressColor = _getColorBasedOnProgress(progress);
+        
+        if (mounted) {
+          setState(() {
+            vitamins[vitaminKey] = NutrientInfo(
+              name: vitaminKey,
+              value: "$currentAmount/${targetValue.toStringAsFixed(1)} $unit",
+              percent: "$percentage%",
+              progress: progress,
+              progressColor: progressColor
+            );
+          });
+        }
+        
+        print('Updated $vitaminKey: $currentAmount/$targetValue $unit = $percentage%');
+      });
+    }
+  }
+  
+  // Helper method to update a mineral with a numeric value
+  void _updateMineralWithValue(String mineralKey, double currentAmount) {
+    if (minerals.containsKey(mineralKey)) {
+      // Get target value and unit from the existing value
+      String currentValue = minerals[mineralKey]!.value;
+      String unit = _extractUnit(currentValue);
+      
+      // Get target value from SharedPreferences
+      _loadTargetValueFromPrefs("mineral_target_" + mineralKey.toLowerCase().replaceAll(' ', '_')).then((targetValue) {
+        // Ensure target value is valid to prevent division by zero
+        if (targetValue <= 0) {
+          print('Warning: Invalid target value for $mineralKey, using default');
+          // Use default targets based on mineral type
+          switch (mineralKey) {
+            case 'Calcium': targetValue = 1000; break;
+            case 'Chloride': targetValue = 2300; break;
+            case 'Chromium': targetValue = 35; break;
+            case 'Copper': targetValue = 900; break;
+            case 'Fluoride': targetValue = 4; break;
+            case 'Iodine': targetValue = 150; break;
+            case 'Iron': targetValue = 18; break;
+            case 'Magnesium': targetValue = 400; break;
+            case 'Manganese': targetValue = 2.3; break;
+            case 'Molybdenum': targetValue = 45; break;
+            case 'Phosphorus': targetValue = 700; break;
+            case 'Potassium': targetValue = 3500; break;
+            case 'Selenium': targetValue = 55; break;
+            case 'Sodium': targetValue = 2300; break;
+            case 'Zinc': targetValue = 11; break;
+            default: targetValue = 100; break;
+          }
+        }
+        
+        // Calculate progress and percentage (safely)
+        double progress = targetValue > 0 ? (currentAmount / targetValue) : 0;
+        int percentage = (progress * 100).round();
+        
+        // Update the mineral info
+        Color progressColor = _getColorBasedOnProgress(progress);
+        
+        if (mounted) {
+          setState(() {
+            minerals[mineralKey] = NutrientInfo(
+              name: mineralKey,
+              value: "$currentAmount/${targetValue.toStringAsFixed(1)} $unit",
+              percent: "$percentage%",
+              progress: progress,
+              progressColor: progressColor
+            );
+          });
+        }
+        
+        print('Updated $mineralKey: $currentAmount/$targetValue $unit = $percentage%');
+      });
+    }
+  }
+  
+  // Helper method to update another nutrient with a numeric value
+  void _updateOtherNutrientWithValue(String nutrientKey, double currentAmount) {
+    if (other.containsKey(nutrientKey)) {
+      // Get target value and unit from the existing value
+      String currentValue = other[nutrientKey]!.value;
+      String unit = _extractUnit(currentValue);
+      
+      // Determine target unit based on nutrient type for correct display
+      if (nutrientKey == 'Omega-3') {
+        unit = 'mg';
+      } else if (nutrientKey == 'Saturated Fats' || nutrientKey == 'Omega-6') {
+        unit = 'g';
+      } else if (nutrientKey == 'Cholesterol') {
+        unit = 'mg';
+      }
+      
+      // Get target value from SharedPreferences
+      _loadTargetValueFromPrefs(nutrientKey).then((targetValue) {
+        // Ensure target value is valid to prevent division by zero
+        if (targetValue <= 0) {
+          print('Warning: Invalid target value for $nutrientKey, using default');
+          // Use default targets based on nutrient type
+          switch (nutrientKey) {
+            case 'Fiber': targetValue = 30; break;
+            case 'Cholesterol': targetValue = 300; break;
+            case 'Omega-3': targetValue = 1500; break;
+            case 'Omega-6': targetValue = 14; break;
+            case 'Saturated Fats': targetValue = 22; break;
+            default: targetValue = 100; break;
+          }
+        }
+        
+        // Calculate progress and percentage (safely)
+        double progress = targetValue > 0 ? (currentAmount / targetValue) : 0;
+        int percentage = (progress * 100).round();
+        
+        // Update the nutrient info
+        Color progressColor = _getColorBasedOnProgress(progress);
+        
+        if (mounted) {
+          setState(() {
+            other[nutrientKey] = NutrientInfo(
+              name: nutrientKey,
+              value: "$currentAmount/${targetValue.toStringAsFixed(unit == 'mg' ? 0 : 1)} $unit",
+              percent: "$percentage%",
+              progress: progress,
+              progressColor: progressColor
+            );
+          });
+        }
+        
+        print('Updated $nutrientKey: $currentAmount/$targetValue $unit = $percentage%');
+      });
+    }
+  }
+  
+  // Helper method to get the target value from SharedPreferences
+  Future<double> _loadTargetValueFromPrefs(String nutrientKey) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String prefKey = '';
+      
+      // Map nutrient key to the correct preference key
+      switch (nutrientKey) {
+        case 'Fiber':
+          prefKey = 'nutrient_target_fiber';
+          break;
+        case 'Cholesterol':
+          prefKey = 'nutrient_target_cholesterol';
+          break;
+        case 'Omega-3':
+          prefKey = 'nutrient_target_omega3';
+          break;
+        case 'Omega-6':
+          prefKey = 'nutrient_target_omega6';
+          break;
+        case 'Saturated Fats':
+          prefKey = 'nutrient_target_saturated_fat';
+          break;
+        default:
+          prefKey = 'nutrient_target_${nutrientKey.toLowerCase().replaceAll(' ', '_')}';
+      }
+      
+      // Try to get the value as int or double
+      int? intValue = prefs.getInt(prefKey);
+      if (intValue != null) {
+        return intValue.toDouble();
+      }
+      
+      double? doubleValue = prefs.getDouble(prefKey);
+      if (doubleValue != null) {
+        return doubleValue;
+      }
+      
+      // Not found
+      return 0.0;
+    } catch (e) {
+      print('Error loading target for $nutrientKey: $e');
+      return 0.0;
+    }
+  }
+  
+  // Helper method to load personalized targets and properly update nutrient displays
+  Future<void> _loadNutrientTargets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Debug output to identify available targets
+      print("\n===== AVAILABLE PERSONALIZED TARGETS =====");
+      Set<String> keys = prefs.getKeys();
+      List<String> targetKeys = keys.where((key) => 
+          key.contains('target_') || 
+          key.contains('vitamin_') || 
+          key.contains('mineral_') ||
+          key.contains('nutrient_')).toList();
+      
+      for (String key in targetKeys) {
+        var value = prefs.get(key);
+        print("$key = $value (${value.runtimeType})");
+      }
+      print("========================================\n");
+      
+      // VITAMINS - Load all vitamins with their proper personalized targets
+      Map<String, String> vitaminKeyMapping = {
+        'Vitamin A': 'vitamin_target_vitamin_a',
+        'Vitamin C': 'vitamin_target_vitamin_c',
+        'Vitamin D': 'vitamin_target_vitamin_d',
+        'Vitamin E': 'vitamin_target_vitamin_e',
+        'Vitamin K': 'vitamin_target_vitamin_k',
+        'Vitamin B1': 'vitamin_target_vitamin_b1',
+        'Vitamin B2': 'vitamin_target_vitamin_b2',
+        'Vitamin B3': 'vitamin_target_vitamin_b3',
+        'Vitamin B5': 'vitamin_target_vitamin_b5',
+        'Vitamin B6': 'vitamin_target_vitamin_b6',
+        'Vitamin B7': 'vitamin_target_vitamin_b7',
+        'Vitamin B9': 'vitamin_target_vitamin_b9',
+        'Vitamin B12': 'vitamin_target_vitamin_b12',
+      };
+      
+      // Units mapping for vitamins
+      Map<String, String> vitaminUnits = {
+        'Vitamin A': 'mcg',
+        'Vitamin C': 'mg',
+        'Vitamin D': 'mcg',
+        'Vitamin E': 'mg',
+        'Vitamin K': 'mcg',
+        'Vitamin B1': 'mg',
+        'Vitamin B2': 'mg',
+        'Vitamin B3': 'mg',
+        'Vitamin B5': 'mg',
+        'Vitamin B6': 'mg',
+        'Vitamin B7': 'mcg',
+        'Vitamin B9': 'mcg',
+        'Vitamin B12': 'mcg',
+      };
+      
+      // Process each vitamin
+      vitaminKeyMapping.forEach((vitaminName, prefsKey) {
+        try {
+          // Try to load int target first, then double, with fallback to default
+          int? intTarget = prefs.getInt(prefsKey);
+          double? doubleTarget = intTarget?.toDouble() ?? prefs.getDouble(prefsKey);
+          
+          if (doubleTarget != null && doubleTarget > 0) {
+            // Target found in preferences, use it
+            double currentValue = _parseCurrentValue(vitamins[vitaminName]!.value);
+            String unit = vitaminUnits[vitaminName] ?? 'mg';
+            
+            // Calculate progress and formatting
+            double progress = currentValue / doubleTarget;
+            int percentage = (progress * 100).round();
+            Color progressColor = _getColorBasedOnProgress(progress);
+            
+            // Update the vitamin display
+            vitamins[vitaminName] = NutrientInfo(
+              name: vitaminName,
+              value: "$currentValue/${doubleTarget.toStringAsFixed(unit == 'mcg' ? 0 : 1)} $unit",
+              percent: "$percentage%",
+              progress: progress,
+              progressColor: progressColor,
+              hasInfo: vitamins[vitaminName]!.hasInfo
+            );
+            
+            print('Updated $vitaminName with personalized target: $doubleTarget $unit');
+          }
+        } catch (e) {
+          print('Error processing $vitaminName target: $e');
+        }
+      });
+      
+      // MINERALS - Process all minerals with their personalized targets
+      Map<String, String> mineralKeyMapping = {
+        'Calcium': 'mineral_target_calcium',
+        'Chloride': 'mineral_target_chloride',
+        'Chromium': 'mineral_target_chromium',
+        'Copper': 'mineral_target_copper',
+        'Fluoride': 'mineral_target_fluoride',
+        'Iodine': 'mineral_target_iodine',
+        'Iron': 'mineral_target_iron',
+        'Magnesium': 'mineral_target_magnesium',
+        'Manganese': 'mineral_target_manganese',
+        'Molybdenum': 'mineral_target_molybdenum',
+        'Phosphorus': 'mineral_target_phosphorus',
+        'Potassium': 'mineral_target_potassium',
+        'Selenium': 'mineral_target_selenium',
+        'Sodium': 'mineral_target_sodium',
+        'Zinc': 'mineral_target_zinc',
+      };
+      
+      // Units mapping for minerals
+      Map<String, String> mineralUnits = {
+        'Calcium': 'mg',
+        'Chloride': 'mg',
+        'Chromium': 'mcg',
+        'Copper': 'mcg',
+        'Fluoride': 'mg',
+        'Iodine': 'mcg',
+        'Iron': 'mg',
+        'Magnesium': 'mg',
+        'Manganese': 'mg',
+        'Molybdenum': 'mcg',
+        'Phosphorus': 'mg',
+        'Potassium': 'mg',
+        'Selenium': 'mcg',
+        'Sodium': 'mg',
+        'Zinc': 'mg',
+      };
+      
+      // Process each mineral
+      mineralKeyMapping.forEach((mineralName, prefsKey) {
+        try {
+          // Try to load int target first, then double, with fallback to default
+          int? intTarget = prefs.getInt(prefsKey);
+          double? doubleTarget = intTarget?.toDouble() ?? prefs.getDouble(prefsKey);
+          
+          if (doubleTarget != null && doubleTarget > 0) {
+            // Target found in preferences, use it
+            double currentValue = _parseCurrentValue(minerals[mineralName]!.value);
+            String unit = mineralUnits[mineralName] ?? 'mg';
+            
+            // Calculate progress and formatting
+            double progress = currentValue / doubleTarget;
+            int percentage = (progress * 100).round();
+            Color progressColor = _getColorBasedOnProgress(progress);
+            
+            // Update the mineral display
+            minerals[mineralName] = NutrientInfo(
+              name: mineralName,
+              value: "$currentValue/${doubleTarget.toStringAsFixed(unit == 'mcg' ? 0 : 1)} $unit",
+              percent: "$percentage%",
+              progress: progress,
+              progressColor: progressColor,
+              hasInfo: minerals[mineralName]!.hasInfo
+            );
+            
+            print('Updated $mineralName with personalized target: $doubleTarget $unit');
+          }
+        } catch (e) {
+          print('Error processing $mineralName target: $e');
+        }
+      });
+      
+      // OTHER NUTRIENTS - Process all other nutrients with their personalized targets
+      Map<String, String> otherKeyMapping = {
+        'Fiber': 'nutrient_target_fiber',
+        'Cholesterol': 'nutrient_target_cholesterol',
+        'Omega-3': 'nutrient_target_omega3',
+        'Omega-6': 'nutrient_target_omega6',
+        'Saturated Fats': 'nutrient_target_saturated_fat',
+      };
+      
+      // Units mapping for other nutrients
+      Map<String, String> otherUnits = {
+        'Fiber': 'g',
+        'Cholesterol': 'mg',
+        'Omega-3': 'mg',
+        'Omega-6': 'g',
+        'Saturated Fats': 'g',
+      };
+      
+      // Process each other nutrient
+      otherKeyMapping.forEach((nutrientName, prefsKey) {
+        try {
+          // Try to load int target first, then double, with fallback to default
+          int? intTarget = prefs.getInt(prefsKey);
+          double? doubleTarget = intTarget?.toDouble() ?? prefs.getDouble(prefsKey);
+          
+          if (doubleTarget != null && doubleTarget > 0) {
+            // Target found in preferences, use it
+            double currentValue = _parseCurrentValue(other[nutrientName]!.value);
+            String unit = otherUnits[nutrientName] ?? 'g';
+            
+            // Calculate progress and formatting
+            double progress = currentValue / doubleTarget;
+            int percentage = (progress * 100).round();
+            Color progressColor = _getColorBasedOnProgress(progress);
+            
+            // Update the other nutrient display
+            other[nutrientName] = NutrientInfo(
+              name: nutrientName,
+              value: "$currentValue/${doubleTarget.toStringAsFixed(unit == 'mg' ? 0 : 1)} $unit",
+              percent: "$percentage%",
+              progress: progress,
+              progressColor: progressColor,
+              hasInfo: other[nutrientName]!.hasInfo
+            );
+            
+            print('Updated $nutrientName with personalized target: $doubleTarget $unit');
+          }
+        } catch (e) {
+          print('Error processing $nutrientName target: $e');
+        }
+      });
+      
+      // Save the updated nutrient data
+      await _saveNutritionData();
+      
+      // Update the UI to reflect the changes
+      if (mounted) {
+        setState(() {});
+      }
+      
+      print("Successfully loaded all personalized nutrient targets");
+    } catch (e) {
+      print("Error loading nutrient targets: $e");
     }
   }
   
@@ -2499,440 +2401,6 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
     }
   }
 
-  // New method to load nutrient targets from SharedPreferences
-  Future<void> _loadNutrientTargets() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      print("Loading personalized nutrient targets from SharedPreferences...");
-      
-      // Check if we have a calculation date to confirm that personalized targets exist
-      String? calculationDate = prefs.getString('nutrient_targets_calculation_date');
-      if (calculationDate != null) {
-        print("Found personalized targets calculated on: $calculationDate");
-      } else {
-        print("No personalized targets date found, using default values if necessary");
-      }
-      
-      // LOAD MAIN MACRONUTRIENT TARGETS
-      // -------------------------------
-      
-      // Protein target
-      double proteinTarget = prefs.getDouble('nutrient_target_protein') ?? 100.0;
-      if (other.containsKey('Protein')) {
-        double currentValue = _parseCurrentValue(other['Protein']!.value);
-        double progress = (currentValue / proteinTarget); // Removed clamp
-        int percentage = (progress * 100).round();
-        
-        // Get color based on progress
-        Color progressColor = _getColorBasedOnProgress(progress);
-        
-        other['Protein'] = NutrientInfo(
-          name: "Protein",
-          value: "$currentValue/${proteinTarget.toStringAsFixed(0)} g",
-          percent: "$percentage%",
-          progress: progress,
-          progressColor: progressColor
-        );
-      }
-      
-      // Fat target
-      double fatTarget = prefs.getDouble('nutrient_target_fat') ?? 70.0;
-      if (other.containsKey('Fat')) {
-        double currentValue = _parseCurrentValue(other['Fat']!.value);
-        double progress = (currentValue / fatTarget); // Removed clamp
-        int percentage = (progress * 100).round();
-        
-        // Get color based on progress
-        Color progressColor = _getColorBasedOnProgress(progress);
-        
-        other['Fat'] = NutrientInfo(
-          name: "Fat",
-          value: "$currentValue/${fatTarget.toStringAsFixed(0)} g",
-          percent: "$percentage%",
-          progress: progress,
-          progressColor: progressColor
-        );
-      }
-      
-      // Carbs target
-      double carbsTarget = prefs.getDouble('nutrient_target_carbs') ?? 200.0;
-      if (other.containsKey('Carbs')) {
-        double currentValue = _parseCurrentValue(other['Carbs']!.value);
-        double progress = (currentValue / carbsTarget); // Removed clamp
-        int percentage = (progress * 100).round();
-        
-        // Get color based on progress
-        Color progressColor = _getColorBasedOnProgress(progress);
-        
-        other['Carbs'] = NutrientInfo(
-          name: "Carbs",
-          value: "$currentValue/${carbsTarget.toStringAsFixed(0)} g",
-          percent: "$percentage%",
-          progress: progress,
-          progressColor: progressColor
-        );
-      }
-      
-      // LOAD VITAMIN TARGETS
-      // -------------------
-      await _loadVitaminTargets(prefs);
-      
-      // LOAD MINERAL TARGETS
-      // -------------------
-      await _loadMineralTargets(prefs);
-      
-      // LOAD OTHER NUTRIENT TARGETS
-      // --------------------------
-      
-      // Fiber target
-      double fiberTarget = prefs.getDouble('nutrient_target_fiber') ?? 30.0;
-      if (other.containsKey('Fiber')) {
-        double currentValue = _parseCurrentValue(other['Fiber']!.value);
-        double progress = (currentValue / fiberTarget); // Removed clamp
-        int percentage = (progress * 100).round();
-        
-        // Get color based on progress
-        Color progressColor = _getColorBasedOnProgress(progress);
-        
-        other['Fiber'] = NutrientInfo(
-          name: "Fiber",
-          value: "$currentValue/${fiberTarget.toStringAsFixed(1)} g",
-          percent: "$percentage%",
-          progress: progress,
-          progressColor: progressColor
-        );
-      }
-      
-      // Cholesterol target (default: 300 mg)
-      double cholesterolTarget = prefs.getDouble('nutrient_target_cholesterol') ?? 300.0;
-      if (other.containsKey('Cholesterol')) {
-        double currentValue = _parseCurrentValue(other['Cholesterol']!.value);
-        double progress = (currentValue / cholesterolTarget); // Removed clamp
-        int percentage = (progress * 100).round();
-        
-        // Get color based on progress
-        Color progressColor = _getColorBasedOnProgress(progress);
-        
-        other['Cholesterol'] = NutrientInfo(
-          name: "Cholesterol",
-          value: "$currentValue/${cholesterolTarget.toStringAsFixed(0)} mg",
-          percent: "$percentage%",
-          progress: progress,
-          progressColor: progressColor
-        );
-      }
-      
-      // Omega-3 target
-      double omega3Target = prefs.getDouble('nutrient_target_omega3') ?? 1500.0;
-      if (other.containsKey('Omega-3')) {
-        double currentValue = _parseCurrentValue(other['Omega-3']!.value);
-        double progress = (currentValue / omega3Target); // Removed clamp
-        int percentage = (progress * 100).round();
-        
-        // Get color based on progress
-        Color progressColor = _getColorBasedOnProgress(progress);
-        
-        other['Omega-3'] = NutrientInfo(
-          name: "Omega-3",
-          value: "$currentValue/${omega3Target.toStringAsFixed(0)} mg",
-          percent: "$percentage%",
-          progress: progress,
-          progressColor: progressColor
-        );
-      }
-      
-      // Omega-6 target
-      double omega6Target = prefs.getDouble('nutrient_target_omega6') ?? 14.0;
-      if (other.containsKey('Omega-6')) {
-        double currentValue = _parseCurrentValue(other['Omega-6']!.value);
-        double progress = (currentValue / omega6Target); // Removed clamp
-        int percentage = (progress * 100).round();
-        
-        // Get color based on progress
-        Color progressColor = _getColorBasedOnProgress(progress);
-        
-        other['Omega-6'] = NutrientInfo(
-          name: "Omega-6",
-          value: "$currentValue/${omega6Target.toStringAsFixed(1)} g",
-          percent: "$percentage%",
-          progress: progress,
-          progressColor: progressColor
-        );
-      }
-      
-      // Saturated fat target
-      double saturatedFatTarget = prefs.getDouble('nutrient_target_saturated_fat') ?? 22.0;
-      if (other.containsKey('Saturated Fats')) {
-        double currentValue = _parseCurrentValue(other['Saturated Fats']!.value);
-        double progress = (currentValue / saturatedFatTarget); // Removed clamp
-        int percentage = (progress * 100).round();
-        
-        // Get color based on progress
-        Color progressColor = _getColorBasedOnProgress(progress);
-        
-        other['Saturated Fats'] = NutrientInfo(
-          name: "Saturated Fats",
-          value: "$currentValue/${saturatedFatTarget.toStringAsFixed(1)} g",
-          percent: "$percentage%",
-          progress: progress,
-          progressColor: progressColor
-        );
-      }
-      
-      // Save the updated nutrient data
-      await _saveNutritionData();
-      
-      // Update the UI to reflect the changes
-      if (mounted) {
-        setState(() {});
-      }
-      
-      print("Successfully loaded all personalized nutrient targets");
-    } catch (e) {
-      print("Error loading nutrient targets: $e");
-    }
-  }
-  
-  // Helper method to load vitamin targets
-  Future<void> _loadVitaminTargets(SharedPreferences prefs) async {
-    try {
-      // Map of vitamin keys in the UI to their keys in SharedPreferences
-      Map<String, String> vitaminKeyMap = {
-        'Vitamin A': 'vitamin_target_vitamin_a',
-        'Vitamin C': 'vitamin_target_vitamin_c',
-        'Vitamin D': 'vitamin_target_vitamin_d',
-        'Vitamin E': 'vitamin_target_vitamin_e',
-        'Vitamin K': 'vitamin_target_vitamin_k',
-        'Vitamin B1': 'vitamin_target_vitamin_b1',
-        'Vitamin B2': 'vitamin_target_vitamin_b2',
-        'Vitamin B3': 'vitamin_target_vitamin_b3',
-        'Vitamin B5': 'vitamin_target_vitamin_b5',
-        'Vitamin B6': 'vitamin_target_vitamin_b6',
-        'Vitamin B7': 'vitamin_target_vitamin_b7',
-        'Vitamin B9': 'vitamin_target_vitamin_b9',
-        'Vitamin B12': 'vitamin_target_vitamin_b12',
-      };
-      
-      // Also check the direct format used in calculation_screen.dart
-      List<String> possiblePrefixFormats = [
-        'vitamin_target_',     // Direct lookup using normalized format
-        'vitamin_target_vitamin_', // For vitamins specifically
-        'vitamin_target_vitamin ' // Format used in calculation_screen.dart
-      ];
-      
-      // Map of vitamin units
-      Map<String, String> vitaminUnits = {
-        'Vitamin A': 'mcg',
-        'Vitamin C': 'mg',
-        'Vitamin D': 'mcg',
-        'Vitamin E': 'mg',
-        'Vitamin K': 'mcg',
-        'Vitamin B1': 'mg',
-        'Vitamin B2': 'mg',
-        'Vitamin B3': 'mg',
-        'Vitamin B5': 'mg',
-        'Vitamin B6': 'mg',
-        'Vitamin B7': 'mcg',
-        'Vitamin B9': 'mcg',
-        'Vitamin B12': 'mcg',
-      };
-      
-      // Default vitamin values if not found in SharedPreferences
-      Map<String, double> defaultValues = {
-        'Vitamin A': 900.0,
-        'Vitamin C': 90.0,
-        'Vitamin D': 15.0,
-        'Vitamin E': 15.0,
-        'Vitamin K': 120.0,
-        'Vitamin B1': 1.2,
-        'Vitamin B2': 1.3,
-        'Vitamin B3': 16.0,
-        'Vitamin B5': 5.0,
-        'Vitamin B6': 1.3,
-        'Vitamin B7': 30.0,
-        'Vitamin B9': 400.0,
-        'Vitamin B12': 2.4,
-      };
-      
-      // Load each vitamin target
-      for (var entry in vitaminKeyMap.entries) {
-        String uiKey = entry.key;
-        String prefsKey = uiKey.toLowerCase().replaceAll(' ', '_');
-        String unit = vitaminUnits[uiKey] ?? 'mg';
-        
-        // Try to load the vitamin target using all possible key formats
-        double? target;
-        
-        // 1. First try the exact key map
-        target = prefs.getDouble(entry.value);
-        
-        // 2. Try with just the vitamin name using each possible prefix format
-        if (target == null) {
-          String basicName = prefsKey.replaceAll('vitamin_', '');
-          for (String prefix in possiblePrefixFormats) {
-            target = prefs.getDouble('${prefix}${basicName}');
-            if (target != null) {
-              print('Found $uiKey target using key format: ${prefix}${basicName}');
-              break;
-            }
-          }
-        }
-        
-        // 3. Try the raw format that calculation_screen.dart uses
-        if (target == null) {
-          // This is how calculation_screen.dart saves it - with spaces instead of underscores
-          String rawKey = uiKey.toLowerCase();
-          target = prefs.getDouble('vitamin_target_$rawKey');
-          if (target != null) {
-            print('Found $uiKey target using raw key format: vitamin_target_$rawKey');
-          }
-        }
-        
-        // 4. Fallback to default if no target found
-        target = target ?? defaultValues[uiKey] ?? 0.0;
-        
-        if (vitamins.containsKey(uiKey)) {
-          double currentValue = _parseCurrentValue(vitamins[uiKey]!.value);
-          double progress = (currentValue / target); // Removed clamp
-          int percentage = (progress * 100).round();
-          
-          // Get color based on progress
-          Color progressColor = _getColorBasedOnProgress(progress);
-          
-          vitamins[uiKey] = NutrientInfo(
-            name: uiKey,
-            value: "$currentValue/${target.toStringAsFixed(1)} $unit",
-            percent: "$percentage%",
-            progress: progress,
-            progressColor: progressColor,
-            hasInfo: vitamins[uiKey]!.hasInfo
-          );
-          
-          print('Set $uiKey target to: $target $unit');
-        }
-      }
-    } catch (e) {
-      print("Error loading vitamin targets: $e");
-    }
-  }
-  
-  // Helper method to load mineral targets
-  Future<void> _loadMineralTargets(SharedPreferences prefs) async {
-    try {
-      // Map of mineral keys in the UI to their expected units
-      Map<String, String> mineralUnits = {
-        'Calcium': 'mg',
-        'Chloride': 'mg',
-        'Chromium': 'mcg',
-        'Copper': 'mcg',
-        'Fluoride': 'mg',
-        'Iodine': 'mcg',
-        'Iron': 'mg',
-        'Magnesium': 'mg',
-        'Manganese': 'mg',
-        'Molybdenum': 'mcg',
-        'Phosphorus': 'mg',
-        'Potassium': 'mg',
-        'Selenium': 'mcg',
-        'Sodium': 'mg',
-        'Zinc': 'mg',
-      };
-      
-      // List of possible prefix formats for mineral keys
-      List<String> possibleMineralPrefixes = [
-        'mineral_target_',     // Direct lookup using normalized format
-        'nutrient_target_'     // Alternative format
-      ];
-      
-      // Default mineral values if not found in SharedPreferences
-      Map<String, double> defaultValues = {
-        'Calcium': 1000.0,
-        'Chloride': 2300.0,
-        'Chromium': 35.0,
-        'Copper': 900.0,
-        'Fluoride': 4.0,
-        'Iodine': 150.0,
-        'Iron': 8.0,
-        'Magnesium': 400.0,
-        'Manganese': 2.3,
-        'Molybdenum': 45.0,
-        'Phosphorus': 700.0,
-        'Potassium': 3500.0,
-        'Selenium': 55.0,
-        'Sodium': 2300.0,
-        'Zinc': 11.0,
-      };
-      
-      // Load each mineral target
-      for (var entry in mineralUnits.entries) {
-        String uiKey = entry.key;
-        String prefsKey = uiKey.toLowerCase().replaceAll(' ', '_');
-        String unit = entry.value;
-        
-        // Try to load the mineral target using multiple key formats
-        double? target;
-        
-        // Try each possible prefix format
-        for (String prefix in possibleMineralPrefixes) {
-          target = prefs.getDouble('$prefix$prefsKey');
-          if (target != null) {
-            print('Found $uiKey target using key format: $prefix$prefsKey = $target $unit');
-            break;
-          }
-        }
-        
-        // Try with raw format (like calculation_screen might save it)
-        if (target == null) {
-          String rawKey = uiKey.toLowerCase();
-          target = prefs.getDouble('mineral_target_$rawKey');
-          if (target != null) {
-            print('Found $uiKey target using raw key format: mineral_target_$rawKey = $target $unit');
-          }
-        }
-        
-        // Fallback to default if no target found
-        target = target ?? defaultValues[uiKey] ?? 0.0;
-        
-        if (minerals.containsKey(uiKey)) {
-          double currentValue = _parseCurrentValue(minerals[uiKey]!.value);
-          double progress = (currentValue / target); // Removed clamp
-          int percentage = (progress * 100).round();
-          
-          // Get color based on progress
-          Color progressColor = _getColorBasedOnProgress(progress);
-          
-          minerals[uiKey] = NutrientInfo(
-            name: uiKey,
-            value: "$currentValue/${target.toStringAsFixed(unit == 'mcg' ? 0 : 1)} $unit",
-            percent: "$percentage%",
-            progress: progress,
-            progressColor: progressColor
-          );
-          
-          print('Set $uiKey target to: $target $unit');
-        }
-      }
-    } catch (e) {
-      print("Error loading mineral targets: $e");
-    }
-  }
-  
-  // Helper method to parse current value from formatted string like "0/0 mg"
-  double _parseCurrentValue(String formattedValue) {
-    try {
-      // Extract the part before the slash
-      if (formattedValue.contains('/')) {
-        String currentValue = formattedValue.split('/')[0];
-        return double.tryParse(currentValue) ?? 0.0;
-      }
-      return 0.0;
-    } catch (e) {
-      print("Error parsing current value from '$formattedValue': $e");
-      return 0.0;
-    }
-  }
-
   // Save nutrition data - ULTRA RELIABLE with one global key
   Future<void> _saveNutritionData({bool useGlobalKey = true}) async {
     try {
@@ -3432,45 +2900,75 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       
       // Get all existing food cards
       List<String> foodCards = prefs.getStringList('food_cards') ?? [];
+      List<String> updatedCards = []; // Initialize the list of updated cards
       bool updated = false;
       
       // Look for the specific food card that matches this scan ID 
       for (int i = 0; i < foodCards.length; i++) {
+        String cardJson = foodCards[i]; // Store current card JSON for reference
         try {
-          Map<String, dynamic> card = jsonDecode(foodCards[i]);
+          Map<String, dynamic> card = jsonDecode(cardJson);
           
           // Check if this is the card for our current food (by name or ID)
           if ((card.containsKey('name') && card['name'].toString().toLowerCase() == foodName.toLowerCase()) ||
               (card.containsKey('scan_id') && card['scan_id'] == _scanId)) {
             
             // Update the card with our latest nutrition data
-            if (!card.containsKey('additionalNutrients')) {
-              card['additionalNutrients'] = {};
+            print('Found matching food card for nutrition update: ${card['name']}');
+            
+            // Add vitamin/mineral data to the card
+            if (nutritionData.containsKey('vitamins')) {
+              card['vitamins'] = nutritionData['vitamins'];
+            }
+            if (nutritionData.containsKey('minerals')) {
+              card['minerals'] = nutritionData['minerals'];
+            }
+            if (nutritionData.containsKey('other')) {
+              card['other'] = nutritionData['other'];
             }
             
-            // Update with all our current nutritional values
-            nutritionData.forEach((key, value) {
-              card['additionalNutrients'][key] = value;
-            });
+            // Add scan_id if it doesn't exist
+            if (!card.containsKey('scan_id')) {
+              card['scan_id'] = _scanId;
+            }
             
-            // Save the updated card back to the list
-            foodCards[i] = jsonEncode(card);
+            // Update the card
+            updatedCards.add(jsonEncode(card));
             updated = true;
-            print('Updated existing food card with latest nutrition data');
-            break;
+          } else {
+            // Keep unchanged cards
+            updatedCards.add(cardJson);
           }
         } catch (e) {
           print('Error processing food card: $e');
+          // Keep original card if there's an error
+          updatedCards.add(cardJson);
         }
       }
       
-      // If we updated a card, save the updated list
+      // Save the updated food cards
       if (updated) {
-        await prefs.setStringList('food_cards', foodCards);
+        await prefs.setStringList('food_cards', updatedCards);
         print('Saved updated food cards list with nutrition data');
       }
     } catch (e) {
       print('Error saving to food cards: $e');
+    }
+  }
+
+  // Helper method to extract an other nutrient value using multiple possible key variants
+  void _extractOtherNutrientByVariants(Map<String, dynamic> data, String nutrientKey, List<String> possibleKeys) {
+    for (String key in possibleKeys) {
+      // Check for the key in both original and lowercase forms
+      if (data.containsKey(key) || data.containsKey(key.toLowerCase())) {
+        String actualKey = data.containsKey(key) ? key : key.toLowerCase();
+        double amount = _extractNumericValue(data[actualKey].toString());
+        if (amount > 0) {
+          _updateOtherNutrientWithValue(nutrientKey, amount);
+          print('Found $nutrientKey: $amount using key: $actualKey');
+          return; // Stop after the first match
+        }
+      }
     }
   }
 }
