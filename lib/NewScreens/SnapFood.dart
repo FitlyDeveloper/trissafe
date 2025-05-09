@@ -237,8 +237,8 @@ class _SnapFoodState extends State<SnapFood> {
               imageBytes,
             targetWidth: 1200,
             quality: 90,
-          );
-          
+            );
+
           final double compressedSizeMB = processedBytes.length / (1024 * 1024);
           print("Compressed to: ${compressedSizeMB.toStringAsFixed(2)} MB");
         } catch (e) {
@@ -813,7 +813,7 @@ class _SnapFoodState extends State<SnapFood> {
         // Navigate based on the meal data
         if (analysisData.containsKey('meal') && analysisData['meal'] is List && analysisData['meal'].isNotEmpty) {
           var meal = analysisData['meal'][0];
-          
+
           // Extract data we need
           String foodName = meal['dish'] ?? "Analyzed Meal";
           double calories = _extractDecimalValue(meal['calories']?.toString() ?? "0");
@@ -823,11 +823,11 @@ class _SnapFoodState extends State<SnapFood> {
           double protein = _extractDecimalValue(macros['protein']?.toString() ?? "0");
           double fat = _extractDecimalValue(macros['fat']?.toString() ?? "0");
           double carbs = _extractDecimalValue(macros['carbohydrates']?.toString() ?? macros['carbs']?.toString() ?? "0");
-          
+
           // Extract ingredients
           List<dynamic> ingredients = meal['ingredients'] ?? [];
           String ingredientsText = ingredients.isNotEmpty ? ingredients.join(", ") : "Mixed ingredients";
-          
+
           // Process ingredients to our format
           List<Map<String, dynamic>> ingredientsList = [];
           for (var ingredient in ingredients) {
@@ -859,7 +859,7 @@ class _SnapFoodState extends State<SnapFood> {
           
           // Mark navigation as handled
           navigationHandled = true;
-        }
+              }
       }
       
       // If we haven't handled navigation yet, try our best with whatever data we have
@@ -889,14 +889,14 @@ class _SnapFoodState extends State<SnapFood> {
         }
         if (analysisData.containsKey('carbs') || analysisData.containsKey('carbohydrates')) {
           carbs = _extractDecimalValue(analysisData['carbs']?.toString() ?? analysisData['carbohydrates']?.toString() ?? "0");
-        }
-        
+          }
+
         // In nutritional_info
         if (analysisData.containsKey('nutritional_info') && analysisData['nutritional_info'] is Map) {
           Map<String, dynamic> nutrition = analysisData['nutritional_info'];
           if (protein == 0 && nutrition.containsKey('protein')) {
             protein = _extractDecimalValue(nutrition['protein']?.toString() ?? "0");
-          }
+        }
           if (fat == 0 && nutrition.containsKey('fat')) {
             fat = _extractDecimalValue(nutrition['fat']?.toString() ?? "0");
           }
@@ -910,10 +910,10 @@ class _SnapFoodState extends State<SnapFood> {
           Map<String, dynamic> macros = analysisData['macronutrients'];
           if (protein == 0 && macros.containsKey('protein')) {
             protein = _extractDecimalValue(macros['protein']?.toString() ?? "0");
-          }
+              }
           if (fat == 0 && macros.containsKey('fat')) {
             fat = _extractDecimalValue(macros['fat']?.toString() ?? "0");
-          }
+              }
           if (carbs == 0 && (macros.containsKey('carbs') || macros.containsKey('carbohydrates'))) {
             carbs = _extractDecimalValue(macros['carbs']?.toString() ?? macros['carbohydrates']?.toString() ?? "0");
           }
@@ -1112,8 +1112,8 @@ class _SnapFoodState extends State<SnapFood> {
       'ingredients': ingredientsList,
       'health_score': healthScore,
       'scan_id': finalScanId, // Store scanId in the food card data
-    };
-  
+      };
+
     // Separate try block for storage operations
     try {
       // Load existing food cards
@@ -1165,7 +1165,7 @@ class _SnapFoodState extends State<SnapFood> {
         
         displayImageBase64 = base64Encode(displayImageBytes);
       }
-    } catch (e) {
+          } catch (e) {
       print("Error preparing display image: $e");
       // Use storage image as fallback
       displayImageBase64 = base64Image;
@@ -1174,7 +1174,7 @@ class _SnapFoodState extends State<SnapFood> {
     // After saving, navigate to FoodCardOpen
     if (mounted) {
       print("Navigating to FoodCardOpen with scan ID: $finalScanId");
-      
+
       // We don't set _isAnalyzing to false until after navigation returns
       try {
         Navigator.push(
@@ -1309,9 +1309,9 @@ class _SnapFoodState extends State<SnapFood> {
                 ),
                     child: const Icon(Icons.arrow_back, color: Colors.black, size: 24),
                   ),
+                  ),
                 ),
               ),
-            ),
 
             // Bottom action buttons (Scan Food, Scan Code, Add Photo)
             Positioned(
@@ -1322,13 +1322,13 @@ class _SnapFoodState extends State<SnapFood> {
                 padding: const EdgeInsets.symmetric(horizontal: 29),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
+                  children: [
                     // Scan Food button
                     _buildActionButton('Scan Food', 'assets/images/foodscan.png'),
-                    
+
                     // Scan Code button
                     _buildActionButton('Scan Code', 'assets/images/qrcodescan.png'),
-                    
+
                     // Add Photo button
                     _buildActionButton('Add Photo', 'assets/images/addphoto.png', leftPadding: 2.0),
                   ],
@@ -1398,7 +1398,7 @@ class _SnapFoodState extends State<SnapFood> {
                     child: Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: [
+      children: [
                           const CircularProgressIndicator(
                             color: Colors.white,
                             strokeWidth: 3,
@@ -1408,49 +1408,49 @@ class _SnapFoodState extends State<SnapFood> {
                             width: 200,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
+        children: [
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     const Text(
                                       "Analyzing meal",
-                                      style: TextStyle(
-                                        color: Colors.white,
+            style: TextStyle(
+              color: Colors.white,
                                         fontSize: 18,
                                         fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    Text(
+            ),
+          ),
+          Text(
                                       _loadingDots > 0
                                           ? ".".padRight(_loadingDots, '.')
                                           : "",
                                       style: const TextStyle(
-                                        color: Colors.white,
+              color: Colors.white,
                                         fontSize: 18,
                                         fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+            ),
+          ),
+        ],
+      ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 5),
-                          Text(
+            Text(
                             _processingSteps[_processingStep],
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+              style: TextStyle(
                               color: Colors.white.withOpacity(0.8),
-                              fontSize: 14,
+                fontSize: 14,
                               fontWeight: FontWeight.w400,
-                            ),
-                          ),
+              ),
+            ),
                         ],
                       ),
                     ),
-                  ),
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -1469,7 +1469,7 @@ class _SnapFoodState extends State<SnapFood> {
               ? Colors.white
               : Colors.white.withOpacity(0.7),
           borderRadius: BorderRadius.circular(20),
-      ),
+        ),
       child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -1483,7 +1483,7 @@ class _SnapFoodState extends State<SnapFood> {
               ),
             ),
             const SizedBox(height: 5),
-          Text(
+        Text(
               buttonName,
               style: const TextStyle(
                 fontSize: 13,
@@ -1492,10 +1492,10 @@ class _SnapFoodState extends State<SnapFood> {
             ),
           ),
         ],
-      ),
-      ),
-    );
-  }
+          ),
+        ),
+      );
+    }
 
   // Optimized background image builder
   Widget _buildBackgroundImage() {
@@ -1508,8 +1508,8 @@ class _SnapFoodState extends State<SnapFood> {
           fit: BoxFit.contain,
         ),
         color: Colors.black,
-      ),
-    );
+        ),
+      );
   }
 
   // Get image provider based on available sources - optimized to cache and avoid unnecessary rebuilds

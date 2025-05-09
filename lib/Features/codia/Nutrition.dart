@@ -2057,9 +2057,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 29)
                         .copyWith(top: 16, bottom: 8.5),
-                    child: Row(
+                child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
+                  children: [
                         // Back button
                         IconButton(
                           icon: const Icon(Icons.arrow_back,
@@ -2115,7 +2115,7 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
 
                         // In-Depth Nutrition title
                         const Text(
-                          'In-Depth Nutrition',
+                      'In-Depth Nutrition',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -2126,9 +2126,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
 
                         // Empty space to balance the header
                         const SizedBox(width: 24),
-                      ],
-                    ),
-                  ),
+                  ],
+                ),
+              ),
 
                   // Slim gray divider line
                   Container(
