@@ -19,12 +19,14 @@ class WeightHeightCopyScreen extends StatefulWidget {
   final bool isMetric;
   final int initialWeight;
   final String? gymGoal;
+  final int? initialHeightInCm;
 
   const WeightHeightCopyScreen({
     super.key,
     required this.isMetric,
     required this.initialWeight,
     this.gymGoal,
+    this.initialHeightInCm,
   });
 
   @override
@@ -74,6 +76,47 @@ class _WeightHeightCopyScreenState extends State<WeightHeightCopyScreen> {
   // CRITICAL FIX: Added method to load height from SharedPreferences
   Future<void> _loadSavedHeight() async {
     try {
+      // If we have an initial height provided directly, use it first
+      if (widget.initialHeightInCm != null) {
+        print("Using provided height: ${widget.initialHeightInCm} cm");
+
+        if (isMetric) {
+          // For metric, use the value directly
+          selectedFeet = ValueNotifier(widget.initialHeightInCm!);
+          selectedInches = ValueNotifier(0); // Not used in metric
+          print("Set metric height to: ${widget.initialHeightInCm} cm");
+        } else {
+          // For imperial, convert cm to feet and inches
+          double inches = widget.initialHeightInCm! / 2.54;
+          int feet = (inches / 12).floor();
+          int remainingInches = (inches % 12).round();
+
+          selectedFeet = ValueNotifier(feet);
+          selectedInches = ValueNotifier(remainingInches);
+          print(
+              "Converted provided ${widget.initialHeightInCm} cm to $feet feet $remainingInches inches");
+        }
+
+        // Save this value to SharedPreferences for future use
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('user_height_cm', widget.initialHeightInCm!);
+        await prefs.setDouble(
+            'heightInCm', widget.initialHeightInCm!.toDouble());
+        await prefs.setInt('height', widget.initialHeightInCm!);
+
+        if (!isMetric) {
+          // Save the original feet and inches
+          double inches = widget.initialHeightInCm! / 2.54;
+          int feet = (inches / 12).floor();
+          int remainingInches = (inches % 12).round();
+          await prefs.setInt('original_height_feet', feet);
+          await prefs.setInt('original_height_inches', remainingInches);
+        }
+
+        return; // Exit early since we already set the height
+      }
+
+      // If no initial height was provided, load from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       print("Loading height from SharedPreferences...");
 
@@ -297,25 +340,22 @@ class _WeightHeightCopyScreenState extends State<WeightHeightCopyScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: MediaQuery.of(context).size.height * 0.05),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.07),
                 Padding(
-                  padding: const EdgeInsets.only(top: 14, left: 16, right: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Row(
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back,
                             color: Colors.black, size: 24),
                         onPressed: () => Navigator.pop(context),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.only(right: 40),
                           child: const LinearProgressIndicator(
-                            value:
-                                8 / 13, // Updated to correct position in flow
+                            value: 8 / 13,
                             minHeight: 2,
                             backgroundColor: Color(0xFFE5E5EA),
                             valueColor:

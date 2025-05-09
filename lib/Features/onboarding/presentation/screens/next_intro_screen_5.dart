@@ -3,6 +3,7 @@ import 'package:fitness_app/Features/onboarding/presentation/screens/next_intro_
 import 'package:fitness_app/Features/onboarding/presentation/screens/gender_selection_screen.dart';
 import 'package:fitness_app/Features/onboarding/presentation/screens/weight_height_copy_screen.dart';
 import 'package:fitness_app/Features/onboarding/presentation/screens/weight_goal_copy_screen.dart';
+import 'package:fitness_app/Features/onboarding/presentation/screens/questions/basic_info_screen.dart';
 
 class NextIntroScreen5 extends StatefulWidget {
   final bool isMetric;
@@ -188,20 +189,20 @@ class _NextIntroScreen5State extends State<NextIntroScreen5> {
   }
 
   void _handleNavigation() {
+    // Print debug info before navigation
+    print(
+        "NextIntroScreen5: Passing height=${widget.heightInCm}cm to WeightHeightCopyScreen");
+
+    // Navigate to the WeightHeightCopyScreen which handles both weight/height and birthdate
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => GenderSelectionScreen(
+        builder: (context) => WeightHeightCopyScreen(
           isMetric: widget.isMetric,
           initialWeight: widget.selectedWeight,
-          selectedGender: selectedIndex == 0
-              ? 'Male'
-              : selectedIndex == 1
-                  ? 'Female'
-                  : 'Other',
-          heightInCm: widget.heightInCm,
-          birthDate: DateTime.now(),
           gymGoal: widget.gymGoal,
+          initialHeightInCm:
+              widget.heightInCm, // Pass the height parameter from this screen
         ),
       ),
     );
