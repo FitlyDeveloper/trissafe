@@ -23,13 +23,16 @@ class _GenderScreenState extends State<GenderScreen> {
       try {
         final prefs = await SharedPreferences.getInstance();
 
-        // Save data and verify
+        // Save data to both keys for consistency across the app
         await prefs.setString('user_gender', selectedGender!);
+        await prefs.setString('gender', selectedGender!);
 
         // Verify it was saved correctly
         final savedGender = prefs.getString('user_gender');
+        final savedGender2 = prefs.getString('gender');
         print('Gender saved to SharedPreferences:');
         print('Key: user_gender, Value: $savedGender');
+        print('Key: gender, Value: $savedGender2');
 
         // Print all keys for debugging
         print('All SharedPreferences keys after saving:');

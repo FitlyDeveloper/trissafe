@@ -154,14 +154,14 @@ class _NextIntroScreen4State extends State<NextIntroScreen4> {
   }
 
   void _handleNavigation() {
-    // Calculate height first
+    // Calculate height first - using the current selectedFeet and selectedInches values
     final heightInCm = isMetric
         ? selectedFeet.value // Already in cm for metric
-        : ((selectedFeet.value * 12 + selectedInches.value) * 2.54)
-            .round(); // Convert total inches to cm
+        : _ftInToCm(selectedFeet.value,
+            selectedInches.value); // Convert total inches to cm
 
     print(
-        "Screen 4: Weight=${selectedWeight.value}, Metric=${isMetric}"); // Debug
+        "Navigation: Selected height=${isMetric ? selectedFeet.value : '${selectedFeet.value}ft ${selectedInches.value}in'}, converted to $heightInCm cm"); // Debug
 
     Navigator.push(
       context,

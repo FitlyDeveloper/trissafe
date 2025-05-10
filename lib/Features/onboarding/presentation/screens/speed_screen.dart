@@ -46,7 +46,8 @@ class _SpeedScreenState extends State<SpeedScreen> {
       final prefs = await SharedPreferences.getInstance();
 
       // Save speed value in kg/week
-      double speedKgPerWeek = widget.isMetric ? speedValue : speedValue * 0.453592;
+      double speedKgPerWeek =
+          widget.isMetric ? speedValue : speedValue * 0.453592;
       await prefs.setDouble('goal_speed_kg_per_week', speedKgPerWeek);
 
       // Verify it was saved correctly
@@ -418,6 +419,33 @@ class _SpeedScreenState extends State<SpeedScreen> {
                 child: TextButton(
                   onPressed: () async {
                     await _saveGoalSpeed();
+
+                    // Get the user_gender from SharedPreferences to verify
+                    final prefs = await SharedPreferences.getInstance();
+
+                    // CRITICAL FIX: Get the most accurate gender value - prioritize user_gender over passed-in value
+                    String mostRecentGender;
+                    if (prefs.containsKey('user_gender')) {
+                      mostRecentGender = prefs.getString('user_gender')!;
+                      print(
+                          'Using user_gender from SharedPreferences: "$mostRecentGender"');
+                    } else if (prefs.containsKey('gender')) {
+                      mostRecentGender = prefs.getString('gender')!;
+                      print(
+                          'Using gender from SharedPreferences: "$mostRecentGender"');
+                    } else {
+                      mostRecentGender = widget.gender;
+                      print(
+                          'No gender in SharedPreferences, using passed value: "$mostRecentGender"');
+                    }
+
+                    // Update both gender keys for consistency
+                    await prefs.setString('user_gender', mostRecentGender);
+                    await prefs.setString('gender', mostRecentGender);
+                    print(
+                        'Saved consistent gender to both keys: "$mostRecentGender"');
+
+                    // Navigate to CalculationScreen with the correct gender
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -427,7 +455,8 @@ class _SpeedScreenState extends State<SpeedScreen> {
                           dreamWeight: widget.dreamWeight,
                           isGaining: widget.isGaining,
                           speedValue: speedValue,
-                          gender: widget.gender,
+                          gender:
+                              mostRecentGender, // Use the most recent gender
                           heightInCm: widget.heightInCm,
                           birthDate: widget.birthDate,
                           gymGoal: widget.gymGoal ?? 'Maintain',
