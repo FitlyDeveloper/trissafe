@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'core/utils/device_size_adapter.dart';
 import 'dart:ui' as ui;
 import 'widgets/health_tracking_card.dart';
+import 'Features/codia/Nutrition.dart' as nutrition; // Import for RouteObserver
 
 // Custom binding to disable overflow errors
 class NoOverflowErrorsFlutterBinding extends WidgetsFlutterBinding {
@@ -97,6 +98,7 @@ class MyApp extends StatelessWidget {
       builder: DevicePreview.appBuilder,
       debugShowCheckedModeBanner: false,
       title: 'Gym App',
+      navigatorObservers: [nutrition.routeObserver],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.black),
         useMaterial3: true,

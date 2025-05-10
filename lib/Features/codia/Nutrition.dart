@@ -13,17 +13,15 @@ class CodiaPage extends StatefulWidget {
   // Always accept a scan ID parameter, defaulting to a generated value if none provided
   final String scanId;
 
-  const CodiaPage({
-    super.key, 
-    this.nutritionData, 
-    this.scanId = 'default_nutrition_id'
-  });
+  const CodiaPage(
+      {super.key, this.nutritionData, this.scanId = 'default_nutrition_id'});
 
   @override
   State<StatefulWidget> createState() => _CodiaPage();
 }
 
-class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAware {
+class _CodiaPage extends State<CodiaPage>
+    with WidgetsBindingObserver, RouteAware {
   // Define color constants with the specified hex codes
   final Color yellowColor = const Color(0xFFF3D960);
   final Color redColor = const Color(0xFFDA7C7C);
@@ -102,7 +100,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       // First, try to load data specific to this food scan ID (highest priority)
       if (_scanId.startsWith('food_nutrition_')) {
         // Try food-specific storage paths
-        String? foodSpecificData = prefs.getString('food_nutrition_data_$_scanId') ?? 
+        String? foodSpecificData =
+            prefs.getString('food_nutrition_data_$_scanId') ??
                                   prefs.getString('nutrition_data_$_scanId');
         
         if (foodSpecificData != null && foodSpecificData.isNotEmpty) {
@@ -138,7 +137,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         if (globalData != null && globalData.isNotEmpty) {
           try {
             Map<String, dynamic> loadedData = jsonDecode(globalData);
-            print('Successfully loaded data from PERMANENT_GLOBAL_NUTRITION_DATA');
+            print(
+                'Successfully loaded data from PERMANENT_GLOBAL_NUTRITION_DATA');
             
             // If this global data has a scanId, update our scanId to match
             if (loadedData.containsKey('scanId')) {
@@ -216,7 +216,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       // Process data into our format
       _updateNutrientValuesFromData(data);
       
-      print('Saved nutrition data from widget to food card storage with ID: $_scanId');
+      print(
+          'Saved nutrition data from widget to food card storage with ID: $_scanId');
     } catch (e) {
       print('Error saving to food card storage: $e');
     }
@@ -282,7 +283,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
   // Handle app lifecycle changes to ensure data isn't lost
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       // App is going to background or inactive, save current data
       if (_dataLoaded) {
         _saveNutritionData();
@@ -387,7 +389,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         } catch (e) {
           print('Error processing loaded nutrition data: $e');
         }
-      } else if (widget.nutritionData != null && widget.nutritionData!.isNotEmpty) {
+      } else if (widget.nutritionData != null &&
+          widget.nutritionData!.isNotEmpty) {
         // If we have widget data, use it as a fallback
         _updateNutrientValuesFromData(widget.nutritionData!);
         
@@ -415,8 +418,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           if (vitamins.containsKey(key) && value is Map) {
             double progress = 0.0;
             if (value.containsKey('progress')) {
-              progress = value['progress'] is double ? 
-                  value['progress'] : double.tryParse(value['progress'].toString()) ?? 0.0;
+              progress = value['progress'] is double
+                  ? value['progress']
+                  : double.tryParse(value['progress'].toString()) ?? 0.0;
             }
             
             Color progressColor = _getColorBasedOnProgress(progress);
@@ -439,8 +443,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           if (minerals.containsKey(key) && value is Map) {
             double progress = 0.0;
             if (value.containsKey('progress')) {
-              progress = value['progress'] is double ? 
-                  value['progress'] : double.tryParse(value['progress'].toString()) ?? 0.0;
+              progress = value['progress'] is double
+                  ? value['progress']
+                  : double.tryParse(value['progress'].toString()) ?? 0.0;
             }
             
             Color progressColor = _getColorBasedOnProgress(progress);
@@ -463,8 +468,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           if (other.containsKey(key) && value is Map) {
             double progress = 0.0;
             if (value.containsKey('progress')) {
-              progress = value['progress'] is double ? 
-                  value['progress'] : double.tryParse(value['progress'].toString()) ?? 0.0;
+              progress = value['progress'] is double
+                  ? value['progress']
+                  : double.tryParse(value['progress'].toString()) ?? 0.0;
             }
             
             Color progressColor = _getColorBasedOnProgress(progress);
@@ -488,7 +494,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
   }
   
   // Helper method to process a nutrient category (vitamins, minerals, other)
-  void _processNutrientCategory(dynamic categoryData, Map<String, NutrientInfo> targetMap) {
+  void _processNutrientCategory(
+      dynamic categoryData, Map<String, NutrientInfo> targetMap) {
     if (categoryData is! Map) return;
     
     Map<String, dynamic> data = categoryData as Map<String, dynamic>;
@@ -534,7 +541,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                 prefs.getString('nutrition_data_$_scanId');
       
       if (savedData != null && savedData.isNotEmpty) {
-        print('✓ FOUND FOOD-SPECIFIC DATA using ID: $_scanId (${savedData.length} bytes)');
+        print(
+            '✓ FOUND FOOD-SPECIFIC DATA using ID: $_scanId (${savedData.length} bytes)');
       } else {
         // Extract food name as fallback
         try {
@@ -544,7 +552,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
             savedData = prefs.getString('food_nutrition_$foodName');
             
             if (savedData != null && savedData.isNotEmpty) {
-              print('✓ FOUND FOOD-SPECIFIC DATA using food name: $foodName (${savedData.length} bytes)');
+              print(
+                  '✓ FOUND FOOD-SPECIFIC DATA using food name: $foodName (${savedData.length} bytes)');
             }
           }
         } catch (e) {
@@ -555,10 +564,10 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       // Try multiple key formats to find saved data with highest priority first
       List<String> possibleDataKeys = [
         // Direct food scan ID format
-        'nutrition_data_$_scanId',       // Primary storage key
-        'backup_nutrition_$_scanId',     // Backup for redundancy
-        'nutrition_${_scanId}_final',     // Final backup storage
-        'simple_nutrition_$_scanId',      // Simplified emergency format
+        'nutrition_data_$_scanId', // Primary storage key
+        'backup_nutrition_$_scanId', // Backup for redundancy
+        'nutrition_${_scanId}_final', // Final backup storage
+        'simple_nutrition_$_scanId', // Simplified emergency format
         
         // Extract food name from scan ID for alternative lookup
         'food_nutrition_${_scanId.replaceFirst('food_nutrition_', '')}', // By food name
@@ -595,13 +604,16 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         Map<String, dynamic> data = jsonDecode(savedData);
         
         // Check if this is the new format with nutritionData field
-        if (data.containsKey('nutritionData') && data['nutritionData'] is Map<String, dynamic>) {
+        if (data.containsKey('nutritionData') &&
+            data['nutritionData'] is Map<String, dynamic>) {
           print('Loading newer data format with nutritionData field');
           _updateNutrientValuesFromData(data['nutritionData']);
           loadedExistingData = true;
         }
         // Otherwise check for vitamins/minerals direct format
-        else if (data.containsKey('vitamins') || data.containsKey('minerals') || data.containsKey('other')) {
+        else if (data.containsKey('vitamins') ||
+            data.containsKey('minerals') ||
+            data.containsKey('other')) {
           // Process vitamins
           if (data.containsKey('vitamins')) {
             Map<String, dynamic> vitaminData = data['vitamins'];
@@ -611,8 +623,13 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                   name: value['name'] ?? key,
                   value: value['value'] ?? '0/0 g',
                   percent: value['percent'] ?? '0%',
-                  progress: value['progress'] is double ? value['progress'] : double.tryParse(value['progress'].toString()) ?? 0.0,
-                  progressColor: _getColorBasedOnProgress(value['progress'] is double ? value['progress'] : double.tryParse(value['progress'].toString()) ?? 0.0),
+                  progress: value['progress'] is double
+                      ? value['progress']
+                      : double.tryParse(value['progress'].toString()) ?? 0.0,
+                  progressColor: _getColorBasedOnProgress(value['progress']
+                          is double
+                      ? value['progress']
+                      : double.tryParse(value['progress'].toString()) ?? 0.0),
                 );
               }
             });
@@ -627,8 +644,13 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                   name: value['name'] ?? key,
                   value: value['value'] ?? '0/0 g',
                   percent: value['percent'] ?? '0%',
-                  progress: value['progress'] is double ? value['progress'] : double.tryParse(value['progress'].toString()) ?? 0.0,
-                  progressColor: _getColorBasedOnProgress(value['progress'] is double ? value['progress'] : double.tryParse(value['progress'].toString()) ?? 0.0),
+                  progress: value['progress'] is double
+                      ? value['progress']
+                      : double.tryParse(value['progress'].toString()) ?? 0.0,
+                  progressColor: _getColorBasedOnProgress(value['progress']
+                          is double
+                      ? value['progress']
+                      : double.tryParse(value['progress'].toString()) ?? 0.0),
                 );
               }
             });
@@ -643,8 +665,13 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                   name: value['name'] ?? key,
                   value: value['value'] ?? '0/0 g',
                   percent: value['percent'] ?? '0%',
-                  progress: value['progress'] is double ? value['progress'] : double.tryParse(value['progress'].toString()) ?? 0.0,
-                  progressColor: _getColorBasedOnProgress(value['progress'] is double ? value['progress'] : double.tryParse(value['progress'].toString()) ?? 0.0),
+                  progress: value['progress'] is double
+                      ? value['progress']
+                      : double.tryParse(value['progress'].toString()) ?? 0.0,
+                  progressColor: _getColorBasedOnProgress(value['progress']
+                          is double
+                      ? value['progress']
+                      : double.tryParse(value['progress'].toString()) ?? 0.0),
                 );
               }
             });
@@ -659,14 +686,16 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
     }
     
     // If no saved data OR we have widget data, use that (prioritize new data)
-    if (!loadedExistingData || (widget.nutritionData != null && widget.nutritionData!.isNotEmpty)) {
+    if (!loadedExistingData ||
+        (widget.nutritionData != null && widget.nutritionData!.isNotEmpty)) {
       if (widget.nutritionData != null && widget.nutritionData!.isNotEmpty) {
         print('Using nutrition data from widget parameter');
         _updateNutrientValuesFromData(widget.nutritionData!);
         
         // Also SAVE this data immediately to ensure it's not lost
         // For food-specific IDs, don't save to global key to avoid overwriting other foods' data
-        await _saveNutritionData(useGlobalKey: !_scanId.startsWith('food_nutrition_'));
+        await _saveNutritionData(
+            useGlobalKey: !_scanId.startsWith('food_nutrition_'));
       } else if (!loadedExistingData) {
         // Last resort, try to get data from NutritionTracker
         print('No saved data or widget data, trying NutritionTracker');
@@ -678,7 +707,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
     await _loadNutrientTargets();
     
     // Save after loading and refreshing targets - preserve food-specific data
-    await _saveNutritionData(useGlobalKey: !_scanId.startsWith('food_nutrition_'));
+    await _saveNutritionData(
+        useGlobalKey: !_scanId.startsWith('food_nutrition_'));
   }
   
   Future<void> _loadDataFromNutritionTracker() async {
@@ -706,48 +736,218 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
     
     // VITAMINS
     vitamins = {
-      'Vitamin A': NutrientInfo(name: 'Vitamin A', value: '0/700 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin C': NutrientInfo(name: 'Vitamin C', value: '0/75 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin D': NutrientInfo(name: 'Vitamin D', value: '0/15 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin E': NutrientInfo(name: 'Vitamin E', value: '0/15 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin K': NutrientInfo(name: 'Vitamin K', value: '0/90 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin B1': NutrientInfo(name: 'Vitamin B1', value: '0/1.1 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin B2': NutrientInfo(name: 'Vitamin B2', value: '0/1.1 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin B3': NutrientInfo(name: 'Vitamin B3', value: '0/14 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin B5': NutrientInfo(name: 'Vitamin B5', value: '0/5 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin B6': NutrientInfo(name: 'Vitamin B6', value: '0/1.3 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin B7': NutrientInfo(name: 'Vitamin B7', value: '0/30 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin B9': NutrientInfo(name: 'Vitamin B9', value: '0/400 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Vitamin B12': NutrientInfo(name: 'Vitamin B12', value: '0/2.4 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Vitamin A': NutrientInfo(
+          name: 'Vitamin A',
+          value: '0/700 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin C': NutrientInfo(
+          name: 'Vitamin C',
+          value: '0/75 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin D': NutrientInfo(
+          name: 'Vitamin D',
+          value: '0/15 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin E': NutrientInfo(
+          name: 'Vitamin E',
+          value: '0/15 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin K': NutrientInfo(
+          name: 'Vitamin K',
+          value: '0/90 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin B1': NutrientInfo(
+          name: 'Vitamin B1',
+          value: '0/1.1 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin B2': NutrientInfo(
+          name: 'Vitamin B2',
+          value: '0/1.1 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin B3': NutrientInfo(
+          name: 'Vitamin B3',
+          value: '0/14 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin B5': NutrientInfo(
+          name: 'Vitamin B5',
+          value: '0/5 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin B6': NutrientInfo(
+          name: 'Vitamin B6',
+          value: '0/1.3 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin B7': NutrientInfo(
+          name: 'Vitamin B7',
+          value: '0/30 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin B9': NutrientInfo(
+          name: 'Vitamin B9',
+          value: '0/400 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Vitamin B12': NutrientInfo(
+          name: 'Vitamin B12',
+          value: '0/2.4 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
     };
     
     // MINERALS
     minerals = {
-      'Calcium': NutrientInfo(name: 'Calcium', value: '0/1000 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Chloride': NutrientInfo(name: 'Chloride', value: '0/2300 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Chromium': NutrientInfo(name: 'Chromium', value: '0/35 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Copper': NutrientInfo(name: 'Copper', value: '0/900 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Fluoride': NutrientInfo(name: 'Fluoride', value: '0/4 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Iodine': NutrientInfo(name: 'Iodine', value: '0/150 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Iron': NutrientInfo(name: 'Iron', value: '0/18 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Magnesium': NutrientInfo(name: 'Magnesium', value: '0/400 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Manganese': NutrientInfo(name: 'Manganese', value: '0/2.3 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Molybdenum': NutrientInfo(name: 'Molybdenum', value: '0/45 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Phosphorus': NutrientInfo(name: 'Phosphorus', value: '0/700 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Potassium': NutrientInfo(name: 'Potassium', value: '0/3500 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Selenium': NutrientInfo(name: 'Selenium', value: '0/55 mcg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Sodium': NutrientInfo(name: 'Sodium', value: '0/2300 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Zinc': NutrientInfo(name: 'Zinc', value: '0/11 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Calcium': NutrientInfo(
+          name: 'Calcium',
+          value: '0/1000 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Chloride': NutrientInfo(
+          name: 'Chloride',
+          value: '0/2300 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Chromium': NutrientInfo(
+          name: 'Chromium',
+          value: '0/35 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Copper': NutrientInfo(
+          name: 'Copper',
+          value: '0/900 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Fluoride': NutrientInfo(
+          name: 'Fluoride',
+          value: '0/4 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Iodine': NutrientInfo(
+          name: 'Iodine',
+          value: '0/150 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Iron': NutrientInfo(
+          name: 'Iron',
+          value: '0/18 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Magnesium': NutrientInfo(
+          name: 'Magnesium',
+          value: '0/400 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Manganese': NutrientInfo(
+          name: 'Manganese',
+          value: '0/2.3 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Molybdenum': NutrientInfo(
+          name: 'Molybdenum',
+          value: '0/45 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Phosphorus': NutrientInfo(
+          name: 'Phosphorus',
+          value: '0/700 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Potassium': NutrientInfo(
+          name: 'Potassium',
+          value: '0/3500 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Selenium': NutrientInfo(
+          name: 'Selenium',
+          value: '0/55 mcg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Sodium': NutrientInfo(
+          name: 'Sodium',
+          value: '0/2300 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Zinc': NutrientInfo(
+          name: 'Zinc',
+          value: '0/11 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
     };
     
     // OTHER NUTRIENTS
     other = {
-      'Fiber': NutrientInfo(name: 'Fiber', value: '0/30 g', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Cholesterol': NutrientInfo(name: 'Cholesterol', value: '0/300 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Sugar': NutrientInfo(name: 'Sugar', value: '0/50 g', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Saturated Fats': NutrientInfo(name: 'Saturated Fats', value: '0/22 g', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Omega-3': NutrientInfo(name: 'Omega-3', value: '0/1500 mg', percent: '0%', progress: 0.0, progressColor: Colors.red),
-      'Omega-6': NutrientInfo(name: 'Omega-6', value: '0/14 g', percent: '0%', progress: 0.0, progressColor: Colors.red),
+      'Fiber': NutrientInfo(
+          name: 'Fiber',
+          value: '0/30 g',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Cholesterol': NutrientInfo(
+          name: 'Cholesterol',
+          value: '0/300 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Sugar': NutrientInfo(
+          name: 'Sugar',
+          value: '0/50 g',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Saturated Fats': NutrientInfo(
+          name: 'Saturated Fats',
+          value: '0/22 g',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Omega-3': NutrientInfo(
+          name: 'Omega-3',
+          value: '0/1500 mg',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
+      'Omega-6': NutrientInfo(
+          name: 'Omega-6',
+          value: '0/14 g',
+          percent: '0%',
+          progress: 0.0,
+          progressColor: Colors.red),
     };
     
     // Set the counters for each category
@@ -768,7 +968,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       
       // Filter keys related to nutrient targets
       List<String> targetKeys = allKeys
-          .where((key) => key.contains('target_') || 
+          .where((key) =>
+              key.contains('target_') ||
                           key.contains('vitamin_') || 
                           key.contains('mineral_'))
           .toList();
@@ -886,15 +1087,21 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
 
     // Process each nutrient individually to prevent one error affecting others
     _processSingleOtherNutrient(data, 'Cholesterol', ['cholesterol', 'chol']);
-    _processSingleOtherNutrient(data, 'Fiber', ['fiber', 'dietary_fiber', 'dietary fiber', 'fibre']);
-    _processSingleOtherNutrient(data, 'Sugar', ['sugar', 'sugars', 'total_sugar', 'total sugar']);
-    _processSingleOtherNutrient(data, 'Saturated Fats', ['saturated_fat', 'saturated fat', 'sat_fat']);
-    _processSingleOtherNutrient(data, 'Omega-3', ['omega_3', 'omega 3', 'omega3']);
-    _processSingleOtherNutrient(data, 'Omega-6', ['omega_6', 'omega 6', 'omega6']);
+    _processSingleOtherNutrient(
+        data, 'Fiber', ['fiber', 'dietary_fiber', 'dietary fiber', 'fibre']);
+    _processSingleOtherNutrient(
+        data, 'Sugar', ['sugar', 'sugars', 'total_sugar', 'total sugar']);
+    _processSingleOtherNutrient(
+        data, 'Saturated Fats', ['saturated_fat', 'saturated fat', 'sat_fat']);
+    _processSingleOtherNutrient(
+        data, 'Omega-3', ['omega_3', 'omega 3', 'omega3']);
+    _processSingleOtherNutrient(
+        data, 'Omega-6', ['omega_6', 'omega 6', 'omega6']);
   }
   
   // Process a single other nutrient safely - prevents one error from affecting others
-  void _processSingleOtherNutrient(Map<String, dynamic> data, String nutrientKey, List<String> possibleKeys) {
+  void _processSingleOtherNutrient(Map<String, dynamic> data,
+      String nutrientKey, List<String> possibleKeys) {
     try {
       _extractOtherNutrientByVariants(data, nutrientKey, possibleKeys);
     } catch (e) {
@@ -971,26 +1178,56 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       String unit = _extractUnit(currentValue);
       
       // Get target value from SharedPreferences
-      _loadTargetValueFromPrefs("vitamin_target_" + vitaminKey.toLowerCase().replaceAll(' ', '_')).then((targetValue) {
+      _loadTargetValueFromPrefs(
+              "vitamin_target_" + vitaminKey.toLowerCase().replaceAll(' ', '_'))
+          .then((targetValue) {
         // Ensure target value is valid to prevent division by zero
         if (targetValue <= 0) {
           print('Warning: Invalid target value for $vitaminKey, using default');
           // Use default targets based on vitamin type
           switch (vitaminKey) {
-            case 'Vitamin A': targetValue = 700; break;
-            case 'Vitamin C': targetValue = 75; break;
-            case 'Vitamin D': targetValue = 15; break;
-            case 'Vitamin E': targetValue = 15; break;
-            case 'Vitamin K': targetValue = 90; break;
-            case 'Vitamin B1': targetValue = 1.1; break;
-            case 'Vitamin B2': targetValue = 1.1; break;
-            case 'Vitamin B3': targetValue = 14; break;
-            case 'Vitamin B5': targetValue = 5; break;
-            case 'Vitamin B6': targetValue = 1.3; break;
-            case 'Vitamin B7': targetValue = 30; break;
-            case 'Vitamin B9': targetValue = 400; break;
-            case 'Vitamin B12': targetValue = 2.4; break;
-            default: targetValue = 100; break;
+            case 'Vitamin A':
+              targetValue = 700;
+              break;
+            case 'Vitamin C':
+              targetValue = 75;
+              break;
+            case 'Vitamin D':
+              targetValue = 15;
+              break;
+            case 'Vitamin E':
+              targetValue = 15;
+              break;
+            case 'Vitamin K':
+              targetValue = 90;
+              break;
+            case 'Vitamin B1':
+              targetValue = 1.1;
+              break;
+            case 'Vitamin B2':
+              targetValue = 1.1;
+              break;
+            case 'Vitamin B3':
+              targetValue = 14;
+              break;
+            case 'Vitamin B5':
+              targetValue = 5;
+              break;
+            case 'Vitamin B6':
+              targetValue = 1.3;
+              break;
+            case 'Vitamin B7':
+              targetValue = 30;
+              break;
+            case 'Vitamin B9':
+              targetValue = 400;
+              break;
+            case 'Vitamin B12':
+              targetValue = 2.4;
+              break;
+            default:
+              targetValue = 100;
+              break;
           }
         }
         
@@ -1008,12 +1245,12 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
               value: "$currentAmount/${targetValue.toStringAsFixed(1)} $unit",
               percent: "$percentage%",
               progress: progress,
-              progressColor: progressColor
-            );
+                progressColor: progressColor);
           });
         }
         
-        print('Updated $vitaminKey: $currentAmount/$targetValue $unit = $percentage%');
+        print(
+            'Updated $vitaminKey: $currentAmount/$targetValue $unit = $percentage%');
       });
     }
   }
@@ -1026,28 +1263,62 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       String unit = _extractUnit(currentValue);
       
       // Get target value from SharedPreferences
-      _loadTargetValueFromPrefs("mineral_target_" + mineralKey.toLowerCase().replaceAll(' ', '_')).then((targetValue) {
+      _loadTargetValueFromPrefs(
+              "mineral_target_" + mineralKey.toLowerCase().replaceAll(' ', '_'))
+          .then((targetValue) {
         // Ensure target value is valid to prevent division by zero
         if (targetValue <= 0) {
           print('Warning: Invalid target value for $mineralKey, using default');
           // Use default targets based on mineral type
           switch (mineralKey) {
-            case 'Calcium': targetValue = 1000; break;
-            case 'Chloride': targetValue = 2300; break;
-            case 'Chromium': targetValue = 35; break;
-            case 'Copper': targetValue = 900; break;
-            case 'Fluoride': targetValue = 4; break;
-            case 'Iodine': targetValue = 150; break;
-            case 'Iron': targetValue = 18; break;
-            case 'Magnesium': targetValue = 400; break;
-            case 'Manganese': targetValue = 2.3; break;
-            case 'Molybdenum': targetValue = 45; break;
-            case 'Phosphorus': targetValue = 700; break;
-            case 'Potassium': targetValue = 3500; break;
-            case 'Selenium': targetValue = 55; break;
-            case 'Sodium': targetValue = 2300; break;
-            case 'Zinc': targetValue = 11; break;
-            default: targetValue = 100; break;
+            case 'Calcium':
+              targetValue = 1000;
+              break;
+            case 'Chloride':
+              targetValue = 2300;
+              break;
+            case 'Chromium':
+              targetValue = 35;
+              break;
+            case 'Copper':
+              targetValue = 900;
+              break;
+            case 'Fluoride':
+              targetValue = 4;
+              break;
+            case 'Iodine':
+              targetValue = 150;
+              break;
+            case 'Iron':
+              targetValue = 18;
+              break;
+            case 'Magnesium':
+              targetValue = 400;
+              break;
+            case 'Manganese':
+              targetValue = 2.3;
+              break;
+            case 'Molybdenum':
+              targetValue = 45;
+              break;
+            case 'Phosphorus':
+              targetValue = 700;
+              break;
+            case 'Potassium':
+              targetValue = 3500;
+              break;
+            case 'Selenium':
+              targetValue = 55;
+              break;
+            case 'Sodium':
+              targetValue = 2300;
+              break;
+            case 'Zinc':
+              targetValue = 11;
+              break;
+            default:
+              targetValue = 100;
+              break;
           }
         }
         
@@ -1065,12 +1336,12 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
               value: "$currentAmount/${targetValue.toStringAsFixed(1)} $unit",
               percent: "$percentage%",
               progress: progress,
-              progressColor: progressColor
-            );
+                progressColor: progressColor);
           });
         }
         
-        print('Updated $mineralKey: $currentAmount/$targetValue $unit = $percentage%');
+        print(
+            'Updated $mineralKey: $currentAmount/$targetValue $unit = $percentage%');
       });
     }
   }
@@ -1095,15 +1366,28 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       _loadTargetValueFromPrefs(nutrientKey).then((targetValue) {
         // Ensure target value is valid to prevent division by zero
         if (targetValue <= 0) {
-          print('Warning: Invalid target value for $nutrientKey, using default');
+          print(
+              'Warning: Invalid target value for $nutrientKey, using default');
           // Use default targets based on nutrient type
           switch (nutrientKey) {
-            case 'Fiber': targetValue = 30; break;
-            case 'Cholesterol': targetValue = 300; break;
-            case 'Omega-3': targetValue = 1500; break;
-            case 'Omega-6': targetValue = 14; break;
-            case 'Saturated Fats': targetValue = 22; break;
-            default: targetValue = 100; break;
+            case 'Fiber':
+              targetValue = 30;
+              break;
+            case 'Cholesterol':
+              targetValue = 300;
+              break;
+            case 'Omega-3':
+              targetValue = 1500;
+              break;
+            case 'Omega-6':
+              targetValue = 14;
+              break;
+            case 'Saturated Fats':
+              targetValue = 22;
+              break;
+            default:
+              targetValue = 100;
+              break;
           }
         }
         
@@ -1118,15 +1402,16 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           setState(() {
             other[nutrientKey] = NutrientInfo(
               name: nutrientKey,
-              value: "$currentAmount/${targetValue.toStringAsFixed(unit == 'mg' ? 0 : 1)} $unit",
+                value:
+                    "$currentAmount/${targetValue.toStringAsFixed(unit == 'mg' ? 0 : 1)} $unit",
               percent: "$percentage%",
               progress: progress,
-              progressColor: progressColor
-            );
+                progressColor: progressColor);
           });
         }
         
-        print('Updated $nutrientKey: $currentAmount/$targetValue $unit = $percentage%');
+        print(
+            'Updated $nutrientKey: $currentAmount/$targetValue $unit = $percentage%');
       });
     }
   }
@@ -1155,7 +1440,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           prefKey = 'nutrient_target_saturated_fat';
           break;
         default:
-          prefKey = 'nutrient_target_${nutrientKey.toLowerCase().replaceAll(' ', '_')}';
+          prefKey =
+              'nutrient_target_${nutrientKey.toLowerCase().replaceAll(' ', '_')}';
       }
       
       // Try to get the value as int or double
@@ -1185,11 +1471,13 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       // Debug output to identify available targets
       print("\n===== AVAILABLE PERSONALIZED TARGETS =====");
       Set<String> keys = prefs.getKeys();
-      List<String> targetKeys = keys.where((key) => 
+      List<String> targetKeys = keys
+          .where((key) =>
           key.contains('target_') || 
           key.contains('vitamin_') || 
           key.contains('mineral_') ||
-          key.contains('nutrient_')).toList();
+              key.contains('nutrient_'))
+          .toList();
       
       for (String key in targetKeys) {
         var value = prefs.get(key);
@@ -1236,11 +1524,13 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         try {
           // Try to load int target first, then double, with fallback to default
           int? intTarget = prefs.getInt(prefsKey);
-          double? doubleTarget = intTarget?.toDouble() ?? prefs.getDouble(prefsKey);
+          double? doubleTarget =
+              intTarget?.toDouble() ?? prefs.getDouble(prefsKey);
           
           if (doubleTarget != null && doubleTarget > 0) {
             // Target found in preferences, use it
-            double currentValue = _parseCurrentValue(vitamins[vitaminName]!.value);
+            double currentValue =
+                _parseCurrentValue(vitamins[vitaminName]!.value);
             String unit = vitaminUnits[vitaminName] ?? 'mg';
             
             // Calculate progress and formatting
@@ -1251,14 +1541,15 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
             // Update the vitamin display
             vitamins[vitaminName] = NutrientInfo(
               name: vitaminName,
-              value: "$currentValue/${doubleTarget.toStringAsFixed(unit == 'mcg' ? 0 : 1)} $unit",
+                value:
+                    "$currentValue/${doubleTarget.toStringAsFixed(unit == 'mcg' ? 0 : 1)} $unit",
               percent: "$percentage%",
               progress: progress,
               progressColor: progressColor,
-              hasInfo: vitamins[vitaminName]!.hasInfo
-            );
+                hasInfo: vitamins[vitaminName]!.hasInfo);
             
-            print('Updated $vitaminName with personalized target: $doubleTarget $unit');
+            print(
+                'Updated $vitaminName with personalized target: $doubleTarget $unit');
           }
         } catch (e) {
           print('Error processing $vitaminName target: $e');
@@ -1308,11 +1599,13 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         try {
           // Try to load int target first, then double, with fallback to default
           int? intTarget = prefs.getInt(prefsKey);
-          double? doubleTarget = intTarget?.toDouble() ?? prefs.getDouble(prefsKey);
+          double? doubleTarget =
+              intTarget?.toDouble() ?? prefs.getDouble(prefsKey);
           
           if (doubleTarget != null && doubleTarget > 0) {
             // Target found in preferences, use it
-            double currentValue = _parseCurrentValue(minerals[mineralName]!.value);
+            double currentValue =
+                _parseCurrentValue(minerals[mineralName]!.value);
             String unit = mineralUnits[mineralName] ?? 'mg';
             
             // Calculate progress and formatting
@@ -1323,14 +1616,15 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
             // Update the mineral display
             minerals[mineralName] = NutrientInfo(
               name: mineralName,
-              value: "$currentValue/${doubleTarget.toStringAsFixed(unit == 'mcg' ? 0 : 1)} $unit",
+                value:
+                    "$currentValue/${doubleTarget.toStringAsFixed(unit == 'mcg' ? 0 : 1)} $unit",
               percent: "$percentage%",
               progress: progress,
               progressColor: progressColor,
-              hasInfo: minerals[mineralName]!.hasInfo
-            );
+                hasInfo: minerals[mineralName]!.hasInfo);
             
-            print('Updated $mineralName with personalized target: $doubleTarget $unit');
+            print(
+                'Updated $mineralName with personalized target: $doubleTarget $unit');
           }
         } catch (e) {
           print('Error processing $mineralName target: $e');
@@ -1360,11 +1654,13 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         try {
           // Try to load int target first, then double, with fallback to default
           int? intTarget = prefs.getInt(prefsKey);
-          double? doubleTarget = intTarget?.toDouble() ?? prefs.getDouble(prefsKey);
+          double? doubleTarget =
+              intTarget?.toDouble() ?? prefs.getDouble(prefsKey);
           
           if (doubleTarget != null && doubleTarget > 0) {
             // Target found in preferences, use it
-            double currentValue = _parseCurrentValue(other[nutrientName]!.value);
+            double currentValue =
+                _parseCurrentValue(other[nutrientName]!.value);
             String unit = otherUnits[nutrientName] ?? 'g';
             
             // Calculate progress and formatting
@@ -1375,14 +1671,15 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
             // Update the other nutrient display
             other[nutrientName] = NutrientInfo(
               name: nutrientName,
-              value: "$currentValue/${doubleTarget.toStringAsFixed(unit == 'mg' ? 0 : 1)} $unit",
+                value:
+                    "$currentValue/${doubleTarget.toStringAsFixed(unit == 'mg' ? 0 : 1)} $unit",
               percent: "$percentage%",
               progress: progress,
               progressColor: progressColor,
-              hasInfo: other[nutrientName]!.hasInfo
-            );
+                hasInfo: other[nutrientName]!.hasInfo);
             
-            print('Updated $nutrientName with personalized target: $doubleTarget $unit');
+            print(
+                'Updated $nutrientName with personalized target: $doubleTarget $unit');
           }
         } catch (e) {
           print('Error processing $nutrientName target: $e');
@@ -1419,10 +1716,12 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         }
         
         // Cholesterol
-        double? cholesterolTarget = prefs.getDouble('nutrient_target_cholesterol');
+        double? cholesterolTarget =
+            prefs.getDouble('nutrient_target_cholesterol');
         if (cholesterolTarget != null) {
           targets['cholesterol'] = cholesterolTarget;
-          print('Loaded personalized cholesterol target: $cholesterolTarget mg');
+          print(
+              'Loaded personalized cholesterol target: $cholesterolTarget mg');
         }
         
         // Omega-3
@@ -1440,10 +1739,12 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         }
         
         // Saturated fats
-        double? saturatedFatTarget = prefs.getDouble('nutrient_target_saturated_fat');
+        double? saturatedFatTarget =
+            prefs.getDouble('nutrient_target_saturated_fat');
         if (saturatedFatTarget != null) {
           targets['saturated_fat'] = saturatedFatTarget;
-          print('Loaded personalized saturated fat target: $saturatedFatTarget g');
+          print(
+              'Loaded personalized saturated fat target: $saturatedFatTarget g');
         }
         
         // Protein
@@ -1593,7 +1894,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         double target = info['target'] as double;
         double progress = (value / target); // Removed clamp
         String unit = info['unit'] as String;
-        bool hasInfo = info.containsKey('hasInfo') ? info['hasInfo'] as bool : false;
+        bool hasInfo =
+            info.containsKey('hasInfo') ? info['hasInfo'] as bool : false;
         
         // Determine color based on progress
         Color progressColor = _getColorBasedOnProgress(progress);
@@ -1604,8 +1906,7 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           percent: "${(progress * 100).toStringAsFixed(0)}%",
           progress: progress,
           progressColor: progressColor,
-          hasInfo: hasInfo
-        );
+            hasInfo: hasInfo);
       }
     });
     
@@ -1632,7 +1933,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         double target = info['target'] as double;
         double progress = (valueNum / target); // Removed clamp
         String unit = info['unit'] as String;
-        bool hasInfo = info.containsKey('hasInfo') ? info['hasInfo'] as bool : false;
+        bool hasInfo =
+            info.containsKey('hasInfo') ? info['hasInfo'] as bool : false;
         
         // Determine color based on progress
         Color progressColor = _getColorBasedOnProgress(progress);
@@ -1643,8 +1945,7 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           percent: "${(progress * 100).toStringAsFixed(0)}%",
           progress: progress,
           progressColor: progressColor,
-          hasInfo: hasInfo
-        );
+            hasInfo: hasInfo);
         
         print('Updated vitamin $vitaminKey from alternative key $key');
       }
@@ -1673,7 +1974,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
     // Check for various patterns in the data keys
     data.forEach((key, value) {
       // Try to extract B vitamin number and value
-      RegExp regExp = RegExp(r'vitamin[_\s]*b(\d+)|b(\d+)', caseSensitive: false);
+      RegExp regExp =
+          RegExp(r'vitamin[_\s]*b(\d+)|b(\d+)', caseSensitive: false);
       Match? match = regExp.firstMatch(key.toLowerCase());
       
       if (match != null) {
@@ -1692,7 +1994,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
               String unit = vitaminInfo['unit'] as String;
               
               // Only update if better than current value
-              if (valueNum > 0 && vitamins[vitaminKey]!.value.startsWith('0/')) {
+              if (valueNum > 0 &&
+                  vitamins[vitaminKey]!.value.startsWith('0/')) {
                 double progress = (valueNum / target);
                 Color progressColor = _getColorBasedOnProgress(progress);
                 
@@ -1701,10 +2004,10 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                   value: "$valueNum/$target $unit",
                   percent: "${(progress * 100).toStringAsFixed(0)}%",
                   progress: progress,
-                  progressColor: progressColor
-                );
+                    progressColor: progressColor);
                 
-                print('Updated $vitaminKey from pattern match key $key with value $valueNum');
+                print(
+                    'Updated $vitaminKey from pattern match key $key with value $valueNum');
               }
             }
           }
@@ -1724,7 +2027,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           
           if (name != null && amount != null) {
             // Check if this is a B vitamin
-            RegExp regExp = RegExp(r'vitamin[_\s]*b(\d+)|b(\d+)', caseSensitive: false);
+            RegExp regExp =
+                RegExp(r'vitamin[_\s]*b(\d+)|b(\d+)', caseSensitive: false);
             Match? match = regExp.firstMatch(name);
             
             if (match != null) {
@@ -1740,7 +2044,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                     double target = vitaminInfo['target'] as double;
                     String unit = vitaminInfo['unit'] as String;
                     
-                    if (valueNum > 0 && vitamins[vitaminKey]!.value.startsWith('0/')) {
+                    if (valueNum > 0 &&
+                        vitamins[vitaminKey]!.value.startsWith('0/')) {
                       double progress = (valueNum / target);
                       Color progressColor = _getColorBasedOnProgress(progress);
                       
@@ -1749,10 +2054,10 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                         value: "$valueNum/$target $unit",
                         percent: "${(progress * 100).toStringAsFixed(0)}%",
                         progress: progress,
-                        progressColor: progressColor
-                      );
+                          progressColor: progressColor);
                       
-                      print('Updated $vitaminKey from nutrients array with value $valueNum');
+                      print(
+                          'Updated $vitaminKey from nutrients array with value $valueNum');
                     }
                   }
                 }
@@ -1769,7 +2074,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
               _updateBVitaminFromNutrient('Vitamin B6', amount, bVitamins);
             } else if (name.contains('biotin') || name.contains('b7')) {
               _updateBVitaminFromNutrient('Vitamin B7', amount, bVitamins);
-            } else if (name.contains('folate') || name.contains('folic') || name.contains('b9')) {
+            } else if (name.contains('folate') ||
+                name.contains('folic') ||
+                name.contains('b9')) {
               _updateBVitaminFromNutrient('Vitamin B9', amount, bVitamins);
             } else if (name.contains('cobalamin') || name.contains('b12')) {
               _updateBVitaminFromNutrient('Vitamin B12', amount, bVitamins);
@@ -1781,7 +2088,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
   }
   
   // Helper method to update B vitamins from nutrient array
-  void _updateBVitaminFromNutrient(String vitaminKey, dynamic amount, Map<String, Map<String, dynamic>> bVitamins) {
+  void _updateBVitaminFromNutrient(String vitaminKey, dynamic amount,
+      Map<String, Map<String, dynamic>> bVitamins) {
     if (vitamins.containsKey(vitaminKey) && bVitamins.containsKey(vitaminKey)) {
       double valueNum = _parseNutrientValue(amount);
       double target = bVitamins[vitaminKey]!['target'] as double;
@@ -1796,10 +2104,10 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           value: "$valueNum/$target $unit",
           percent: "${(progress * 100).toStringAsFixed(0)}%",
           progress: progress,
-          progressColor: progressColor
-        );
+            progressColor: progressColor);
         
-        print('Updated $vitaminKey from nutrients array detailed match with value $valueNum');
+        print(
+            'Updated $vitaminKey from nutrients array detailed match with value $valueNum');
       }
     }
   }
@@ -1916,14 +2224,14 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           value: "$value/$target $unit",
           percent: "${(progress * 100).toStringAsFixed(0)}%",
           progress: progress,
-          progressColor: progressColor
-        );
+            progressColor: progressColor);
       }
     });
   }
   
   // Helper method to load personalized mineral targets from SharedPreferences
-  Future<void> _loadPersonalizedMineralTargets(Map<String, Map<String, dynamic>> mineralInfo) async {
+  Future<void> _loadPersonalizedMineralTargets(
+      Map<String, Map<String, dynamic>> mineralInfo) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
@@ -1940,9 +2248,11 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         // If found, update the target in the mineralInfo map
         if (target != null) {
           mineralInfo[dataKey]!['target'] = target;
-          print('Loaded personalized mineral target: $uiKey = $target ${info['unit']}');
+          print(
+              'Loaded personalized mineral target: $uiKey = $target ${info['unit']}');
         } else {
-          print('No personalized target found for $uiKey, using default: ${info['target']} ${info['unit']}');
+          print(
+              'No personalized target found for $uiKey, using default: ${info['target']} ${info['unit']}');
         }
       }
     } catch (e) {
@@ -2009,14 +2319,16 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           Map<String, dynamic> nutritionData = {
             'scanId': _scanId,
             'lastSaved': DateTime.now().millisecondsSinceEpoch,
-            'vitamins': Map.fromEntries(vitamins.entries.map((e) => MapEntry(e.key, {
+            'vitamins':
+                Map.fromEntries(vitamins.entries.map((e) => MapEntry(e.key, {
               'name': e.value.name,
               'value': e.value.value,
               'percent': e.value.percent,
               'progress': e.value.progress,
               'hasInfo': e.value.hasInfo,
             }))),
-            'minerals': Map.fromEntries(minerals.entries.map((e) => MapEntry(e.key, {
+            'minerals':
+                Map.fromEntries(minerals.entries.map((e) => MapEntry(e.key, {
               'name': e.value.name,
               'value': e.value.value,
               'percent': e.value.percent,
@@ -2070,27 +2382,32 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                             
                             // Double-save to the global key for extra reliability
                             try {
-                              final prefs = await SharedPreferences.getInstance();
+                              final prefs =
+                                  await SharedPreferences.getInstance();
                               
                               // Create a data object with nutrition data
                               Map<String, dynamic> nutritionData = {
                                 'scanId': _scanId,
-                                'lastSaved': DateTime.now().millisecondsSinceEpoch,
-                                'vitamins': Map.fromEntries(vitamins.entries.map((e) => MapEntry(e.key, {
+                                'lastSaved':
+                                    DateTime.now().millisecondsSinceEpoch,
+                                'vitamins': Map.fromEntries(vitamins.entries
+                                    .map((e) => MapEntry(e.key, {
                                   'name': e.value.name,
                                   'value': e.value.value,
                                   'percent': e.value.percent,
                                   'progress': e.value.progress,
                                   'hasInfo': e.value.hasInfo,
                                 }))),
-                                'minerals': Map.fromEntries(minerals.entries.map((e) => MapEntry(e.key, {
+                                'minerals': Map.fromEntries(minerals.entries
+                                    .map((e) => MapEntry(e.key, {
                                   'name': e.value.name,
                                   'value': e.value.value,
                                   'percent': e.value.percent,
                                   'progress': e.value.progress,
                                   'hasInfo': e.value.hasInfo,
                                 }))),
-                                'other': Map.fromEntries(other.entries.map((e) => MapEntry(e.key, {
+                                'other': Map.fromEntries(
+                                    other.entries.map((e) => MapEntry(e.key, {
                                   'name': e.value.name,
                                   'value': e.value.value,
                                   'percent': e.value.percent,
@@ -2100,7 +2417,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                               };
                               
                               String json = jsonEncode(nutritionData);
-                              await prefs.setString('PERMANENT_GLOBAL_NUTRITION_DATA', json);
+                              await prefs.setString(
+                                  'PERMANENT_GLOBAL_NUTRITION_DATA', json);
                             } catch (e) {
                               print('Error during extra save: $e');
                             }
@@ -2144,6 +2462,7 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                     title: "Vitamins",
                     count: "${_countNonZeroValues(vitamins)}/13",
                     nutrients: vitamins.values.toList(),
+                    centerTitle: true,
                   ),
 
                   const SizedBox(height: 20),
@@ -2153,6 +2472,7 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                     title: "Minerals",
                     count: "${_countNonZeroValues(minerals)}/15",
                     nutrients: minerals.values.toList(),
+                    centerTitle: true,
                   ),
 
                   const SizedBox(height: 20),
@@ -2160,8 +2480,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                   // Other Nutrients Section
                   _buildNutrientSection(
                     title: "Other",
-                    count: "${_countNonZeroValues(other)}/10",
+                    count: "${_countNonZeroValues(other)}/6",
                     nutrients: other.values.toList(),
+                    centerTitle: true,
                   ),
 
                   // Bottom padding
@@ -2177,7 +2498,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
   
   int _countNonZeroValues(Map<String, NutrientInfo> nutrientMap) {
     return nutrientMap.values
-        .where((nutrient) => nutrient.progress >= 1.0)  // Only count as filled if progress is 100% or higher
+        .where((nutrient) =>
+            nutrient.progress >=
+            1.0) // Only count as filled if progress is 100% or higher
         .length;
   }
 
@@ -2186,6 +2509,7 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
     required String title,
     required String count,
     required List<NutrientInfo> nutrients,
+    bool centerTitle = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 29),
@@ -2207,18 +2531,202 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
             // Header section with divider
             Padding(
               padding: const EdgeInsets.only(top: 10, left: 20, right: 20),
-                child: Row(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Title in exact center
+                  Center(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'SF Pro',
+                      ),
+                    ),
+                  ),
+                  // Row for info icon, spacer, and count
+                  Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                   // Info icon on left
-                  Container(
+                      GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            barrierColor: Colors.black.withOpacity(0.6),
+                            builder: (context) {
+                              return Dialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                backgroundColor: Colors.white,
+                                insetPadding:
+                                    EdgeInsets.symmetric(horizontal: 32),
+                                child: Container(
+                                  width: 326,
+                                  height: 310,
+                                  child: Stack(
+                                    children: [
+                                      // Close icon
+                                      Positioned(
+                                        top: 21,
+                                        right: 21,
+                                        child: GestureDetector(
+                                          onTap: () =>
+                                              Navigator.of(context).pop(),
+                                          child: Image.asset(
+                                            'assets/images/closeicon.png',
+                                            width: 19,
+                                            height: 19,
+                                          ),
+                                        ),
+                                      ),
+                                      // Content
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          SizedBox(height: 21),
+                                          // Info headline horizontally centered and moved up by 6px
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 0),
+                                            child: Align(
+                                              alignment: Alignment.topCenter,
+                                              child: Transform.translate(
+                                                offset: Offset(0, -6),
+                                                child: Text(
+                                                  'Info',
+                                                  style: TextStyle(
+                                                    fontSize: 24,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontFamily:
+                                                        'SF Pro Display',
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          Spacer(),
+                                          // Vertically centered, left-aligned subtext/checkmark group
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              SizedBox(width: 32),
+                                              Transform.translate(
+                                                offset: Offset(0, -10),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Row(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        CustomPaint(
+                                                          size: Size(22, 22),
+                                                          painter:
+                                                              _CheckmarkPainter(
+                                                                  size: 22),
+                                                        ),
+                                                        SizedBox(width: 16),
+                                                        Text(
+                                                          'Aim for 100% daily intake',
+                                                          style: TextStyle(
+                                                            fontSize: 18,
+                                                            fontFamily:
+                                                                'SF Pro Display',
+                                                            color: Colors.black,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    SizedBox(height: 18),
+                                                    Row(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        CustomPaint(
+                                                          size: Size(22, 22),
+                                                          painter:
+                                                              _CheckmarkPainter(
+                                                                  size: 22),
+                                                        ),
+                                                        SizedBox(width: 16),
+                                                        Text(
+                                                          'Individual needs may differ',
+                                                          style: TextStyle(
+                                                            fontSize: 18,
+                                                            fontFamily:
+                                                                'SF Pro Display',
+                                                            color: Colors.black,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Spacer(),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 20),
+                                            child: Container(
+                                              width: 280,
+                                              height: 48,
+                                              margin:
+                                                  EdgeInsets.only(bottom: 24),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black,
+                                                borderRadius:
+                                                    BorderRadius.circular(28),
+                                              ),
+                                              child: TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(context).pop(),
+                                                style: ButtonStyle(
+                                                  overlayColor:
+                                                      MaterialStateProperty.all(
+                                                          Colors.transparent),
+                                                ),
+                                                child: const Text(
+                                                  'Continue',
+                                                  style: TextStyle(
+                                                    fontSize: 17,
+                                                    fontWeight: FontWeight.w500,
+                                                    fontFamily:
+                                                        'SF Pro Display',
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                        child: Container(
                     width: 20,
                     height: 20,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.black, width: 1),
                     ),
-                    child: const Center(
+                          child: Center(
                           child: Text(
                         "i",
                         style: TextStyle(
@@ -2229,21 +2737,7 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                         ),
                       ),
                   ),
-
-                  // Title in center
-                      Expanded(
-                    child: Center(
-                          child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'SF Pro',
-                          ),
-                        ),
                       ),
-                  ),
-
                   // Counter on right
                   Text(
                     count,
@@ -2252,6 +2746,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                       color: Colors.grey,
                       fontFamily: 'SF Pro',
                         ),
+                      ),
+                    ],
                       ),
                     ],
                   ),
@@ -2336,7 +2832,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: LinearProgressIndicator(
-                          value: nutrient.progress.clamp(0.0, 1.0), // Clamp only for UI display, still show >100% in text
+                          value: nutrient.progress.clamp(0.0,
+                              1.0), // Clamp only for UI display, still show >100% in text
                           minHeight: 8,
                           backgroundColor: Colors.grey.withOpacity(0.3),
                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -2411,14 +2908,16 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       Map<String, dynamic> nutritionData = {
         'scanId': _scanId,
         'lastSaved': DateTime.now().millisecondsSinceEpoch,
-        'vitamins': Map.fromEntries(vitamins.entries.map((e) => MapEntry(e.key, {
+        'vitamins':
+            Map.fromEntries(vitamins.entries.map((e) => MapEntry(e.key, {
           'name': e.value.name,
           'value': e.value.value,
           'percent': e.value.percent,
           'progress': e.value.progress,
           'hasInfo': e.value.hasInfo,
         }))),
-        'minerals': Map.fromEntries(minerals.entries.map((e) => MapEntry(e.key, {
+        'minerals':
+            Map.fromEntries(minerals.entries.map((e) => MapEntry(e.key, {
           'name': e.value.name,
           'value': e.value.value,
           'percent': e.value.percent,
@@ -2470,14 +2969,16 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       // Always store the current scan ID globally
       await prefs.setString('current_nutrition_scan_id', _scanId);
       
-      print('Saved nutrition data for ID: $_scanId (useGlobalKey=$useGlobalKey)');
+      print(
+          'Saved nutrition data for ID: $_scanId (useGlobalKey=$useGlobalKey)');
     } catch (e) {
       print('Error saving nutrition data: $e');
     }
   }
   
   // Helper method to update a food card's nutrition data if it exists
-  Future<void> _updateFoodCardWithNutrition(String foodName, Map<String, dynamic> nutritionData) async {
+  Future<void> _updateFoodCardWithNutrition(
+      String foodName, Map<String, dynamic> nutritionData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       List<String>? foodCards = prefs.getStringList('food_cards');
@@ -2491,11 +2992,18 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       for (String cardJson in foodCards) {
         try {
           Map<String, dynamic> card = jsonDecode(cardJson);
-          String cardName = (card['name'] ?? '').toString().toLowerCase().trim().replaceAll(' ', '_');
-          
-          if (cardName == foodName || cardName.contains(foodName) || foodName.contains(cardName)) {
+          String cardName = (card['name'] ?? '')
+              .toString()
+              .toLowerCase()
+              .trim()
+              .replaceAll(' ', '_');
+
+          if (cardName == foodName ||
+              cardName.contains(foodName) ||
+              foodName.contains(cardName)) {
             // Found a matching food card, update its nutrition data
-            print('Found matching food card for nutrition update: ${card['name']}');
+            print(
+                'Found matching food card for nutrition update: ${card['name']}');
             
             // Add vitamin/mineral data to the card
             if (nutritionData.containsKey('vitamins')) {
@@ -2563,7 +3071,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
             double progress = 0.0;
             if (value is Map) {
               if (value.containsKey('progress')) {
-                progress = value['progress'] is double ? value['progress'] : double.parse(value['progress'].toString());
+                progress = value['progress'] is double
+                    ? value['progress']
+                    : double.parse(value['progress'].toString());
               }
               
               Color progressColor = _getColorBasedOnProgress(progress);
@@ -2588,7 +3098,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
             double progress = 0.0;
             if (value is Map) {
               if (value.containsKey('progress')) {
-                progress = value['progress'] is double ? value['progress'] : double.parse(value['progress'].toString());
+                progress = value['progress'] is double
+                    ? value['progress']
+                    : double.parse(value['progress'].toString());
               }
               
               Color progressColor = _getColorBasedOnProgress(progress);
@@ -2613,7 +3125,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
             double progress = 0.0;
             if (value is Map) {
               if (value.containsKey('progress')) {
-                progress = value['progress'] is double ? value['progress'] : double.parse(value['progress'].toString());
+                progress = value['progress'] is double
+                    ? value['progress']
+                    : double.parse(value['progress'].toString());
               }
               
               Color progressColor = _getColorBasedOnProgress(progress);
@@ -2633,7 +3147,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         await _saveNutritionData();
         
         return true;
-      } else if (widget.nutritionData != null && widget.nutritionData!.isNotEmpty) {
+      } else if (widget.nutritionData != null &&
+          widget.nutritionData!.isNotEmpty) {
         // If no saved data but widget provided data, use that
         _updateNutrientValuesFromData(widget.nutritionData!);
         
@@ -2650,7 +3165,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
   }
   
   // Helper method to process simplified data format
-  void _processSimplifiedData(Map<String, dynamic> simplifiedData, Map<String, NutrientInfo> targetMap) {
+  void _processSimplifiedData(Map<String, dynamic> simplifiedData,
+      Map<String, NutrientInfo> targetMap) {
     simplifiedData.forEach((key, value) {
       if (targetMap.containsKey(key)) {
         List<String> parts = value.toString().split('/');
@@ -2669,7 +3185,9 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           }
         }
         
-        double progress = targetValue > 0 ? (currentValue / targetValue) : 0.0; // Removed clamp
+        double progress = targetValue > 0
+            ? (currentValue / targetValue)
+            : 0.0; // Removed clamp
         Color progressColor = _getColorBasedOnProgress(progress);
         
         targetMap[key] = NutrientInfo(
@@ -2706,16 +3224,17 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
   // Add a helper method to determine color based on progress
   Color _getColorBasedOnProgress(double progress) {
     if (progress < 0.4) {
-      return Colors.red;  // Red for 0-40%
+      return Colors.red; // Red for 0-40%
     } else if (progress < 0.8) {
       return yellowColor; // Yellow for 40-80%
     } else {
-      return greenColor;  // Green for 80-100%+ (anything above 0.8 is good)
+      return greenColor; // Green for 80-100%+ (anything above 0.8 is good)
     }
   }
 
   // Helper method to load personalized vitamin targets from SharedPreferences
-  Future<void> _loadPersonalizedVitaminTargets(Map<String, Map<String, dynamic>> vitaminInfo) async {
+  Future<void> _loadPersonalizedVitaminTargets(
+      Map<String, Map<String, dynamic>> vitaminInfo) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
@@ -2732,9 +3251,11 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
         // If found, update the target in the vitaminInfo map
         if (target != null) {
           vitaminInfo[dataKey]!['target'] = target;
-          print('Loaded personalized vitamin target: $uiKey = $target ${info['unit']}');
+          print(
+              'Loaded personalized vitamin target: $uiKey = $target ${info['unit']}');
         } else {
-          print('No personalized target found for $uiKey, using default: ${info['target']} ${info['unit']}');
+          print(
+              'No personalized target found for $uiKey, using default: ${info['target']} ${info['unit']}');
         }
       }
     } catch (e) {
@@ -2747,44 +3268,55 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       final prefs = await SharedPreferences.getInstance();
       
       // Check if we have personalized targets
-      String? calculationDate = prefs.getString('nutrient_targets_calculation_date');
+      String? calculationDate =
+          prefs.getString('nutrient_targets_calculation_date');
       if (calculationDate != null) {
-        print('Refreshing all displays with personalized targets calculated on: $calculationDate');
+        print(
+            'Refreshing all displays with personalized targets calculated on: $calculationDate');
         
         // UPDATE OTHER NUTRIENTS
         // Fiber
         double fiberTarget = prefs.getDouble('nutrient_target_fiber') ?? 30.0;
         if (other.containsKey('Fiber')) {
           double currentValue = _parseCurrentValue(other['Fiber']!.value);
-          _updateNutrientDisplay('Fiber', currentValue, fiberTarget, 'g', other);
+          _updateNutrientDisplay(
+              'Fiber', currentValue, fiberTarget, 'g', other);
         }
         
         // Cholesterol - FIXED to use the proper SharedPreferences key
-        double cholesterolTarget = prefs.getDouble('nutrient_target_cholesterol') ?? 300.0;
+        double cholesterolTarget =
+            prefs.getDouble('nutrient_target_cholesterol') ?? 300.0;
         if (other.containsKey('Cholesterol')) {
           double currentValue = _parseCurrentValue(other['Cholesterol']!.value);
-          _updateNutrientDisplay('Cholesterol', currentValue, cholesterolTarget, 'mg', other);
+          _updateNutrientDisplay(
+              'Cholesterol', currentValue, cholesterolTarget, 'mg', other);
         }
         
         // Omega-3
-        double omega3Target = prefs.getDouble('nutrient_target_omega3') ?? 1500.0;
+        double omega3Target =
+            prefs.getDouble('nutrient_target_omega3') ?? 1500.0;
         if (other.containsKey('Omega-3')) {
           double currentValue = _parseCurrentValue(other['Omega-3']!.value);
-          _updateNutrientDisplay('Omega-3', currentValue, omega3Target, 'mg', other);
+          _updateNutrientDisplay(
+              'Omega-3', currentValue, omega3Target, 'mg', other);
         }
         
         // Omega-6
         double omega6Target = prefs.getDouble('nutrient_target_omega6') ?? 14.0;
         if (other.containsKey('Omega-6')) {
           double currentValue = _parseCurrentValue(other['Omega-6']!.value);
-          _updateNutrientDisplay('Omega-6', currentValue, omega6Target, 'g', other);
+          _updateNutrientDisplay(
+              'Omega-6', currentValue, omega6Target, 'g', other);
         }
         
         // Saturated Fats
-        double saturatedFatTarget = prefs.getDouble('nutrient_target_saturated_fat') ?? 22.0;
+        double saturatedFatTarget =
+            prefs.getDouble('nutrient_target_saturated_fat') ?? 22.0;
         if (other.containsKey('Saturated Fats')) {
-          double currentValue = _parseCurrentValue(other['Saturated Fats']!.value);
-          _updateNutrientDisplay('Saturated Fats', currentValue, saturatedFatTarget, 'g', other);
+          double currentValue =
+              _parseCurrentValue(other['Saturated Fats']!.value);
+          _updateNutrientDisplay(
+              'Saturated Fats', currentValue, saturatedFatTarget, 'g', other);
         }
         
         // UPDATE VITAMINS
@@ -2801,12 +3333,17 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           
           // Try with spaces as saved by calculation_screen.dart
           if (storedTarget == null) {
-            storedTarget = prefs.getDouble('vitamin_target_${key.toLowerCase()}');
+            storedTarget =
+                prefs.getDouble('vitamin_target_${key.toLowerCase()}');
           }
           
           // Try with basic name and various prefixes
           if (storedTarget == null) {
-            for (String prefix in ['vitamin_target_', 'vitamin_target_vitamin_', 'vitamin_target_vitamin ']) {
+            for (String prefix in [
+              'vitamin_target_',
+              'vitamin_target_vitamin_',
+              'vitamin_target_vitamin '
+            ]) {
               storedTarget = prefs.getDouble('$prefix$basicName');
               if (storedTarget != null) break;
             }
@@ -2815,14 +3352,22 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           if (storedTarget != null) {
             // Use the personalized target
             double currentValue = _parseCurrentValue(info.value);
-            String unit = key.contains('A') || key.contains('D') || key.contains('B7') || 
-                          key.contains('B9') || key.contains('B12') || key.contains('K') ? 'mcg' : 'mg';
-            
-            _updateNutrientDisplay(key, currentValue, storedTarget, unit, vitamins);
+            String unit = key.contains('A') ||
+                    key.contains('D') ||
+                    key.contains('B7') ||
+                    key.contains('B9') ||
+                    key.contains('B12') ||
+                    key.contains('K')
+                ? 'mcg'
+                : 'mg';
+
+            _updateNutrientDisplay(
+                key, currentValue, storedTarget, unit, vitamins);
             print('Using personalized target for $key: $storedTarget $unit');
           } else {
             // No personalized target found - should never happen if calculation worked correctly
-            print('WARNING: No personalized target found for $key, using existing value');
+            print(
+                'WARNING: No personalized target found for $key, using existing value');
           }
         });
         
@@ -2842,27 +3387,36 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           
           // Try with raw key format
           if (storedTarget == null) {
-            storedTarget = prefs.getDouble('mineral_target_${key.toLowerCase()}');
+            storedTarget =
+                prefs.getDouble('mineral_target_${key.toLowerCase()}');
           }
           
           if (storedTarget != null) {
             // Use the personalized target
             double currentValue = _parseCurrentValue(info.value);
-            String unit = key == 'Chromium' || key == 'Copper' || 
-                         key == 'Iodine' || key == 'Molybdenum' || 
-                         key == 'Selenium' ? 'mcg' : 'mg';
-            
-            _updateNutrientDisplay(key, currentValue, storedTarget, unit, minerals);
+            String unit = key == 'Chromium' ||
+                    key == 'Copper' ||
+                    key == 'Iodine' ||
+                    key == 'Molybdenum' ||
+                    key == 'Selenium'
+                ? 'mcg'
+                : 'mg';
+
+            _updateNutrientDisplay(
+                key, currentValue, storedTarget, unit, minerals);
             print('Using personalized target for $key: $storedTarget $unit');
           } else {
             // No personalized target found - should never happen if calculation worked correctly
-            print('WARNING: No personalized target found for $key, using existing value');
+            print(
+                'WARNING: No personalized target found for $key, using existing value');
           }
         });
         
-        print('Successfully refreshed all nutrient displays with personalized targets');
+        print(
+            'Successfully refreshed all nutrient displays with personalized targets');
       } else {
-        print('No personalized targets calculation date found - targets may not be fully personalized');
+        print(
+            'No personalized targets calculation date found - targets may not be fully personalized');
       }
     } catch (e) {
       print('Error refreshing displays with personalized targets: $e');
@@ -2870,7 +3424,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
   }
   
   // Helper method to update nutrient displays consistently
-  void _updateNutrientDisplay(String key, double currentValue, double target, String unit, Map<String, NutrientInfo> nutrientMap) {
+  void _updateNutrientDisplay(String key, double currentValue, double target,
+      String unit, Map<String, NutrientInfo> nutrientMap) {
     double progress = (currentValue / target); // No clamping
     int percentage = (progress * 100).round();
     Color progressColor = _getColorBasedOnProgress(progress);
@@ -2889,12 +3444,12 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
       percent: "$percentage%",
       progress: progress,
       progressColor: progressColor,
-      hasInfo: nutrientMap[key]?.hasInfo ?? false
-    );
+        hasInfo: nutrientMap[key]?.hasInfo ?? false);
   }
   
   // Save nutrition data to food cards list for permanent storage
-  Future<void> _saveToFoodCards(Map<String, dynamic> nutritionData, String foodName) async {
+  Future<void> _saveToFoodCards(
+      Map<String, dynamic> nutritionData, String foodName) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
@@ -2910,11 +3465,13 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
           Map<String, dynamic> card = jsonDecode(cardJson);
           
           // Check if this is the card for our current food (by name or ID)
-          if ((card.containsKey('name') && card['name'].toString().toLowerCase() == foodName.toLowerCase()) ||
+          if ((card.containsKey('name') &&
+                  card['name'].toString().toLowerCase() ==
+                      foodName.toLowerCase()) ||
               (card.containsKey('scan_id') && card['scan_id'] == _scanId)) {
-            
             // Update the card with our latest nutrition data
-            print('Found matching food card for nutrition update: ${card['name']}');
+            print(
+                'Found matching food card for nutrition update: ${card['name']}');
             
             // Add vitamin/mineral data to the card
             if (nutritionData.containsKey('vitamins')) {
@@ -2957,7 +3514,8 @@ class _CodiaPage extends State<CodiaPage> with WidgetsBindingObserver, RouteAwar
   }
 
   // Helper method to extract an other nutrient value using multiple possible key variants
-  void _extractOtherNutrientByVariants(Map<String, dynamic> data, String nutrientKey, List<String> possibleKeys) {
+  void _extractOtherNutrientByVariants(Map<String, dynamic> data,
+      String nutrientKey, List<String> possibleKeys) {
     for (String key in possibleKeys) {
       // Check for the key in both original and lowercase forms
       if (data.containsKey(key) || data.containsKey(key.toLowerCase())) {
@@ -2992,3 +3550,31 @@ class NutrientInfo {
   });
 }
 
+class _CheckmarkPainter extends CustomPainter {
+  final double size;
+  _CheckmarkPainter({this.size = 22});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint circlePaint = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.fill;
+    final Paint checkPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    // Draw circle
+    canvas.drawCircle(
+        Offset(size.width / 2, size.height / 2), size.width / 2, circlePaint);
+    // Draw checkmark
+    final Path path = Path();
+    path.moveTo(size.width * 0.32, size.height * 0.55);
+    path.lineTo(size.width * 0.48, size.height * 0.7);
+    path.lineTo(size.width * 0.72, size.height * 0.36);
+    canvas.drawPath(path, checkPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}

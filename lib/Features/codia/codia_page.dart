@@ -561,11 +561,16 @@ class _CodiaPageState extends State<CodiaPage> {
       }
 
       // Load gender
-      if (prefs.containsKey('gender')) {
+      if (prefs.containsKey('user_gender')) {
+        setState(() {
+          userGender = prefs.getString('user_gender') ?? 'Male';
+        });
+        debugPrint('Loaded gender from user_gender key: $userGender');
+      } else if (prefs.containsKey('gender')) {
         setState(() {
           userGender = prefs.getString('gender') ?? 'Male';
         });
-        debugPrint('Loaded gender: $userGender');
+        debugPrint('Loaded gender from gender key: $userGender');
       } else {
         debugPrint('No gender found, using default: Male');
       }
@@ -2714,36 +2719,46 @@ class _CodiaPageState extends State<CodiaPage> {
   void _navigateToNutrition() async {
     String finalScanId = 'nutrition_general_view';
     Map<String, dynamic>? existingNutritionData;
-    
+
     try {
       // Get the current food scan ID from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      
+
       // First try to find food-specific nutrition data from recent food cards (highest priority)
       List<String>? foodCards = prefs.getStringList('food_cards');
       bool foundFoodCardData = false;
-      
+
       if (foodCards != null && foodCards.isNotEmpty) {
         // Try to find the most recent food card with valid nutrition data
-        for (String cardJson in foodCards.take(5)) { // Check only the 5 most recent cards
+        for (String cardJson in foodCards.take(5)) {
+          // Check only the 5 most recent cards
           try {
             Map<String, dynamic> foodCard = jsonDecode(cardJson);
-            
+
             // Generate the proper scan ID using the same format as FoodCardOpen.dart
-            if (foodCard.containsKey('name') && foodCard.containsKey('calories')) {
-              String foodName = foodCard['name'].toString().toLowerCase().trim().replaceAll(' ', '_');
-              String caloriesId = foodCard['calories'].toString().replaceAll('.', '_');
-              String foodSpecificScanId = "food_nutrition_${foodName}_${caloriesId}";
-              
+            if (foodCard.containsKey('name') &&
+                foodCard.containsKey('calories')) {
+              String foodName = foodCard['name']
+                  .toString()
+                  .toLowerCase()
+                  .trim()
+                  .replaceAll(' ', '_');
+              String caloriesId =
+                  foodCard['calories'].toString().replaceAll('.', '_');
+              String foodSpecificScanId =
+                  "food_nutrition_${foodName}_${caloriesId}";
+
               // Try to load nutrition data with this ID
-              String? nutritionJson = prefs.getString('food_nutrition_data_$foodSpecificScanId') ?? 
-                                      prefs.getString('nutrition_data_$foodSpecificScanId');
-              
+              String? nutritionJson =
+                  prefs.getString('food_nutrition_data_$foodSpecificScanId') ??
+                      prefs.getString('nutrition_data_$foodSpecificScanId');
+
               if (nutritionJson != null && nutritionJson.isNotEmpty) {
                 try {
                   existingNutritionData = jsonDecode(nutritionJson);
                   finalScanId = foodSpecificScanId;
-                  print('Found nutrition data using food card ID: $foodSpecificScanId');
+                  print(
+                      'Found nutrition data using food card ID: $foodSpecificScanId');
                   foundFoodCardData = true;
                   break;
                 } catch (e) {
@@ -2756,20 +2771,21 @@ class _CodiaPageState extends State<CodiaPage> {
           }
         }
       }
-      
+
       // If we couldn't find any food-specific data, use the global data as fallback
       if (!foundFoodCardData) {
         // Check for global nutrition data
         if (prefs.containsKey('PERMANENT_GLOBAL_NUTRITION_DATA')) {
           try {
-            String globalData = prefs.getString('PERMANENT_GLOBAL_NUTRITION_DATA')!;
+            String globalData =
+                prefs.getString('PERMANENT_GLOBAL_NUTRITION_DATA')!;
             Map<String, dynamic> parsedData = jsonDecode(globalData);
-            
+
             // Extract both scanId and the actual nutrition data
             if (parsedData.containsKey('scanId')) {
               finalScanId = parsedData['scanId'];
               print('Using scan ID from global nutrition data: $finalScanId');
-              
+
               // Keep the existing nutrition data to pass to the next screen
               existingNutritionData = parsedData;
             }
@@ -2778,21 +2794,22 @@ class _CodiaPageState extends State<CodiaPage> {
           }
         }
       }
-      
+
       print('Navigating to Nutrition with scan ID: $finalScanId');
     } catch (e) {
       print('Error preparing navigation to Nutrition: $e');
       // Keep using the default ID set above
     }
-    
+
     // Always navigate, using either the found ID or the default
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => Nutrition.CodiaPage(
-          nutritionData: existingNutritionData != null ? 
-                        (existingNutritionData['nutritionData'] ?? existingNutritionData) : 
-                        null,
+          nutritionData: existingNutritionData != null
+              ? (existingNutritionData['nutritionData'] ??
+                  existingNutritionData)
+              : null,
           scanId: finalScanId,
         ),
       ),

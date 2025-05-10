@@ -10,6 +10,7 @@ import 'package:fitness_app/Features/onboarding/presentation/screens/gender_sele
 import 'package:fitness_app/Features/onboarding/presentation/screens/verification_screen.dart';
 import 'package:fitness_app/Features/codia/codia_page.dart';
 import 'package:fitness_app/Features/onboarding/presentation/screens/questions/gender_screen.dart';
+import 'package:fitness_app/Features/onboarding/presentation/screens/questions/basic_info_screen.dart';
 import 'package:fitness_app/services/auth_service.dart';
 import 'package:fitness_app/core/widgets/responsive_scaffold.dart';
 import 'package:fitness_app/core/utils/device_size_adapter.dart';
@@ -70,12 +71,12 @@ class _SignInScreenState extends State<SignInScreen> {
     try {
       // Check if user came from verification screen
       if (widget.fromVerification) {
-        // Navigate to gender screen if from verification
+        // Navigate to BasicInfoScreen if from verification
         if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => const GenderScreen(),
+              builder: (context) => const BasicInfoScreen(),
             ),
           );
         }

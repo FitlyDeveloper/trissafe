@@ -228,28 +228,21 @@ class _SnapFoodState extends State<SnapFood> {
       final double originalSizeMB = imageBytes.length / (1024 * 1024);
       print("Original image size: ${originalSizeMB.toStringAsFixed(2)} MB");
 
-      // Process image only if needed (use a single compression operation)
+      // Process image - compressImage now handles the target size of 0.7MB automatically
       Uint8List processedBytes;
-      if (originalSizeMB > 0.7) {
-        try {
-          // Compress to target size of 0.7MB in a single operation
-          processedBytes = await compressImage(
+      try {
+        // Use our image compression function that targets 0.7MB for large images
+        processedBytes = await compressImage(
               imageBytes,
-            targetWidth: 1200,
-            quality: 90,
-            );
+          targetWidth: 1200, // Use a reasonable width that preserves details
+        );
 
-          final double compressedSizeMB = processedBytes.length / (1024 * 1024);
-          print("Compressed to: ${compressedSizeMB.toStringAsFixed(2)} MB");
+        final double compressedSizeMB = processedBytes.length / (1024 * 1024);
+        print("Image processed: ${compressedSizeMB.toStringAsFixed(2)} MB");
         } catch (e) {
-          print("Error during image compression: $e");
+        print("Error during image compression: $e");
           // Fall back to original bytes if compression fails
           processedBytes = imageBytes;
-        }
-      } else {
-        // Skip compression for small images
-        processedBytes = imageBytes;
-        print("Image already under 0.7MB, skipping compression");
       }
 
       print("Calling secure API service");
