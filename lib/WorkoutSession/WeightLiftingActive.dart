@@ -58,15 +58,26 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                       onPressed: () {
                         Navigator.of(context).pushReplacement(
                           PageRouteBuilder(
+                            opaque: false,
                             pageBuilder: (context, animation, secondaryAnimation) => WeightLifting(),
                             transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                              const begin = Offset(1.0, 0.0);
-                              const end = Offset.zero;
-                              const curve = Curves.ease;
-                              final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                              return SlideTransition(
-                                position: animation.drive(tween),
-                                child: child,
+                              return Stack(
+                                children: [
+                                  child,
+                                  SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: Offset.zero,
+                                      end: const Offset(1.0, 0.0),
+                                    ).animate(CurvedAnimation(
+                                      parent: animation,
+                                      curve: Curves.easeInOut,
+                                    )),
+                                    child: Container(
+                                      color: Colors.transparent,
+                                      child: this.widget,
+                                    ),
+                                  ),
+                                ],
                               );
                             },
                           ),
@@ -416,7 +427,11 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(builder: (context) => WeightLifting()),
+                              );
+                            },
                             borderRadius: BorderRadius.circular(15),
                             child: Padding(
                               padding: EdgeInsets.symmetric(horizontal: 20),
