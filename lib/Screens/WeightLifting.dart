@@ -64,15 +64,26 @@ class _WeightLiftingState extends State<WeightLifting> {
                             onPressed: () {
                               Navigator.of(context).pushReplacement(
                                 PageRouteBuilder(
+                                  opaque: false,
                                   pageBuilder: (context, animation, secondaryAnimation) => ChooseWorkout(),
                                   transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                    const begin = Offset(-1.0, 0.0);
-                                    const end = Offset.zero;
-                                    const curve = Curves.ease;
-                                    final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                                    return SlideTransition(
-                                      position: animation.drive(tween),
-                                      child: child,
+                                    return Stack(
+                                      children: [
+                                        child,
+                                        SlideTransition(
+                                          position: Tween<Offset>(
+                                            begin: Offset.zero,
+                                            end: const Offset(1.0, 0.0),
+                                          ).animate(CurvedAnimation(
+                                            parent: animation,
+                                            curve: Curves.easeInOut,
+                                          )),
+                                          child: Container(
+                                            color: Colors.transparent,
+                                            child: this.widget,
+                                          ),
+                                        ),
+                                      ],
                                     );
                                   },
                                 ),

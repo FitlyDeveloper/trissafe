@@ -60,7 +60,7 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                           PageRouteBuilder(
                             pageBuilder: (context, animation, secondaryAnimation) => WeightLifting(),
                             transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                              const begin = Offset(-1.0, 0.0);
+                              const begin = Offset(1.0, 0.0);
                               const end = Offset.zero;
                               const curve = Curves.ease;
                               final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
@@ -87,7 +87,7 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                     ),
                     GestureDetector(
                       onTap: () => _showRestTimerPopup(context),
-                      child: Image.asset('assets/images/Stopwatch.png', width: 24, height: 24),
+                      child: Image.asset('images/stopwatch.png', width: 24, height: 24),
                     ),
                   ],
                 ),
@@ -178,7 +178,7 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                 height: 0.5,
                 color: Color(0xFFBDBDBD),
               ),
-              SizedBox(height: 12),
+              SizedBox(height: 20),
               // Exercise Cards
               Expanded(
                 child: ListView.builder(
