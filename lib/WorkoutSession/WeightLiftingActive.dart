@@ -3,6 +3,45 @@ import 'package:grouped_list/grouped_list.dart';
 import '../NewScreens/AddExercise.dart';
 import 'package:flutter/cupertino.dart';
 import '../Screens/WeightLifting.dart';
+import 'package:flutter/services.dart';
+import '../NewScreens/ExerciseInfo.dart';
+
+// Model for exercise sets
+class ExerciseSet {
+  int kg;
+  int reps;
+  bool isCompleted;
+
+  ExerciseSet({
+    this.kg = 0,
+    this.reps = 0,
+    this.isCompleted = false,
+  });
+}
+
+// Extended Exercise model to include sets
+class ExerciseWithSets {
+  final String name;
+  final String muscle;
+  final String equipment;
+  List<ExerciseSet> sets;
+
+  ExerciseWithSets({
+    required this.name,
+    required this.muscle,
+    required this.equipment,
+    List<ExerciseSet>? sets,
+  }) : sets = sets ?? [ExerciseSet()]; // Initialize with one empty set
+
+  // Convert from basic Exercise
+  factory ExerciseWithSets.fromExercise(Exercise exercise) {
+    return ExerciseWithSets(
+      name: exercise.name,
+      muscle: exercise.muscle,
+      equipment: exercise.equipment,
+    );
+  }
+}
 
 class WeightLiftingActive extends StatefulWidget {
   final List<Exercise> selectedExercises;
@@ -12,13 +51,132 @@ class WeightLiftingActive extends StatefulWidget {
   State<StatefulWidget> createState() => _WeightLiftingActive();
 }
 
-class _WeightLiftingActive extends State<WeightLiftingActive> {
-  late List<Exercise> _exercises;
+class _WeightLiftingActive extends State<WeightLiftingActive> with TickerProviderStateMixin {
+  late List<ExerciseWithSets> _exercises;
+  final Map<String, TextEditingController> _controllers = {};
+  // Add focus nodes map to track focus state
+  final Map<String, FocusNode> _focusNodes = {};
 
   @override
   void initState() {
     super.initState();
-    _exercises = List.from(widget.selectedExercises);
+    _initializeExercises();
+  }
+
+  void _initializeExercises() {
+    _exercises = widget.selectedExercises
+        .map((e) => ExerciseWithSets.fromExercise(e))
+        .toList();
+    _initializeControllers();
+  }
+
+  void _initializeControllers() {
+    // Clear existing controllers and focus nodes
+    _controllers.values.forEach((controller) => controller.dispose());
+    _focusNodes.values.forEach((node) => node.dispose());
+    _controllers.clear();
+    _focusNodes.clear();
+    
+    // Create new controllers and focus nodes with default values
+    for (int i = 0; i < _exercises.length; i++) {
+      for (int j = 0; j < _exercises[i].sets.length; j++) {
+        final kgKey = 'kg_${i}_${j}';
+        final repsKey = 'reps_${i}_${j}';
+        
+        // Always initialize with '0'
+        _controllers[kgKey] = TextEditingController(text: '0');
+        _controllers[repsKey] = TextEditingController(text: '0');
+        
+        // Ensure exercise set values match
+        _exercises[i].sets[j].kg = 0;
+        _exercises[i].sets[j].reps = 0;
+        
+        _focusNodes[kgKey] = FocusNode();
+        _focusNodes[repsKey] = FocusNode();
+        
+        _focusNodes[kgKey]?.addListener(() => _handleFocusChange(kgKey, i, j, true));
+        _focusNodes[repsKey]?.addListener(() => _handleFocusChange(repsKey, i, j, false));
+      }
+    }
+  }
+
+  void _handleFocusChange(String key, int exerciseIndex, int setIndex, bool isKg) {
+    final focusNode = _focusNodes[key];
+    final controller = _controllers[key];
+    
+    if (focusNode != null && controller != null) {
+      if (!focusNode.hasFocus) {
+        // Field lost focus - ensure it shows 0 if empty
+        if (controller.text.isEmpty) {
+          setState(() {
+            controller.text = '0';
+            if (isKg) {
+              _exercises[exerciseIndex].sets[setIndex].kg = 0;
+            } else {
+              _exercises[exerciseIndex].sets[setIndex].reps = 0;
+            }
+          });
+        }
+      } else {
+        // Field gained focus - clear only if it's 0
+        if (controller.text == '0') {
+          controller.clear();
+        }
+      }
+    }
+  }
+
+  void _addSet(int exerciseIndex) {
+    setState(() {
+      final newSetIndex = _exercises[exerciseIndex].sets.length;
+      _exercises[exerciseIndex].sets.add(ExerciseSet());
+      
+      // Initialize new set controllers with '0' as default
+      final kgKey = 'kg_${exerciseIndex}_${newSetIndex}';
+      final repsKey = 'reps_${exerciseIndex}_${newSetIndex}';
+      
+      _controllers[kgKey] = TextEditingController(text: '0');
+      _controllers[repsKey] = TextEditingController(text: '0');
+      
+      _focusNodes[kgKey] = FocusNode();
+      _focusNodes[repsKey] = FocusNode();
+      
+      _focusNodes[kgKey]?.addListener(() => _handleFocusChange(kgKey, exerciseIndex, newSetIndex, true));
+      _focusNodes[repsKey]?.addListener(() => _handleFocusChange(repsKey, exerciseIndex, newSetIndex, false));
+    });
+  }
+
+  @override
+  void dispose() {
+    _controllers.values.forEach((controller) => controller.dispose());
+    _focusNodes.values.forEach((node) => node.dispose());
+    _controllers.clear();
+    _focusNodes.clear();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(WeightLiftingActive oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reinitialize if the selected exercises changed
+    if (oldWidget.selectedExercises != widget.selectedExercises) {
+      _initializeExercises();
+    }
+  }
+
+  void _updateSet(int exerciseIndex, int setIndex, {int? kg, int? reps, bool? isCompleted}) {
+    setState(() {
+      final set = _exercises[exerciseIndex].sets[setIndex];
+      if (kg != null) {
+        set.kg = kg;
+        _controllers['kg_${exerciseIndex}_${setIndex}']?.text = kg.toString();
+      }
+      if (reps != null) {
+        set.reps = reps;
+        _controllers['reps_${exerciseIndex}_${setIndex}']?.text = reps.toString();
+      }
+      if (isCompleted != null) set.isCompleted = isCompleted;
+    });
   }
 
   Future<void> _addExercise() async {
@@ -26,25 +184,51 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
       context,
       MaterialPageRoute(builder: (context) => CodiaPage()),
     );
-    if (result != null && result is Exercise) {
+    if (result != null && result is List<Exercise>) {
       setState(() {
-        _exercises.add(result);
+        // Convert new exercises to ExerciseWithSets with default values
+        final newExercises = result.map((e) {
+          final exercise = ExerciseWithSets.fromExercise(e);
+          // Initialize all sets with default values
+          exercise.sets = [ExerciseSet(kg: 0, reps: 0, isCompleted: false)];
+          return exercise;
+        }).toList();
+        
+        _exercises.addAll(newExercises);
+        
+        // Initialize controllers for new exercises
+        for (int i = _exercises.length - newExercises.length; i < _exercises.length; i++) {
+          for (int j = 0; j < _exercises[i].sets.length; j++) {
+            final kgKey = 'kg_${i}_${j}';
+            final repsKey = 'reps_${i}_${j}';
+            
+            _controllers[kgKey] = TextEditingController(text: '0');
+            _controllers[repsKey] = TextEditingController(text: '0');
+            
+            _focusNodes[kgKey] = FocusNode();
+            _focusNodes[repsKey] = FocusNode();
+            
+            _focusNodes[kgKey]?.addListener(() => _handleFocusChange(kgKey, i, j, true));
+            _focusNodes[repsKey]?.addListener(() => _handleFocusChange(repsKey, i, j, false));
+          }
+        }
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/images/background4.jpg'),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/background4.jpg',
           fit: BoxFit.cover,
         ),
       ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
+          SafeArea(
           child: Column(
             children: [
               // Header (Figma/Memories style)
@@ -190,16 +374,24 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                 color: Color(0xFFBDBDBD),
               ),
               SizedBox(height: 20),
+                // Exercise Cards and Bottom Buttons Container
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.only(
+                      left: 20,
+                      right: 20,
+                      top: 0,
+                      bottom: 0,
+                    ),
+                    children: [
               // Exercise Cards
-              Expanded(
-                child: ListView.builder(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-                  itemCount: _exercises.length,
-                  itemBuilder: (context, idx) {
+                      ...List.generate(_exercises.length, (idx) {
                     final exercise = _exercises[idx];
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 18),
-                      child: Container(
+                          padding: EdgeInsets.only(bottom: 18),
+                          child: Stack(
+                            children: [
+                              Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
@@ -263,6 +455,29 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                                       ],
                                     ),
                                   ),
+                                  // 3-dot menu icon in header, aligned with title
+                                  Material(
+                                    color: Colors.white.withOpacity(0.7),
+                                    shape: const CircleBorder(),
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      splashColor: Colors.grey[300],
+                                      highlightColor: Colors.grey[200],
+                                      onTap: () => _showExerciseMenu(context, idx),
+                                      child: SizedBox(
+                                        width: 36,
+                                        height: 36,
+                                        child: Center(
+                                          child: Image.asset(
+                                            'assets/images/more2.png',
+                                            width: 21.6,
+                                            height: 21.6,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                               SizedBox(height: 18),
@@ -280,19 +495,128 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                                 ],
                               ),
                               SizedBox(height: 7),
+                                      // Dynamic set rows
+                                      ...List.generate(_exercises[idx].sets.length, (setIndex) {
+                                        final set = _exercises[idx].sets[setIndex];
+                                        // Find the most recent completed set before this one
+                                        String previousText = '-';
+                                        for (int prev = setIndex - 1; prev >= 0; prev--) {
+                                          final prevSet = _exercises[idx].sets[prev];
+                                          if (prevSet.isCompleted) {
+                                            previousText = '${prevSet.kg}kg x ${prevSet.reps}';
+                                            break;
+                                          }
+                                        }
+                                        return Column(
+                                          children: [
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Expanded(flex: 2, child: Text('1', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w400))),
+                                                Expanded(flex: 2, child: Text('${setIndex + 1}', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w400))),
                                   SizedBox(width: 8),
-                                  Expanded(flex: 3, child: Text('-', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w400))),
+                                                Expanded(
+                                                  flex: 3,
+                                                  child: Text(
+                                                    previousText,
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      color: Colors.black.withOpacity(0.5),
+                                                      fontWeight: FontWeight.w400,
+                                                      fontFamily: '.SF Pro Display',
+                                                    ),
+                                                  ),
+                                                ),
                                   SizedBox(width: 8),
-                                  Expanded(flex: 2, child: Text('0', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w400))),
+                                                Expanded(
+                                                  flex: 2,
+                                                  child: TextField(
+                                                    controller: _controllers['kg_${idx}_${setIndex}'],
+                                                    focusNode: _focusNodes['kg_${idx}_${setIndex}'],
+                                                    keyboardType: TextInputType.number,
+                                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                    textAlign: TextAlign.center,
+                                                    cursorColor: Colors.black,
+                                                    cursorWidth: 1.2,
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      color: Colors.black,
+                                                      fontWeight: FontWeight.w400,
+                                                      fontFamily: '.SF Pro Display',
+                                                    ),
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                                      border: InputBorder.none,
+                                                      enabledBorder: InputBorder.none,
+                                                      focusedBorder: InputBorder.none,
+                                                    ),
+                                                    onChanged: (value) {
+                                                      if (value.isNotEmpty) {
+                                                        final controller = _controllers['kg_${idx}_${setIndex}'];
+                                                        _updateSet(idx, setIndex, kg: int.parse(value));
+                                                        controller?.selection = TextSelection.fromPosition(
+                                                          TextPosition(offset: controller?.text.length ?? 0),
+                                                        );
+                                                      }
+                                                    },
+                                                  ),
+                                                ),
                                   SizedBox(width: 8),
-                                  Expanded(flex: 2, child: Text('0', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w400))),
-                                  Expanded(flex: 2, child: Align(alignment: Alignment.centerRight, child: SizedBox(width: 24, height: 24, child: Icon(Icons.check_circle, color: Colors.green, size: 24)))),
-                                ],
-                              ),
+                                                Expanded(
+                                                  flex: 2,
+                                                  child: TextField(
+                                                    controller: _controllers['reps_${idx}_${setIndex}'],
+                                                    focusNode: _focusNodes['reps_${idx}_${setIndex}'],
+                                                    keyboardType: TextInputType.number,
+                                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                    textAlign: TextAlign.center,
+                                                    cursorColor: Colors.black,
+                                                    cursorWidth: 1.2,
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      color: Colors.black,
+                                                      fontWeight: FontWeight.w400,
+                                                      fontFamily: '.SF Pro Display',
+                                                    ),
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                                      border: InputBorder.none,
+                                                      enabledBorder: InputBorder.none,
+                                                      focusedBorder: InputBorder.none,
+                                                    ),
+                                                    onChanged: (value) {
+                                                      if (value.isNotEmpty) {
+                                                        final controller = _controllers['reps_${idx}_${setIndex}'];
+                                                        _updateSet(idx, setIndex, reps: int.parse(value));
+                                                        controller?.selection = TextSelection.fromPosition(
+                                                          TextPosition(offset: controller?.text.length ?? 0),
+                                                        );
+                                                      }
+                                                    },
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  flex: 2,
+                                                  child: Align(
+                                                    alignment: Alignment.centerRight,
+                                                    child: GestureDetector(
+                                                      onTap: () => _updateSet(idx, setIndex, isCompleted: !set.isCompleted),
+                                                      child: Icon(
+                                                        set.isCompleted ? Icons.check_circle : Icons.circle_outlined,
+                                                        color: set.isCompleted ? Color(0xFF34C759) : Colors.grey[400],
+                                                        size: 24,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            if (setIndex < _exercises[idx].sets.length - 1) SizedBox(height: 12),
+                                          ],
+                                        );
+                                      }),
                               SizedBox(height: 18),
                               Center(
                                 child: Container(
@@ -309,13 +633,13 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                                       overlayColor: MaterialStateProperty.resolveWith<Color?>(
                                         (states) {
                                           if (states.contains(MaterialState.hovered) || states.contains(MaterialState.pressed)) {
-                                            return Color(0xFF6D6D6D); // darker shade, not purple
+                                                    return Color(0xFF6D6D6D);
                                           }
                                           return null;
                                         },
                                       ),
                                     ),
-                                    onPressed: _addExercise,
+                                            onPressed: () => _addSet(idx),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
@@ -331,16 +655,22 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                           ),
                         ),
                       ),
-                    );
-                  },
-                ),
-              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      
+                      // Bottom Buttons Section - Part of scrollable content
+                      Padding(
+                        padding: EdgeInsets.only(top: 18, bottom: 24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
               // Add Exercise Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 29),
-                child: Container(
-                  width: double.infinity,
+                            Container(
                   height: 48,
+                              margin: EdgeInsets.symmetric(horizontal: 9),
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
@@ -352,12 +682,12 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                     onPressed: _addExercise,
                     icon: Image.asset('assets/images/add.png', width: 20, height: 20, color: Colors.white),
                     label: Text('Add Exercise', style: TextStyle(color: Colors.white, fontSize: 16)),
-                  ),
                 ),
               ),
               SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 29),
+                            // Discard and Finish Buttons
+                            Container(
+                              margin: EdgeInsets.symmetric(horizontal: 9),
                 child: Row(
                   children: [
                     // Discard Button
@@ -463,10 +793,16 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
                   ],
                 ),
               ),
-              SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
+        ],
       ),
     );
   }
@@ -592,6 +928,169 @@ class _WeightLiftingActive extends State<WeightLiftingActive> {
           },
         );
       },
+    );
+  }
+
+  void _showExerciseMenu(BuildContext context, int exerciseIndex) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      barrierColor: Colors.black.withOpacity(0.18),
+      isScrollControlled: false,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildMenuItem(context, 'Exercise Info', 'assets/images/CircleMenu.png', onTap: () {
+              Navigator.of(context).pop();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ExerciseInfo(
+                    exerciseName: _exercises[exerciseIndex].name,
+                    muscle: _exercises[exerciseIndex].muscle,
+                    // Add other fields as needed
+                  ),
+                ),
+              );
+            }),
+            SizedBox(height: 8),
+            _buildMenuItem(context, 'Replace Exercise', 'assets/images/replace.png', onTap: () async {
+              Navigator.of(context).pop();
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CodiaPage()),
+              );
+              if (result != null && result is List<Exercise> && result.isNotEmpty) {
+                setState(() {
+                  _exercises[exerciseIndex] = ExerciseWithSets.fromExercise(result.first);
+                });
+              }
+            }),
+            SizedBox(height: 8),
+            _buildMenuItem(context, 'Delete Exercise', 'assets/images/trashcan.png', isDelete: true, onTap: () {
+              Navigator.of(context).pop();
+              _showDeleteConfirmation(context, exerciseIndex);
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(BuildContext context, String title, String iconAsset, {bool isDelete = false, VoidCallback? onTap}) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap ?? () => Navigator.of(context).pop(),
+      child: Container(
+        height: 44,
+        padding: EdgeInsets.symmetric(horizontal: 18),
+        child: Row(
+          children: [
+            Image.asset(
+              iconAsset,
+              width: 20,
+              height: 20,
+              color: isDelete ? Color(0xFFE97372) : Colors.black,
+            ),
+            SizedBox(width: 16),
+            Text(
+              title,
+              style: TextStyle(
+                color: isDelete ? Color(0xFFE97372) : Colors.black,
+                fontSize: 16,
+                fontFamily: 'SF Pro Display',
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, int exerciseIndex) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      barrierColor: Colors.black.withOpacity(0.18),
+      isScrollControlled: false,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Delete Exercise?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'SF Pro Display',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            SizedBox(height: 28),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: Color(0xFFE97372)),
+                        ),
+                      ),
+                      icon: Image.asset('assets/images/closeicon.png', width: 20, height: 20, color: Colors.grey[600]),
+                      onPressed: () => Navigator.of(context).pop(),
+                      label: Text('Cancel', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFFE97372),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: Image.asset('assets/images/trashcan.png', width: 20, height: 20, color: Colors.white),
+                      onPressed: () {
+                        setState(() {
+                          _exercises.removeAt(exerciseIndex);
+                        });
+                        Navigator.of(context).pop();
+                      },
+                      label: Text('Delete', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'AddExercise.dart';
+import '../WorkoutSession/WeightLiftingActive.dart';
 
 class StartWorkoutScreen extends StatelessWidget {
   const StartWorkoutScreen({Key? key}) : super(key: key);
@@ -128,13 +129,23 @@ class StartWorkoutScreen extends StatelessWidget {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
+                          onPressed: () async {
+                            final result = await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => CodiaPage(),
                               ),
                             );
+                            if (result != null && result is List<Exercise>) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => WeightLiftingActive(
+                                    selectedExercises: result,
+                                  ),
+                                ),
+                              );
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.black,

@@ -521,14 +521,10 @@ class _CodiaPage extends State<CodiaPage> {
                     ),
                     child: TextButton(
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => WeightLiftingActive(
-                              selectedExercises: _selectedIndices.map((i) => displayedExercises[i]).toList(),
-                            ),
-                          ),
-                        );
+                        final selectedExercises = _selectedIndices
+                            .map((i) => displayedExercises[i])
+                            .toList();
+                        Navigator.pop(context, selectedExercises);
                       },
                       child: Text(
                         'Add ${_selectedIndices.length} ${_selectedIndices.length == 1 ? 'exercise' : 'exercises'}',
